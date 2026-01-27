@@ -93,9 +93,73 @@
 
 .dashboard-middle h2 {
     margin-top: 0;
-    border-bottom: 1px solid var(--background-modifier-border);
     padding-bottom: 10px;
     margin-bottom: 20px;
+}
+
+/* Middle Column Tabs */
+.content-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--background-modifier-border);
+    margin-bottom: 20px;
+}
+
+.content-tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.content-tab:hover {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+
+.content-tab.is-active {
+    color: var(--text-normal);
+    border-bottom-color: var(--interactive-accent);
+}
+
+/* Task Item Styles */
+.task-item {
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    background-color: var(--background-secondary);
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.task-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.task-item-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.task-content {
+    font-size: 1em;
+    line-height: 1.4;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.task-checkbox {
+    margin-top: 3px;
+    pointer-events: none; /* Display only */
 }
 
 .file-item {

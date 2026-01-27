@@ -4,12 +4,14 @@ import IotoDashboardPlugin from "./main";
 export interface IotoDashboardSettings {
 	inputFolder: string;
 	outputFolder: string;
+	taskFolder: string;
 	outcomeFolder: string;
 }
 
 export const DEFAULT_SETTINGS: IotoDashboardSettings = {
 	inputFolder: "1-输入",
 	outputFolder: "2-输出",
+	taskFolder: "3-任务",
 	outcomeFolder: "4-成果",
 };
 
@@ -53,11 +55,24 @@ export class DashboardSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Outcome Folder")
-			.setDesc("Path to the Outcome folder (e.g. 3-Outcome)")
+			.setName("Task Folder")
+			.setDesc("Path to the Task folder (e.g. 3-Task)")
 			.addText((text) =>
 				text
-					.setPlaceholder("3-Outcome")
+					.setPlaceholder("3-Task")
+					.setValue(this.plugin.settings.taskFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.taskFolder = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Outcome Folder")
+			.setDesc("Path to the Outcome folder (e.g. 4-Outcome)")
+			.addText((text) =>
+				text
+					.setPlaceholder("4-Outcome")
 					.setValue(this.plugin.settings.outcomeFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.outcomeFolder = value;

@@ -6,6 +6,7 @@ import {
 	TFolder,
 	TextComponent,
 	DropdownComponent,
+	MarkdownView,
 } from "obsidian";
 import { DASHBOARD_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
@@ -20,15 +21,25 @@ interface FilterState {
 	dateEnd: string;
 }
 
+interface TaskItem {
+	file: TFile;
+	content: string;
+	status: string;
+	line: number;
+}
+
 export class DashboardView extends ItemView {
 	plugin: IotoDashboardPlugin;
 	activeCategory: Category = "Input";
+	activeTab: "Notes" | "Tasks" = "Notes";
 	leftPanelCollapsed = false;
 	rightPanelCollapsed = false;
 
 	// Data
 	files: TFile[] = [];
 	filteredFiles: TFile[] = [];
+	tasks: TaskItem[] = [];
+	filteredTasks: TaskItem[] = [];
 
 	// Filters
 	filters: FilterState = {
@@ -86,6 +97,7 @@ export class DashboardView extends ItemView {
 	}
 
 	async refreshFiles() {
+		// 1. Fetch Notes
 		let folderPath = "";
 		switch (this.activeCategory) {
 			case "Input":
@@ -101,15 +113,15 @@ export class DashboardView extends ItemView {
 
 		const folder = this.app.vault.getAbstractFileByPath(folderPath);
 		if (folder && folder instanceof TFolder) {
-			this.files = [];
-			WorkspaceLeaf;
-			// Recursive get files or just first level? Usually recursive for "folder notes" but let's assume flat or recursive.
-			// Let's use a helper to get all files in folder recursively
 			this.files = this.getAllFiles(folder);
 		} else {
 			this.files = [];
 		}
 
+		// 2. Fetch Tasks
+		await this.fetchTasks();
+
+		// 3. Apply Filters
 		this.applyFilters();
 	}
 
@@ -127,56 +139,152 @@ export class DashboardView extends ItemView {
 		return files;
 	}
 
-	applyFilters() {
-		this.filteredFiles = this.files.filter((file) => {
-			// 1. Name Filter
-			if (
-				this.filters.name &&
-				!file.basename
-					.toLowerCase()
-					.includes(this.filters.name.toLowerCase())
-			) {
-				return false;
-			}
+	async fetchTasks() {
+		this.tasks = [];
+		const taskFolderPath = this.plugin.settings.taskFolder;
+		const taskFolder = this.app.vault.getAbstractFileByPath(taskFolderPath);
 
-			// 2. Project Filter
-			if (this.filters.project) {
-				const cache = this.app.metadataCache.getFileCache(file);
-				const project = cache?.frontmatter?.["Project"];
-				if (
-					!project ||
-					!String(project)
-						.toLowerCase()
-						.includes(this.filters.project.toLowerCase())
-				) {
-					return false;
+		if (!taskFolder || !(taskFolder instanceof TFolder)) {
+			return;
+		}
+
+		const files = this.getAllFiles(taskFolder);
+		const targetHeader = this.getTargetHeader(this.activeCategory);
+
+		for (const file of files) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			if (!cache || !cache.headings) continue;
+
+			const headings = cache.headings;
+
+			console.dir(headings);
+			console.dir(targetHeader);
+
+			// Find the target header
+			const headingIndex = headings.findIndex(
+				(h) => h.heading === targetHeader,
+			);
+			console.dir(headingIndex);
+			if (headingIndex === -1) continue;
+
+			const targetHeading = headings[headingIndex];
+			if (!targetHeading) continue;
+
+			const startLine = targetHeading.position.start.line;
+
+			// Find end line
+			let endLine = Infinity;
+			for (let i = headingIndex + 1; i < headings.length; i++) {
+				const h = headings[i];
+				if (!h) continue;
+				if (h.level <= targetHeading.level) {
+					endLine = h.position.start.line;
+					break;
 				}
 			}
 
-			// 3. Date Filter
-			const dateValue =
-				this.filters.dateType === "created"
-					? file.stat.ctime
-					: file.stat.mtime;
-			const date = new Date(dateValue);
+			// Get list items in range
+			if (!cache.listItems) continue;
+			const relevantItems = cache.listItems.filter(
+				(item) =>
+					item.position.start.line > startLine &&
+					item.position.start.line < endLine &&
+					item.task !== undefined,
+			);
 
-			if (this.filters.dateStart) {
-				const startDate = new Date(this.filters.dateStart);
-				if (date < startDate) return false;
+			if (relevantItems.length > 0) {
+				// Read file content
+				const content = await this.app.vault.read(file);
+				const lines = content.split("\n");
+
+				for (const item of relevantItems) {
+					let text = lines[item.position.start.line];
+					if (text === undefined) continue;
+
+					// Strip checkbox pattern like "- [ ] " or "* [x] "
+					text = text.replace(/^(\s*)[-*+]\s*\[.\]\s*/, "");
+
+					this.tasks.push({
+						file: file,
+						content: text,
+						status: item.task!,
+						line: item.position.start.line,
+					});
+				}
 			}
+		}
+	}
 
-			if (this.filters.dateEnd) {
-				const endDate = new Date(this.filters.dateEnd);
-				// Set end date to end of day
-				endDate.setHours(23, 59, 59, 999);
-				if (date > endDate) return false;
-			}
+	getTargetHeader(category: Category): string {
+		switch (category) {
+			case "Input":
+				return "输入 LEARN";
+			case "Output":
+				return "输出 THINK";
+			case "Outcome":
+				return "成果 DO";
+		}
+	}
 
-			return true;
+	applyFilters() {
+		// Filter Files
+		this.filteredFiles = this.files.filter((file) => {
+			return this.matchesFilter(file, file.basename);
 		});
-
-		// Sort by date descending (newest first) by default
 		this.filteredFiles.sort((a, b) => b.stat.ctime - a.stat.ctime);
+
+		// Filter Tasks
+		this.filteredTasks = this.tasks.filter((task) => {
+			return this.matchesFilter(task.file, task.content);
+		});
+		// Sort tasks? Maybe by file creation date?
+		this.filteredTasks.sort(
+			(a, b) => b.file.stat.ctime - a.file.stat.ctime,
+		);
+	}
+
+	matchesFilter(file: TFile, textContent: string): boolean {
+		// 1. Name Filter (applies to File Name or Task Content)
+		if (
+			this.filters.name &&
+			!textContent.toLowerCase().includes(this.filters.name.toLowerCase())
+		) {
+			return false;
+		}
+
+		// 2. Project Filter
+		if (this.filters.project) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const project = cache?.frontmatter?.["Project"];
+			if (
+				!project ||
+				!String(project)
+					.toLowerCase()
+					.includes(this.filters.project.toLowerCase())
+			) {
+				return false;
+			}
+		}
+
+		// 3. Date Filter
+		const dateValue =
+			this.filters.dateType === "created"
+				? file.stat.ctime
+				: file.stat.mtime;
+		const date = new Date(dateValue);
+
+		if (this.filters.dateStart) {
+			const startDate = new Date(this.filters.dateStart);
+			if (date < startDate) return false;
+		}
+
+		if (this.filters.dateEnd) {
+			const endDate = new Date(this.filters.dateEnd);
+			endDate.setHours(23, 59, 59, 999);
+			if (date > endDate) return false;
+		}
+
+		return true;
 	}
 
 	renderLeftColumn(container: HTMLElement) {
@@ -219,7 +327,6 @@ export class DashboardView extends ItemView {
 					.forEach((el) => el.removeClass("is-active"));
 				li.addClass("is-active");
 
-				// Clear filters on category switch? Maybe keep them. Let's keep them for now.
 				await this.refreshFiles();
 				this.renderMiddleColumn();
 				this.renderRightColumn();
@@ -234,20 +341,51 @@ export class DashboardView extends ItemView {
 		const header = this.middleContainer.createDiv({
 			cls: "content-header",
 		});
+
+		const count =
+			this.activeTab === "Notes"
+				? this.filteredFiles.length
+				: this.filteredTasks.length;
+
 		header.createEl("h2", {
-			text: `${this.activeCategory} (${this.filteredFiles.length})`,
+			text: `${this.activeCategory} (${count})`,
 		});
+
+		// Tabs
+		const tabs = this.middleContainer.createDiv({ cls: "content-tabs" });
+		const notesTab = tabs.createDiv({ cls: "content-tab", text: "笔记" });
+		const tasksTab = tabs.createDiv({ cls: "content-tab", text: "任务" });
+
+		if (this.activeTab === "Notes") notesTab.addClass("is-active");
+		else tasksTab.addClass("is-active");
+
+		notesTab.onclick = () => {
+			this.activeTab = "Notes";
+			this.renderMiddleColumn();
+		};
+		tasksTab.onclick = () => {
+			this.activeTab = "Tasks";
+			this.renderMiddleColumn();
+		};
 
 		// List
 		const list = this.middleContainer.createDiv({ cls: "file-list" });
 
+		if (this.activeTab === "Notes") {
+			this.renderNoteList(list);
+		} else {
+			this.renderTaskList(list);
+		}
+	}
+
+	renderNoteList(container: HTMLElement) {
 		if (this.filteredFiles.length === 0) {
-			list.createEl("p", { text: "No files found." });
+			container.createEl("p", { text: "No notes found." });
 			return;
 		}
 
 		this.filteredFiles.forEach((file) => {
-			const item = list.createDiv({ cls: "file-item" });
+			const item = container.createDiv({ cls: "file-item" });
 			item.createEl("h4", { text: file.basename });
 
 			const meta = item.createDiv({ cls: "file-meta" });
@@ -270,6 +408,38 @@ export class DashboardView extends ItemView {
 		});
 	}
 
+	renderTaskList(container: HTMLElement) {
+		if (this.filteredTasks.length === 0) {
+			container.createEl("p", { text: "No tasks found." });
+			return;
+		}
+
+		this.filteredTasks.forEach((task) => {
+			const item = container.createDiv({ cls: "task-item" });
+
+			const header = item.createDiv({ cls: "task-item-header" });
+			header.createEl("span", { text: task.file.basename });
+			const date = new Date(task.file.stat.ctime).toLocaleDateString();
+			header.createEl("span", { text: date });
+
+			const content = item.createDiv({ cls: "task-content" });
+			const checkbox = content.createEl("input", {
+				type: "checkbox",
+				cls: "task-checkbox",
+			});
+			checkbox.checked = task.status !== " ";
+
+			content.createEl("span", { text: task.content });
+
+			item.onclick = (e) => {
+				// Prevent triggering if clicking checkbox directly (though it's pointer-events: none currently)
+				this.app.workspace.getLeaf(false).openFile(task.file, {
+					eState: { line: task.line },
+				});
+			};
+		});
+	}
+
 	renderRightColumn() {
 		this.rightContainer.empty();
 		this.rightContainer.createEl("h3", { text: "Filters" });
@@ -278,7 +448,9 @@ export class DashboardView extends ItemView {
 
 		// Name Filter
 		const nameDiv = form.createDiv({ cls: "filter-item" });
-		nameDiv.createEl("label", { text: "Note Name" });
+		nameDiv.createEl("label", {
+			text: this.activeTab === "Notes" ? "Note Name" : "Task Content",
+		});
 		new TextComponent(nameDiv)
 			.setValue(this.filters.name)
 			.setPlaceholder("Search...")
@@ -348,7 +520,7 @@ export class DashboardView extends ItemView {
 			};
 			this.applyFilters();
 			this.renderMiddleColumn();
-			this.renderRightColumn(); // Re-render to clear inputs
+			this.renderRightColumn();
 		};
 	}
 }
