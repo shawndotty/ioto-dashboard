@@ -141,6 +141,19 @@ export class DashboardView extends ItemView {
 		return files;
 	}
 
+	getAllProjects(): string[] {
+		const projects = new Set<string>();
+		const files = this.app.vault.getMarkdownFiles();
+		for (const file of files) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const project = cache?.frontmatter?.["Project"];
+			if (project) {
+				projects.add(String(project));
+			}
+		}
+		return Array.from(projects).sort();
+	}
+
 	async fetchTasks() {
 		this.tasks = [];
 		const taskFolderPath = this.plugin.settings.taskFolder;
@@ -494,7 +507,17 @@ export class DashboardView extends ItemView {
 		// Project Filter
 		const projectDiv = form.createDiv({ cls: "filter-item" });
 		projectDiv.createEl("label", { text: "Project" });
-		new TextComponent(projectDiv)
+
+		const allProjects = this.getAllProjects();
+		const dataListId = "project-list-" + Date.now();
+		const dataList = projectDiv.createEl("datalist", {
+			attr: { id: dataListId },
+		});
+		allProjects.forEach((p) => {
+			dataList.createEl("option", { attr: { value: p } });
+		});
+
+		const projectInput = new TextComponent(projectDiv)
 			.setValue(this.filters.project)
 			.setPlaceholder("Project name...")
 			.onChange((val) => {
@@ -502,6 +525,7 @@ export class DashboardView extends ItemView {
 				this.applyFilters();
 				this.renderMiddleColumn();
 			});
+		projectInput.inputEl.setAttribute("list", dataListId);
 
 		// Date Type
 		const dateTypeDiv = form.createDiv({ cls: "filter-item" });
