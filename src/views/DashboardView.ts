@@ -9,6 +9,7 @@ import {
 	MarkdownView,
 	Menu,
 	Notice,
+	MarkdownRenderer,
 } from "obsidian";
 import { DASHBOARD_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
@@ -608,16 +609,38 @@ export class DashboardView extends ItemView {
 				await this.toggleTaskStatus(task);
 			};
 
-			content.createEl("span", { text: task.content });
+			const textSpan = content.createEl("span", {
+				cls: "task-markdown-content",
+			});
+			MarkdownRenderer.render(
+				this.app,
+				task.content,
+				textSpan,
+				task.file.path,
+				this,
+			).then(() => {
+				// Remove paragraph margins to keep it inline-like
+				const p = textSpan.querySelector("p");
+				if (p) {
+					p.style.margin = "0";
+					p.style.display = "inline";
+				}
+			});
 
 			item.onclick = (e) => {
+				const target = e.target as HTMLElement;
 				// Prevent triggering if clicking checkbox directly
 				if (
-					e.target instanceof HTMLInputElement &&
-					e.target.type === "checkbox"
+					target instanceof HTMLInputElement &&
+					target.type === "checkbox"
 				) {
 					return;
 				}
+				// Prevent triggering if clicking a link (internal or external)
+				if (target.tagName === "A" || target.closest("a")) {
+					return;
+				}
+
 				this.app.workspace.getLeaf(false).openFile(task.file, {
 					eState: { line: task.line },
 				});
