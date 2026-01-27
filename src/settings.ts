@@ -8,9 +8,9 @@ export interface IotoDashboardSettings {
 }
 
 export const DEFAULT_SETTINGS: IotoDashboardSettings = {
-	inputFolder: "1-Input",
-	outputFolder: "2-Output",
-	outcomeFolder: "3-Outcome",
+	inputFolder: "1-输入",
+	outputFolder: "2-输出",
+	outcomeFolder: "4-成果",
 };
 
 export class DashboardSettingTab extends PluginSettingTab {
