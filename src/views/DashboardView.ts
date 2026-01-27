@@ -10,6 +10,7 @@ import {
 } from "obsidian";
 import { DASHBOARD_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
+import { t } from "../lang/helpers";
 
 type Category = "Input" | "Output" | "Outcome";
 
@@ -66,7 +67,7 @@ export class DashboardView extends ItemView {
 	}
 
 	getDisplayText() {
-		return "IOTO Dashboard";
+		return t("DASHBOARD_TITLE");
 	}
 
 	getIcon() {
@@ -318,7 +319,7 @@ export class DashboardView extends ItemView {
 
 		const header = container.createDiv({ cls: "nav-header" });
 		if (!this.leftPanelCollapsed) {
-			header.createEl("h3", { text: "Navigation" });
+			header.createEl("h3", { text: t("NAV_TITLE") });
 		}
 
 		const toggle = header.createEl("button", { cls: "nav-toggle" });
@@ -340,8 +341,13 @@ export class DashboardView extends ItemView {
 		const list = container.createEl("ul", { cls: "nav-list" });
 
 		navItems.forEach((item) => {
+			let label = "";
+			if (item === "Input") label = t("NAV_INPUT");
+			else if (item === "Output") label = t("NAV_OUTPUT");
+			else if (item === "Outcome") label = t("NAV_OUTCOME");
+
 			const li = list.createEl("li", {
-				text: this.leftPanelCollapsed ? item.charAt(0) : item,
+				text: this.leftPanelCollapsed ? label.charAt(0) : label,
 				cls: "nav-item",
 			});
 			if (item === this.activeCategory) li.addClass("is-active");
@@ -379,8 +385,14 @@ export class DashboardView extends ItemView {
 
 		// Tabs
 		const tabs = this.middleContainer.createDiv({ cls: "content-tabs" });
-		const notesTab = tabs.createDiv({ cls: "content-tab", text: "笔记" });
-		const tasksTab = tabs.createDiv({ cls: "content-tab", text: "任务" });
+		const notesTab = tabs.createDiv({
+			cls: "content-tab",
+			text: t("TAB_NOTES"),
+		});
+		const tasksTab = tabs.createDiv({
+			cls: "content-tab",
+			text: t("TAB_TASKS"),
+		});
 
 		if (this.activeTab === "Notes") notesTab.addClass("is-active");
 		else tasksTab.addClass("is-active");
@@ -408,7 +420,7 @@ export class DashboardView extends ItemView {
 
 	renderNoteList(container: HTMLElement) {
 		if (this.filteredFiles.length === 0) {
-			container.createEl("p", { text: "No notes found." });
+			container.createEl("p", { text: t("NO_NOTES_FOUND") });
 			return;
 		}
 
@@ -438,7 +450,7 @@ export class DashboardView extends ItemView {
 
 	renderTaskList(container: HTMLElement) {
 		if (this.filteredTasks.length === 0) {
-			container.createEl("p", { text: "No tasks found." });
+			container.createEl("p", { text: t("NO_TASKS_FOUND") });
 			return;
 		}
 
@@ -470,18 +482,21 @@ export class DashboardView extends ItemView {
 
 	renderRightColumn() {
 		this.rightContainer.empty();
-		this.rightContainer.createEl("h3", { text: "Filters" });
+		this.rightContainer.createEl("h3", { text: t("FILTER_TITLE") });
 
 		const form = this.rightContainer.createDiv({ cls: "filter-form" });
 
 		// Name Filter
 		const nameDiv = form.createDiv({ cls: "filter-item" });
 		nameDiv.createEl("label", {
-			text: this.activeTab === "Notes" ? "Note Name" : "Task Content",
+			text:
+				this.activeTab === "Notes"
+					? t("FILTER_NAME_LABEL_NOTES")
+					: t("FILTER_NAME_LABEL_TASKS"),
 		});
 		new TextComponent(nameDiv)
 			.setValue(this.filters.name)
-			.setPlaceholder("Search...")
+			.setPlaceholder(t("FILTER_NAME_PLACEHOLDER"))
 			.onChange((val) => {
 				this.filters.name = val;
 				this.applyFilters();
@@ -491,11 +506,11 @@ export class DashboardView extends ItemView {
 		// Status Filter (Only for Tasks)
 		if (this.activeTab === "Tasks") {
 			const statusDiv = form.createDiv({ cls: "filter-item" });
-			statusDiv.createEl("label", { text: "Status" });
+			statusDiv.createEl("label", { text: t("FILTER_STATUS_LABEL") });
 			new DropdownComponent(statusDiv)
-				.addOption("all", "All")
-				.addOption("completed", "Completed")
-				.addOption("incomplete", "Incomplete")
+				.addOption("all", t("FILTER_STATUS_ALL"))
+				.addOption("completed", t("FILTER_STATUS_COMPLETED"))
+				.addOption("incomplete", t("FILTER_STATUS_INCOMPLETE"))
 				.setValue(this.filters.status)
 				.onChange((val: "all" | "completed" | "incomplete") => {
 					this.filters.status = val;
@@ -506,7 +521,7 @@ export class DashboardView extends ItemView {
 
 		// Project Filter
 		const projectDiv = form.createDiv({ cls: "filter-item" });
-		projectDiv.createEl("label", { text: "Project" });
+		projectDiv.createEl("label", { text: t("FILTER_PROJECT_LABEL") });
 
 		const allProjects = this.getAllProjects();
 		const dataListId = "project-list-" + Date.now();
@@ -519,7 +534,7 @@ export class DashboardView extends ItemView {
 
 		const projectInput = new TextComponent(projectDiv)
 			.setValue(this.filters.project)
-			.setPlaceholder("Project name...")
+			.setPlaceholder(t("FILTER_PROJECT_PLACEHOLDER"))
 			.onChange((val) => {
 				this.filters.project = val;
 				this.applyFilters();
@@ -529,10 +544,10 @@ export class DashboardView extends ItemView {
 
 		// Date Type
 		const dateTypeDiv = form.createDiv({ cls: "filter-item" });
-		dateTypeDiv.createEl("label", { text: "Date Type" });
+		dateTypeDiv.createEl("label", { text: t("FILTER_DATE_TYPE_LABEL") });
 		new DropdownComponent(dateTypeDiv)
-			.addOption("created", "Created")
-			.addOption("modified", "Modified")
+			.addOption("created", t("FILTER_DATE_TYPE_CREATED"))
+			.addOption("modified", t("FILTER_DATE_TYPE_MODIFIED"))
 			.setValue(this.filters.dateType)
 			.onChange((val: "created" | "modified") => {
 				this.filters.dateType = val;
@@ -542,7 +557,7 @@ export class DashboardView extends ItemView {
 
 		// Date Start
 		const dateStartDiv = form.createDiv({ cls: "filter-item" });
-		dateStartDiv.createEl("label", { text: "From Date" });
+		dateStartDiv.createEl("label", { text: t("FILTER_DATE_START_LABEL") });
 		const dateStartInput = dateStartDiv.createEl("input", { type: "date" });
 		dateStartInput.value = this.filters.dateStart;
 		dateStartInput.onchange = (e) => {
@@ -553,7 +568,7 @@ export class DashboardView extends ItemView {
 
 		// Date End
 		const dateEndDiv = form.createDiv({ cls: "filter-item" });
-		dateEndDiv.createEl("label", { text: "To Date" });
+		dateEndDiv.createEl("label", { text: t("FILTER_DATE_END_LABEL") });
 		const dateEndInput = dateEndDiv.createEl("input", { type: "date" });
 		dateEndInput.value = this.filters.dateEnd;
 		dateEndInput.onchange = (e) => {
@@ -564,7 +579,9 @@ export class DashboardView extends ItemView {
 
 		// Reset Button
 		const btnDiv = form.createDiv({ cls: "filter-actions" });
-		const resetBtn = btnDiv.createEl("button", { text: "Reset Filters" });
+		const resetBtn = btnDiv.createEl("button", {
+			text: t("FILTER_RESET_BTN"),
+		});
 		resetBtn.onclick = () => {
 			this.filters = {
 				name: "",

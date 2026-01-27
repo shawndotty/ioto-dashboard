@@ -1,6 +1,7 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
 import { DashboardView } from "./views/DashboardView";
 import { DASHBOARD_VIEW_TYPE } from "./models/constants";
+import { t } from "./lang/helpers";
 import {
 	DEFAULT_SETTINGS,
 	IotoDashboardSettings,
@@ -22,7 +23,7 @@ export default class IotoDashboardPlugin extends Plugin {
 		// Ribbon Icon
 		this.addRibbonIcon(
 			"layout-dashboard",
-			"Open IOTO Dashboard",
+			t("RIBBON_ICON_TITLE"),
 			(evt: MouseEvent) => {
 				this.activateView();
 			},
@@ -31,7 +32,7 @@ export default class IotoDashboardPlugin extends Plugin {
 		// Command
 		this.addCommand({
 			id: "open-ioto-dashboard",
-			name: "Open Dashboard",
+			name: t("COMMAND_OPEN_DASHBOARD"),
 			callback: () => {
 				this.activateView();
 			},

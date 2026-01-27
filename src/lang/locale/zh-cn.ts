@@ -1,0 +1,47 @@
+export default {
+	// Dashboard
+	DASHBOARD_TITLE: "IOTO 仪表盘",
+	NAV_INPUT: "输入 Input",
+	NAV_OUTPUT: "输出 Output",
+	NAV_OUTCOME: "成果 Outcome",
+	NAV_TITLE: "导航",
+	TAB_NOTES: "笔记",
+	TAB_TASKS: "任务",
+
+	// Filters
+	FILTER_TITLE: "过滤",
+	FILTER_NAME_LABEL_NOTES: "笔记名称",
+	FILTER_NAME_LABEL_TASKS: "任务内容",
+	FILTER_NAME_PLACEHOLDER: "搜索...",
+	FILTER_PROJECT_LABEL: "项目",
+	FILTER_PROJECT_PLACEHOLDER: "项目名称...",
+	FILTER_DATE_TYPE_LABEL: "日期类型",
+	FILTER_DATE_TYPE_CREATED: "创建时间",
+	FILTER_DATE_TYPE_MODIFIED: "修改时间",
+	FILTER_DATE_START_LABEL: "开始日期",
+	FILTER_DATE_END_LABEL: "结束日期",
+	FILTER_STATUS_LABEL: "状态",
+	FILTER_STATUS_ALL: "全部",
+	FILTER_STATUS_COMPLETED: "已完成",
+	FILTER_STATUS_INCOMPLETE: "未完成",
+	FILTER_RESET_BTN: "重置过滤",
+
+	// Empty States
+	NO_NOTES_FOUND: "没有找到笔记。",
+	NO_TASKS_FOUND: "没有找到任务。",
+
+	// Settings
+	SETTINGS_INPUT_FOLDER_NAME: "输入文件夹",
+	SETTINGS_INPUT_FOLDER_DESC: "输入 (Input) 文件夹的路径 (例如: 1-Input)",
+	SETTINGS_OUTPUT_FOLDER_NAME: "输出文件夹",
+	SETTINGS_OUTPUT_FOLDER_DESC: "输出 (Output) 文件夹的路径 (例如: 2-Output)",
+	SETTINGS_OUTCOME_FOLDER_NAME: "成果文件夹",
+	SETTINGS_OUTCOME_FOLDER_DESC:
+		"成果 (Outcome) 文件夹的路径 (例如: 4-Outcome)",
+	SETTINGS_TASK_FOLDER_NAME: "任务文件夹",
+	SETTINGS_TASK_FOLDER_DESC: "任务 (Task) 文件夹的路径 (例如: 3-Task)",
+
+	// Commands & Ribbon
+	RIBBON_ICON_TITLE: "打开 IOTO 仪表盘",
+	COMMAND_OPEN_DASHBOARD: "打开仪表盘",
+};

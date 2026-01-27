@@ -1,0 +1,47 @@
+export default {
+	// Dashboard
+	DASHBOARD_TITLE: "IOTO 儀表板",
+	NAV_INPUT: "輸入 Input",
+	NAV_OUTPUT: "輸出 Output",
+	NAV_OUTCOME: "成果 Outcome",
+	NAV_TITLE: "導航",
+	TAB_NOTES: "筆記",
+	TAB_TASKS: "任務",
+
+	// Filters
+	FILTER_TITLE: "過濾",
+	FILTER_NAME_LABEL_NOTES: "筆記名稱",
+	FILTER_NAME_LABEL_TASKS: "任務內容",
+	FILTER_NAME_PLACEHOLDER: "搜尋...",
+	FILTER_PROJECT_LABEL: "專案",
+	FILTER_PROJECT_PLACEHOLDER: "專案名稱...",
+	FILTER_DATE_TYPE_LABEL: "日期類型",
+	FILTER_DATE_TYPE_CREATED: "建立時間",
+	FILTER_DATE_TYPE_MODIFIED: "修改時間",
+	FILTER_DATE_START_LABEL: "開始日期",
+	FILTER_DATE_END_LABEL: "結束日期",
+	FILTER_STATUS_LABEL: "狀態",
+	FILTER_STATUS_ALL: "全部",
+	FILTER_STATUS_COMPLETED: "已完成",
+	FILTER_STATUS_INCOMPLETE: "未完成",
+	FILTER_RESET_BTN: "重置過濾",
+
+	// Empty States
+	NO_NOTES_FOUND: "沒有找到筆記。",
+	NO_TASKS_FOUND: "沒有找到任務。",
+
+	// Settings
+	SETTINGS_INPUT_FOLDER_NAME: "輸入資料夾",
+	SETTINGS_INPUT_FOLDER_DESC: "輸入 (Input) 資料夾的路徑 (例如: 1-Input)",
+	SETTINGS_OUTPUT_FOLDER_NAME: "輸出資料夾",
+	SETTINGS_OUTPUT_FOLDER_DESC: "輸出 (Output) 資料夾的路徑 (例如: 2-Output)",
+	SETTINGS_OUTCOME_FOLDER_NAME: "成果資料夾",
+	SETTINGS_OUTCOME_FOLDER_DESC:
+		"成果 (Outcome) 資料夾的路徑 (例如: 4-Outcome)",
+	SETTINGS_TASK_FOLDER_NAME: "任務資料夾",
+	SETTINGS_TASK_FOLDER_DESC: "任務 (Task) 資料夾的路徑 (例如: 3-Task)",
+
+	// Commands & Ribbon
+	RIBBON_ICON_TITLE: "開啟 IOTO 儀表板",
+	COMMAND_OPEN_DASHBOARD: "開啟儀表板",
+};

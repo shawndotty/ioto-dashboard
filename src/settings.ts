@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import IotoDashboardPlugin from "./main";
+import { t } from "./lang/helpers";
 
 export interface IotoDashboardSettings {
 	inputFolder: string;
@@ -29,8 +30,8 @@ export class DashboardSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName("Input Folder")
-			.setDesc("Path to the Input folder (e.g. 1-Input)")
+			.setName(t("SETTINGS_INPUT_FOLDER_NAME"))
+			.setDesc(t("SETTINGS_INPUT_FOLDER_DESC"))
 			.addText((text) =>
 				text
 					.setPlaceholder("1-Input")
@@ -42,8 +43,8 @@ export class DashboardSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Output Folder")
-			.setDesc("Path to the Output folder (e.g. 2-Output)")
+			.setName(t("SETTINGS_OUTPUT_FOLDER_NAME"))
+			.setDesc(t("SETTINGS_OUTPUT_FOLDER_DESC"))
 			.addText((text) =>
 				text
 					.setPlaceholder("2-Output")
@@ -55,8 +56,8 @@ export class DashboardSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Task Folder")
-			.setDesc("Path to the Task folder (e.g. 3-Task)")
+			.setName(t("SETTINGS_TASK_FOLDER_NAME"))
+			.setDesc(t("SETTINGS_TASK_FOLDER_DESC"))
 			.addText((text) =>
 				text
 					.setPlaceholder("3-Task")
@@ -68,8 +69,8 @@ export class DashboardSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Outcome Folder")
-			.setDesc("Path to the Outcome folder (e.g. 4-Outcome)")
+			.setName(t("SETTINGS_OUTCOME_FOLDER_NAME"))
+			.setDesc(t("SETTINGS_OUTCOME_FOLDER_DESC"))
 			.addText((text) =>
 				text
 					.setPlaceholder("4-Outcome")
