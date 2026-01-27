@@ -220,6 +220,8 @@ export class DashboardView extends ItemView {
 					// Strip checkbox pattern like "- [ ] " or "* [x] "
 					text = text.replace(/^(\s*)[-*+]\s*\[.\]\s*/, "");
 
+					if (!text.trim()) continue;
+
 					this.tasks.push({
 						file: file,
 						content: text,
