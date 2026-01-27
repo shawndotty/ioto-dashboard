@@ -625,6 +625,46 @@ export class DashboardView extends ItemView {
 					p.style.margin = "0";
 					p.style.display = "inline";
 				}
+
+				// Handle internal links (preview and navigation)
+				const internalLinks =
+					textSpan.querySelectorAll("a.internal-link");
+				internalLinks.forEach((link) => {
+					// Hover preview
+					link.addEventListener("mouseenter", (e) => {
+						this.app.workspace.trigger("hover-link", {
+							event: e,
+							source: DASHBOARD_VIEW_TYPE,
+							hoverParent: textSpan,
+							targetEl: link,
+							linktext: link.getAttribute("data-href"),
+							sourcePath: task.file.path,
+						});
+					});
+
+					// Click navigation
+					link.addEventListener("click", (e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						const href = link.getAttribute("data-href");
+						if (href) {
+							this.app.workspace.openLinkText(
+								href,
+								task.file.path,
+								false, // open in same tab? or true for new tab? usually false for clicking link
+							);
+						}
+					});
+				});
+
+				// Handle external links (stop propagation to avoid opening task file)
+				const externalLinks =
+					textSpan.querySelectorAll("a.external-link");
+				externalLinks.forEach((link) => {
+					link.addEventListener("click", (e) => {
+						e.stopPropagation();
+					});
+				});
 			});
 
 			item.onclick = (e) => {
