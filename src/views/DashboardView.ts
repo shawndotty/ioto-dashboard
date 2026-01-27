@@ -550,6 +550,17 @@ export class DashboardView extends ItemView {
 			const item = container.createDiv({ cls: "file-item" });
 			item.createEl("h4", { text: file.basename });
 
+			item.addEventListener("mouseenter", (e) => {
+				this.app.workspace.trigger("hover-link", {
+					event: e,
+					source: DASHBOARD_VIEW_TYPE,
+					hoverParent: item,
+					targetEl: item,
+					linktext: file.path,
+					sourcePath: file.path,
+				});
+			});
+
 			const meta = item.createDiv({ cls: "file-meta" });
 			const cache = this.app.metadataCache.getFileCache(file);
 			const project = cache?.frontmatter?.["Project"];
