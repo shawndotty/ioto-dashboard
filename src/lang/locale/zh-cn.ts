@@ -11,8 +11,11 @@ export default {
 	// Saved Queries
 	NAV_USER_QUERIES: "用户查询",
 	BTN_SAVE_QUERY: "保存当前查询",
-	BTN_DELETE_QUERY: "删除查询",
+	BTN_UPDATE_QUERY: "更新当前查询",
 	BTN_EDIT_QUERY: "重命名查询",
+	BTN_DELETE_QUERY: "删除查询",
+	BTN_CANCEL: "取消",
+	BTN_CONFIRM: "确认",
 	MODAL_SAVE_TITLE: "保存查询",
 	MODAL_SAVE_NAME_LABEL: "查询名称",
 	MODAL_SAVE_PLACEHOLDER: "输入名称...",

@@ -11,8 +11,11 @@ export default {
 	// Saved Queries
 	NAV_USER_QUERIES: "Saved Queries",
 	BTN_SAVE_QUERY: "Save Current Query",
-	BTN_DELETE_QUERY: "Delete Query",
+	BTN_UPDATE_QUERY: "Update Current Query",
 	BTN_EDIT_QUERY: "Rename Query",
+	BTN_DELETE_QUERY: "Delete Query",
+	BTN_CANCEL: "Cancel",
+	BTN_CONFIRM: "Confirm",
 	MODAL_SAVE_TITLE: "Save Query",
 	MODAL_SAVE_NAME_LABEL: "Query Name",
 	MODAL_SAVE_PLACEHOLDER: "Enter name...",

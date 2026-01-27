@@ -11,8 +11,11 @@ export default {
 	// Saved Queries
 	NAV_USER_QUERIES: "使用者查詢",
 	BTN_SAVE_QUERY: "儲存目前查詢",
-	BTN_DELETE_QUERY: "刪除查詢",
+	BTN_UPDATE_QUERY: "更新目前查詢",
 	BTN_EDIT_QUERY: "重新命名查詢",
+	BTN_DELETE_QUERY: "刪除查詢",
+	BTN_CANCEL: "取消",
+	BTN_CONFIRM: "確認",
 	MODAL_SAVE_TITLE: "儲存查詢",
 	MODAL_SAVE_NAME_LABEL: "查詢名稱",
 	MODAL_SAVE_PLACEHOLDER: "輸入名稱...",

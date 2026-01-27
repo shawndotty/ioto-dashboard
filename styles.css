@@ -153,8 +153,9 @@
     font-size: 1em;
     line-height: 1.4;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 8px;
+    align-content: center;
 }
 
 .task-checkbox {

@@ -14,6 +14,7 @@ import { DASHBOARD_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { SaveQueryModal } from "../ui/SaveQueryModal";
+import { ConfirmModal } from "../ui/ConfirmModal";
 import { SavedQuery } from "../settings";
 
 type Category = "Input" | "Output" | "Outcome";
@@ -355,20 +356,20 @@ export class DashboardView extends ItemView {
 			header.createEl("h3", { text: t("NAV_TITLE") });
 		}
 
-		const toggle = header.createEl("button", { cls: "nav-toggle" });
-		setIcon(
-			toggle,
-			this.leftPanelCollapsed ? "chevrons-right" : "chevrons-left",
-		);
-		toggle.onclick = () => {
-			this.leftPanelCollapsed = !this.leftPanelCollapsed;
-			const grid = container.closest(".dashboard-grid");
-			if (grid) {
-				if (this.leftPanelCollapsed) grid.addClass("usages-collapsed");
-				else grid.removeClass("usages-collapsed");
-			}
-			this.renderLeftColumn(container);
-		};
+		// const toggle = header.createEl("button", { cls: "nav-toggle" });
+		// setIcon(
+		// 	toggle,
+		// 	this.leftPanelCollapsed ? "chevrons-right" : "chevrons-left",
+		// );
+		// toggle.onclick = () => {
+		// 	this.leftPanelCollapsed = !this.leftPanelCollapsed;
+		// 	const grid = container.closest(".dashboard-grid");
+		// 	if (grid) {
+		// 		if (this.leftPanelCollapsed) grid.addClass("usages-collapsed");
+		// 		else grid.removeClass("usages-collapsed");
+		// 	}
+		// 	this.renderLeftColumn(container);
+		// };
 
 		const navItems: Category[] = ["Input", "Output", "Outcome"];
 		const list = container.createEl("ul", { cls: "nav-list" });
@@ -383,7 +384,8 @@ export class DashboardView extends ItemView {
 				text: this.leftPanelCollapsed ? label.charAt(0) : label,
 				cls: "nav-item",
 			});
-			if (item === this.activeCategory) li.addClass("is-active");
+			if (item === this.activeCategory && !this.activeQueryId)
+				li.addClass("is-active");
 
 			li.onclick = async () => {
 				this.activeCategory = item;
@@ -454,15 +456,54 @@ export class DashboardView extends ItemView {
 		const header = this.middleContainer.createDiv({
 			cls: "content-header",
 		});
+		header.style.display = "flex";
+		header.style.justifyContent = "space-between";
+		header.style.alignItems = "center";
 
 		const count =
 			this.activeTab === "Notes"
 				? this.filteredFiles.length
 				: this.filteredTasks.length;
 
-		header.createEl("h2", {
+		const title = header.createEl("h2", {
 			text: `${this.activeCategory} (${count})`,
+			cls: "view-header-title",
 		});
+		title.style.margin = "0";
+
+		// Query Actions
+		if (this.activeQueryId) {
+			const actionsDiv = header.createDiv({ cls: "header-actions" });
+			actionsDiv.style.display = "flex";
+			actionsDiv.style.alignItems = "center";
+			actionsDiv.style.paddingBottom = "10px";
+
+			const editBtn = actionsDiv.createEl("button", {
+				cls: "clickable-icon",
+			});
+			setIcon(editBtn, "pencil");
+			editBtn.setAttribute("aria-label", t("BTN_EDIT_QUERY"));
+			editBtn.onclick = () => {
+				this.renameSavedQuery(this.activeQueryId!);
+			};
+
+			const deleteBtn = actionsDiv.createEl("button", {
+				cls: "clickable-icon",
+			});
+			setIcon(deleteBtn, "trash");
+			deleteBtn.setAttribute("aria-label", t("BTN_DELETE_QUERY"));
+			deleteBtn.style.marginLeft = "8px";
+			deleteBtn.onclick = () => {
+				new ConfirmModal(
+					this.app,
+					t("CONFIRM_DELETE_TITLE"),
+					t("CONFIRM_DELETE_MSG"),
+					async () => {
+						await this.deleteSavedQuery(this.activeQueryId!);
+					},
+				).open();
+			};
+		}
 
 		// Tabs
 		const tabs = this.middleContainer.createDiv({ cls: "content-tabs" });
@@ -701,6 +742,7 @@ export class DashboardView extends ItemView {
 		const resetBtn = btnDiv.createEl("button", {
 			text: t("FILTER_RESET_BTN"),
 		});
+		resetBtn.style.flex = "1";
 		resetBtn.onclick = () => {
 			this.filters = {
 				name: "",
@@ -715,23 +757,37 @@ export class DashboardView extends ItemView {
 			this.applyFilters();
 			this.renderMiddleColumn();
 			this.renderRightColumn();
-			this.renderLeftColumn(this.contentEl.querySelector(".dashboard-left") as HTMLElement);
+			this.renderLeftColumn(
+				this.contentEl.querySelector(".dashboard-left") as HTMLElement,
+			);
 		};
 
-		const saveBtn = btnDiv.createEl("button", {
-			text: t("BTN_SAVE_QUERY"),
-			cls: "mod-cta",
-		});
-		saveBtn.onclick = () => {
-			new SaveQueryModal(
-				this.app,
-				t("MODAL_SAVE_TITLE"),
-				"",
-				async (name) => {
-					await this.saveCurrentQuery(name);
-				}
-			).open();
-		};
+		if (this.activeQueryId) {
+			const updateBtn = btnDiv.createEl("button", {
+				text: t("BTN_UPDATE_QUERY"),
+				cls: "mod-cta",
+			});
+			updateBtn.style.flex = "1";
+			updateBtn.onclick = async () => {
+				await this.updateSavedQuery(this.activeQueryId!);
+			};
+		} else {
+			const saveBtn = btnDiv.createEl("button", {
+				text: t("BTN_SAVE_QUERY"),
+				cls: "mod-cta",
+			});
+			saveBtn.style.flex = "1";
+			saveBtn.onclick = () => {
+				new SaveQueryModal(
+					this.app,
+					t("MODAL_SAVE_TITLE"),
+					"",
+					async (name) => {
+						await this.saveCurrentQuery(name);
+					},
+				).open();
+			};
+		}
 	}
 
 	async saveCurrentQuery(name: string) {
@@ -747,13 +803,31 @@ export class DashboardView extends ItemView {
 		new Notice(`Query "${name}" saved.`);
 		this.activeQueryId = newQuery.id;
 		this.renderLeftColumn(
-			this.contentEl.querySelector(".dashboard-left") as HTMLElement
+			this.contentEl.querySelector(".dashboard-left") as HTMLElement,
 		);
 		this.renderMiddleColumn();
+		this.renderRightColumn();
+	}
+
+	async updateSavedQuery(id: string) {
+		const query = this.plugin.settings.savedQueries.find(
+			(q) => q.id === id,
+		);
+		if (!query) return;
+
+		// Update query details
+		query.category = this.activeCategory;
+		query.tab = this.activeTab;
+		query.filters = JSON.parse(JSON.stringify(this.filters));
+
+		await this.plugin.saveSettings();
+		new Notice(`Query "${query.name}" updated.`);
 	}
 
 	async renameSavedQuery(id: string) {
-		const query = this.plugin.settings.savedQueries.find((q) => q.id === id);
+		const query = this.plugin.settings.savedQueries.find(
+			(q) => q.id === id,
+		);
 		if (!query) return;
 
 		new SaveQueryModal(
@@ -764,9 +838,11 @@ export class DashboardView extends ItemView {
 				query.name = newName;
 				await this.plugin.saveSettings();
 				this.renderLeftColumn(
-					this.contentEl.querySelector(".dashboard-left") as HTMLElement
+					this.contentEl.querySelector(
+						".dashboard-left",
+					) as HTMLElement,
 				);
-			}
+			},
 		).open();
 	}
 
@@ -779,7 +855,7 @@ export class DashboardView extends ItemView {
 			this.activeQueryId = null;
 		}
 		this.renderLeftColumn(
-			this.contentEl.querySelector(".dashboard-left") as HTMLElement
+			this.contentEl.querySelector(".dashboard-left") as HTMLElement,
 		);
 		this.renderMiddleColumn();
 	}
