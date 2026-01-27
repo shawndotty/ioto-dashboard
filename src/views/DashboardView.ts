@@ -600,17 +600,65 @@ export class DashboardView extends ItemView {
 				type: "checkbox",
 				cls: "task-checkbox",
 			});
+			// Explicitly allow pointer events to ensure click is captured
+			checkbox.style.pointerEvents = "auto";
 			checkbox.checked = task.status !== " ";
+			checkbox.onclick = async (e) => {
+				e.stopPropagation();
+				await this.toggleTaskStatus(task);
+			};
 
 			content.createEl("span", { text: task.content });
 
 			item.onclick = (e) => {
-				// Prevent triggering if clicking checkbox directly (though it's pointer-events: none currently)
+				// Prevent triggering if clicking checkbox directly
+				if (
+					e.target instanceof HTMLInputElement &&
+					e.target.type === "checkbox"
+				) {
+					return;
+				}
 				this.app.workspace.getLeaf(false).openFile(task.file, {
 					eState: { line: task.line },
 				});
 			};
 		});
+	}
+
+	async toggleTaskStatus(task: TaskItem) {
+		const file = task.file;
+		const content = await this.app.vault.read(file);
+		const lines = content.split("\n");
+
+		if (task.line >= lines.length) return;
+
+		const lineContent = lines[task.line];
+		if (!lineContent) return;
+
+		// Regex to match task: - [ ] content
+		const taskRegex = /^(\s*[-*]\s*\[)(.)(\]\s*.*)$/;
+		const match = lineContent.match(taskRegex);
+
+		if (match) {
+			const prefix = match[1];
+			const currentStatus = match[2];
+			const suffix = match[3];
+
+			const newStatus = currentStatus === " " ? "x" : " ";
+			lines[task.line] = `${prefix}${newStatus}${suffix}`;
+
+			await this.app.vault.modify(file, lines.join("\n"));
+
+			// Update local state and UI
+			task.status = newStatus;
+
+			// Re-apply filters to update lists (e.g. hide if completed)
+			// Do NOT call refreshFiles() here because metadataCache update is async and might be stale,
+			// which would revert the status in the UI.
+			this.applyFilters();
+			this.renderMiddleColumn();
+			this.renderRightColumn();
+		}
 	}
 
 	renderRightColumn() {
