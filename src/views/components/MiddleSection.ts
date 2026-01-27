@@ -125,14 +125,21 @@ export class MiddleSection {
 			const project = cache?.frontmatter?.["Project"];
 
 			if (project) {
-				meta.createEl("span", {
-					text: `📂 ${project}`,
+				const projectSpan = meta.createEl("p", {
 					cls: "file-project",
 				});
+				// Use Lucide icon 'folder'
+				const iconSpan = projectSpan.createSpan({ cls: "meta-icon" });
+				setIcon(iconSpan, "folder");
+				projectSpan.createSpan({ text: ` ${project}` });
 			}
 
+			const dateSpan = meta.createEl("p", { cls: "file-date" });
+			// Use Lucide icon 'calendar'
+			const dateIconSpan = dateSpan.createSpan({ cls: "meta-icon" });
+			setIcon(dateIconSpan, "calendar");
 			const date = new Date(file.stat.ctime).toLocaleDateString();
-			meta.createEl("span", { text: `📅 ${date}`, cls: "file-date" });
+			dateSpan.createSpan({ text: ` ${date}` });
 
 			item.onclick = () => {
 				this.app.workspace.getLeaf(false).openFile(file);
