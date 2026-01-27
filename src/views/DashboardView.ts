@@ -20,6 +20,13 @@ interface FilterState {
 	dateType: "created" | "modified";
 	dateStart: string;
 	dateEnd: string;
+	datePreset:
+		| "all"
+		| "last3days"
+		| "last7days"
+		| "last14days"
+		| "last30days"
+		| "custom";
 	status: "all" | "completed" | "incomplete";
 }
 
@@ -50,6 +57,7 @@ export class DashboardView extends ItemView {
 		dateType: "created",
 		dateStart: "",
 		dateEnd: "",
+		datePreset: "all",
 		status: "all",
 	};
 
@@ -302,15 +310,33 @@ export class DashboardView extends ItemView {
 				: file.stat.mtime;
 		const date = new Date(dateValue);
 
-		if (this.filters.dateStart) {
-			const startDate = new Date(this.filters.dateStart);
-			if (date < startDate) return false;
-		}
+		if (
+			this.filters.datePreset !== "all" &&
+			this.filters.datePreset !== "custom"
+		) {
+			const now = new Date();
+			let days = 0;
+			if (this.filters.datePreset === "last3days") days = 3;
+			else if (this.filters.datePreset === "last7days") days = 7;
+			else if (this.filters.datePreset === "last14days") days = 14;
+			else if (this.filters.datePreset === "last30days") days = 30;
 
-		if (this.filters.dateEnd) {
-			const endDate = new Date(this.filters.dateEnd);
-			endDate.setHours(23, 59, 59, 999);
-			if (date > endDate) return false;
+			const startDate = new Date();
+			startDate.setDate(now.getDate() - days);
+			startDate.setHours(0, 0, 0, 0);
+
+			if (date < startDate) return false;
+		} else if (this.filters.datePreset === "custom") {
+			if (this.filters.dateStart) {
+				const startDate = new Date(this.filters.dateStart);
+				if (date < startDate) return false;
+			}
+
+			if (this.filters.dateEnd) {
+				const endDate = new Date(this.filters.dateEnd);
+				endDate.setHours(23, 59, 59, 999);
+				if (date > endDate) return false;
+			}
 		}
 
 		return true;
@@ -557,27 +583,62 @@ export class DashboardView extends ItemView {
 				this.renderMiddleColumn();
 			});
 
-		// Date Start
-		const dateStartDiv = form.createDiv({ cls: "filter-item" });
-		dateStartDiv.createEl("label", { text: t("FILTER_DATE_START_LABEL") });
-		const dateStartInput = dateStartDiv.createEl("input", { type: "date" });
-		dateStartInput.value = this.filters.dateStart;
-		dateStartInput.onchange = (e) => {
-			this.filters.dateStart = (e.target as HTMLInputElement).value;
-			this.applyFilters();
-			this.renderMiddleColumn();
-		};
+		// Date Preset
+		const datePresetDiv = form.createDiv({ cls: "filter-item" });
+		datePresetDiv.createEl("label", {
+			text: t("FILTER_DATE_PRESET_LABEL"),
+		});
+		new DropdownComponent(datePresetDiv)
+			.addOption("all", t("FILTER_DATE_PRESET_ALL"))
+			.addOption("last3days", t("FILTER_DATE_PRESET_LAST_3_DAYS"))
+			.addOption("last7days", t("FILTER_DATE_PRESET_LAST_7_DAYS"))
+			.addOption("last14days", t("FILTER_DATE_PRESET_LAST_14_DAYS"))
+			.addOption("last30days", t("FILTER_DATE_PRESET_LAST_30_DAYS"))
+			.addOption("custom", t("FILTER_DATE_PRESET_CUSTOM"))
+			.setValue(this.filters.datePreset)
+			.onChange(
+				(
+					val:
+						| "all"
+						| "last3days"
+						| "last7days"
+						| "last14days"
+						| "last30days"
+						| "custom",
+				) => {
+					this.filters.datePreset = val;
+					this.applyFilters();
+					this.renderMiddleColumn();
+					this.renderRightColumn(); // Re-render to show/hide custom dates
+				},
+			);
 
-		// Date End
-		const dateEndDiv = form.createDiv({ cls: "filter-item" });
-		dateEndDiv.createEl("label", { text: t("FILTER_DATE_END_LABEL") });
-		const dateEndInput = dateEndDiv.createEl("input", { type: "date" });
-		dateEndInput.value = this.filters.dateEnd;
-		dateEndInput.onchange = (e) => {
-			this.filters.dateEnd = (e.target as HTMLInputElement).value;
-			this.applyFilters();
-			this.renderMiddleColumn();
-		};
+		// Date Start & End (Only if Custom)
+		if (this.filters.datePreset === "custom") {
+			const dateStartDiv = form.createDiv({ cls: "filter-item" });
+			dateStartDiv.createEl("label", {
+				text: t("FILTER_DATE_START_LABEL"),
+			});
+			const dateStartInput = dateStartDiv.createEl("input", {
+				type: "date",
+			});
+			dateStartInput.value = this.filters.dateStart;
+			dateStartInput.onchange = (e) => {
+				this.filters.dateStart = (e.target as HTMLInputElement).value;
+				this.applyFilters();
+				this.renderMiddleColumn();
+			};
+
+			const dateEndDiv = form.createDiv({ cls: "filter-item" });
+			dateEndDiv.createEl("label", { text: t("FILTER_DATE_END_LABEL") });
+			const dateEndInput = dateEndDiv.createEl("input", { type: "date" });
+			dateEndInput.value = this.filters.dateEnd;
+			dateEndInput.onchange = (e) => {
+				this.filters.dateEnd = (e.target as HTMLInputElement).value;
+				this.applyFilters();
+				this.renderMiddleColumn();
+			};
+		}
 
 		// Reset Button
 		const btnDiv = form.createDiv({ cls: "filter-actions" });
@@ -591,6 +652,7 @@ export class DashboardView extends ItemView {
 				dateType: "created",
 				dateStart: "",
 				dateEnd: "",
+				datePreset: "all",
 				status: "all",
 			};
 			this.applyFilters();
