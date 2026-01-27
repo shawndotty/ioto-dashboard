@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "ioto-dashboard",
+	"version": "2.0.0",
+	"description": "Dashoboard for IOTO framework",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {

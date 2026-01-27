@@ -1,36 +1,68 @@
-import {App, PluginSettingTab, Setting} from "obsidian";
-import MyPlugin from "./main";
+import { App, PluginSettingTab, Setting } from "obsidian";
+import IotoDashboardPlugin from "./main";
 
-export interface MyPluginSettings {
-	mySetting: string;
+export interface IotoDashboardSettings {
+	inputFolder: string;
+	outputFolder: string;
+	outcomeFolder: string;
 }
 
-export const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
+export const DEFAULT_SETTINGS: IotoDashboardSettings = {
+	inputFolder: "1-Input",
+	outputFolder: "2-Output",
+	outcomeFolder: "3-Outcome",
+};
 
-export class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+export class DashboardSettingTab extends PluginSettingTab {
+	plugin: IotoDashboardPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: IotoDashboardPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const { containerEl } = this;
 
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Settings #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+			.setName("Input Folder")
+			.setDesc("Path to the Input folder (e.g. 1-Input)")
+			.addText((text) =>
+				text
+					.setPlaceholder("1-Input")
+					.setValue(this.plugin.settings.inputFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.inputFolder = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Output Folder")
+			.setDesc("Path to the Output folder (e.g. 2-Output)")
+			.addText((text) =>
+				text
+					.setPlaceholder("2-Output")
+					.setValue(this.plugin.settings.outputFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.outputFolder = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Outcome Folder")
+			.setDesc("Path to the Outcome folder (e.g. 3-Outcome)")
+			.addText((text) =>
+				text
+					.setPlaceholder("3-Outcome")
+					.setValue(this.plugin.settings.outcomeFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.outcomeFolder = value;
+						await this.plugin.saveSettings();
+					}),
+			);
 	}
 }
