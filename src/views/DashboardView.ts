@@ -19,6 +19,7 @@ interface FilterState {
 	dateType: "created" | "modified";
 	dateStart: string;
 	dateEnd: string;
+	status: "all" | "completed" | "incomplete";
 }
 
 interface TaskItem {
@@ -48,6 +49,7 @@ export class DashboardView extends ItemView {
 		dateType: "created",
 		dateStart: "",
 		dateEnd: "",
+		status: "all",
 	};
 
 	// UI Elements
@@ -235,7 +237,18 @@ export class DashboardView extends ItemView {
 
 		// Filter Tasks
 		this.filteredTasks = this.tasks.filter((task) => {
-			return this.matchesFilter(task.file, task.content);
+			if (!this.matchesFilter(task.file, task.content)) return false;
+
+			// Status Filter
+			if (this.filters.status !== "all") {
+				const isCompleted = task.status !== " ";
+				if (this.filters.status === "completed" && !isCompleted)
+					return false;
+				if (this.filters.status === "incomplete" && isCompleted)
+					return false;
+			}
+
+			return true;
 		});
 		// Sort tasks? Maybe by file creation date?
 		this.filteredTasks.sort(
@@ -362,10 +375,12 @@ export class DashboardView extends ItemView {
 		notesTab.onclick = () => {
 			this.activeTab = "Notes";
 			this.renderMiddleColumn();
+			this.renderRightColumn();
 		};
 		tasksTab.onclick = () => {
 			this.activeTab = "Tasks";
 			this.renderMiddleColumn();
+			this.renderRightColumn();
 		};
 
 		// List
@@ -460,6 +475,22 @@ export class DashboardView extends ItemView {
 				this.renderMiddleColumn();
 			});
 
+		// Status Filter (Only for Tasks)
+		if (this.activeTab === "Tasks") {
+			const statusDiv = form.createDiv({ cls: "filter-item" });
+			statusDiv.createEl("label", { text: "Status" });
+			new DropdownComponent(statusDiv)
+				.addOption("all", "All")
+				.addOption("completed", "Completed")
+				.addOption("incomplete", "Incomplete")
+				.setValue(this.filters.status)
+				.onChange((val: "all" | "completed" | "incomplete") => {
+					this.filters.status = val;
+					this.applyFilters();
+					this.renderMiddleColumn();
+				});
+		}
+
 		// Project Filter
 		const projectDiv = form.createDiv({ cls: "filter-item" });
 		projectDiv.createEl("label", { text: "Project" });
@@ -517,6 +548,7 @@ export class DashboardView extends ItemView {
 				dateType: "created",
 				dateStart: "",
 				dateEnd: "",
+				status: "all",
 			};
 			this.applyFilters();
 			this.renderMiddleColumn();
