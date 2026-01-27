@@ -1,47 +1,14 @@
-import {
-	ItemView,
-	WorkspaceLeaf,
-	setIcon,
-	TFile,
-	TFolder,
-	TextComponent,
-	DropdownComponent,
-	MarkdownView,
-	Menu,
-	Notice,
-	MarkdownRenderer,
-} from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, TFolder, Notice } from "obsidian";
 import { DASHBOARD_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { SaveQueryModal } from "../ui/SaveQueryModal";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { SavedQuery } from "../settings";
-
-type Category = "Input" | "Output" | "Outcome";
-
-interface FilterState {
-	name: string;
-	project: string;
-	dateType: "created" | "modified";
-	dateStart: string;
-	dateEnd: string;
-	datePreset:
-		| "all"
-		| "last3days"
-		| "last7days"
-		| "last14days"
-		| "last30days"
-		| "custom";
-	status: "all" | "completed" | "incomplete";
-}
-
-interface TaskItem {
-	file: TFile;
-	content: string;
-	status: string;
-	line: number;
-}
+import { Category, FilterState, TaskItem } from "../models/types";
+import { LeftSidebar } from "./components/LeftSidebar";
+import { RightSidebar } from "./components/RightSidebar";
+import { MiddleSection } from "./components/MiddleSection";
 
 export class DashboardView extends ItemView {
 	plugin: IotoDashboardPlugin;
@@ -188,14 +155,10 @@ export class DashboardView extends ItemView {
 
 			const headings = cache.headings;
 
-			console.dir(headings);
-			console.dir(targetHeader);
-
 			// Find the target header
 			const headingIndex = headings.findIndex(
 				(h) => h.heading === targetHeader,
 			);
-			console.dir(headingIndex);
 			if (headingIndex === -1) continue;
 
 			const targetHeading = headings[headingIndex];
@@ -350,89 +313,27 @@ export class DashboardView extends ItemView {
 	}
 
 	renderLeftColumn(container: HTMLElement) {
-		container.empty();
-
-		const header = container.createDiv({ cls: "nav-header" });
-		if (!this.leftPanelCollapsed) {
-			header.createEl("h3", { text: t("NAV_TITLE") });
-		}
-
-		// const toggle = header.createEl("button", { cls: "nav-toggle" });
-		// setIcon(
-		// 	toggle,
-		// 	this.leftPanelCollapsed ? "chevrons-right" : "chevrons-left",
-		// );
-		// toggle.onclick = () => {
-		// 	this.leftPanelCollapsed = !this.leftPanelCollapsed;
-		// 	const grid = container.closest(".dashboard-grid");
-		// 	if (grid) {
-		// 		if (this.leftPanelCollapsed) grid.addClass("usages-collapsed");
-		// 		else grid.removeClass("usages-collapsed");
-		// 	}
-		// 	this.renderLeftColumn(container);
-		// };
-
-		const navItems: Category[] = ["Input", "Output", "Outcome"];
-		const list = container.createEl("ul", { cls: "nav-list" });
-
-		navItems.forEach((item) => {
-			let label = "";
-			if (item === "Input") label = t("NAV_INPUT");
-			else if (item === "Output") label = t("NAV_OUTPUT");
-			else if (item === "Outcome") label = t("NAV_OUTCOME");
-
-			const li = list.createEl("li", {
-				text: this.leftPanelCollapsed ? label.charAt(0) : label,
-				cls: "nav-item",
-			});
-			if (item === this.activeCategory && !this.activeQueryId)
-				li.addClass("is-active");
-
-			li.onclick = async () => {
-				this.activeCategory = item;
+		new LeftSidebar(
+			container,
+			this.activeCategory,
+			this.activeQueryId,
+			this.leftPanelCollapsed,
+			this.plugin.settings.savedQueries,
+			async (category) => {
+				this.activeCategory = category;
 				this.activeQueryId = null; // Reset active query when switching main category
-				container
-					.findAll(".nav-item")
-					.forEach((el) => el.removeClass("is-active"));
-				li.addClass("is-active");
+				// Update active class manually or re-render?
+				// renderLeftColumn re-renders the whole list, so it handles active class.
+				this.renderLeftColumn(container);
 
 				await this.refreshFiles();
 				this.renderMiddleColumn();
 				this.renderRightColumn();
-			};
-		});
-
-		// Saved Queries
-		if (this.plugin.settings.savedQueries.length > 0) {
-			const divider = container.createDiv({ cls: "nav-divider" });
-			divider.style.borderTop =
-				"1px solid var(--background-modifier-border)";
-			divider.style.margin = "10px 0";
-
-			const queryHeader = container.createDiv({ cls: "nav-header" });
-			if (!this.leftPanelCollapsed) {
-				queryHeader.createEl("h3", { text: t("NAV_USER_QUERIES") });
-			}
-
-			const queryList = container.createEl("ul", { cls: "nav-list" });
-			this.plugin.settings.savedQueries.forEach((query) => {
-				const li = queryList.createEl("li", {
-					text: this.leftPanelCollapsed
-						? query.name.charAt(0)
-						: query.name,
-					cls: "nav-item",
-				});
-				if (this.activeQueryId === query.id) li.addClass("is-active");
-				// Add a tooltip if collapsed
-				if (this.leftPanelCollapsed) {
-					li.setAttribute("aria-label", query.name);
-				}
-
-				li.onclick = async () => {
-					this.loadSavedQuery(query);
-				};
-			});
-		}
+			},
+			async (query) => {
+				this.loadSavedQuery(query);
+			},
+		).render();
 	}
 
 	async loadSavedQuery(query: SavedQuery) {
@@ -451,241 +352,37 @@ export class DashboardView extends ItemView {
 	}
 
 	renderMiddleColumn() {
-		this.middleContainer.empty();
-
-		// Header
-		const header = this.middleContainer.createDiv({
-			cls: "content-header",
-		});
-		header.style.display = "flex";
-		header.style.justifyContent = "space-between";
-		header.style.alignItems = "center";
-
-		const count =
-			this.activeTab === "Notes"
-				? this.filteredFiles.length
-				: this.filteredTasks.length;
-
-		const title = header.createEl("h2", {
-			text: `${this.activeCategory} (${count})`,
-			cls: "view-header-title",
-		});
-		title.style.margin = "0";
-
-		// Query Actions
-		if (this.activeQueryId) {
-			const actionsDiv = header.createDiv({ cls: "header-actions" });
-			actionsDiv.style.display = "flex";
-			actionsDiv.style.alignItems = "center";
-			actionsDiv.style.paddingBottom = "10px";
-
-			const editBtn = actionsDiv.createEl("button", {
-				cls: "clickable-icon",
-			});
-			setIcon(editBtn, "pencil");
-			editBtn.setAttribute("aria-label", t("BTN_EDIT_QUERY"));
-			editBtn.onclick = () => {
-				this.renameSavedQuery(this.activeQueryId!);
-			};
-
-			const deleteBtn = actionsDiv.createEl("button", {
-				cls: "clickable-icon",
-			});
-			setIcon(deleteBtn, "trash");
-			deleteBtn.setAttribute("aria-label", t("BTN_DELETE_QUERY"));
-			deleteBtn.style.marginLeft = "8px";
-			deleteBtn.onclick = () => {
+		new MiddleSection(
+			this.app,
+			this.middleContainer,
+			this,
+			this.activeCategory,
+			this.activeTab,
+			this.activeQueryId,
+			this.filteredFiles,
+			this.filteredTasks,
+			(tab) => {
+				this.activeTab = tab;
+				this.renderMiddleColumn();
+				this.renderRightColumn();
+			},
+			(id) => {
+				this.renameSavedQuery(id);
+			},
+			(id) => {
 				new ConfirmModal(
 					this.app,
 					t("CONFIRM_DELETE_TITLE"),
 					t("CONFIRM_DELETE_MSG"),
 					async () => {
-						await this.deleteSavedQuery(this.activeQueryId!);
+						await this.deleteSavedQuery(id);
 					},
 				).open();
-			};
-		}
-
-		// Tabs
-		const tabs = this.middleContainer.createDiv({ cls: "content-tabs" });
-		const notesTab = tabs.createDiv({
-			cls: "content-tab",
-			text: t("TAB_NOTES"),
-		});
-		const tasksTab = tabs.createDiv({
-			cls: "content-tab",
-			text: t("TAB_TASKS"),
-		});
-
-		if (this.activeTab === "Notes") notesTab.addClass("is-active");
-		else tasksTab.addClass("is-active");
-
-		notesTab.onclick = () => {
-			this.activeTab = "Notes";
-			this.renderMiddleColumn();
-			this.renderRightColumn();
-		};
-		tasksTab.onclick = () => {
-			this.activeTab = "Tasks";
-			this.renderMiddleColumn();
-			this.renderRightColumn();
-		};
-
-		// List
-		const list = this.middleContainer.createDiv({ cls: "file-list" });
-
-		if (this.activeTab === "Notes") {
-			this.renderNoteList(list);
-		} else {
-			this.renderTaskList(list);
-		}
-	}
-
-	renderNoteList(container: HTMLElement) {
-		if (this.filteredFiles.length === 0) {
-			container.createEl("p", { text: t("NO_NOTES_FOUND") });
-			return;
-		}
-
-		this.filteredFiles.forEach((file) => {
-			const item = container.createDiv({ cls: "file-item" });
-			item.createEl("h4", { text: file.basename });
-
-			item.addEventListener("mouseenter", (e) => {
-				this.app.workspace.trigger("hover-link", {
-					event: e,
-					source: DASHBOARD_VIEW_TYPE,
-					hoverParent: item,
-					targetEl: item,
-					linktext: file.path,
-					sourcePath: file.path,
-				});
-			});
-
-			const meta = item.createDiv({ cls: "file-meta" });
-			const cache = this.app.metadataCache.getFileCache(file);
-			const project = cache?.frontmatter?.["Project"];
-
-			if (project) {
-				meta.createEl("span", {
-					text: `📂 ${project}`,
-					cls: "file-project",
-				});
-			}
-
-			const date = new Date(file.stat.ctime).toLocaleDateString();
-			meta.createEl("span", { text: `📅 ${date}`, cls: "file-date" });
-
-			item.onclick = () => {
-				this.app.workspace.getLeaf(false).openFile(file);
-			};
-		});
-	}
-
-	renderTaskList(container: HTMLElement) {
-		if (this.filteredTasks.length === 0) {
-			container.createEl("p", { text: t("NO_TASKS_FOUND") });
-			return;
-		}
-
-		this.filteredTasks.forEach((task) => {
-			const item = container.createDiv({ cls: "task-item" });
-
-			const header = item.createDiv({ cls: "task-item-header" });
-			header.createEl("span", { text: task.file.basename });
-			const date = new Date(task.file.stat.ctime).toLocaleDateString();
-			header.createEl("span", { text: date });
-
-			const content = item.createDiv({ cls: "task-content" });
-			const checkbox = content.createEl("input", {
-				type: "checkbox",
-				cls: "task-checkbox",
-			});
-			// Explicitly allow pointer events to ensure click is captured
-			checkbox.style.pointerEvents = "auto";
-			checkbox.checked = task.status !== " ";
-			checkbox.onclick = async (e) => {
-				e.stopPropagation();
+			},
+			async (task) => {
 				await this.toggleTaskStatus(task);
-			};
-
-			const textSpan = content.createEl("span", {
-				cls: "task-markdown-content",
-			});
-			MarkdownRenderer.render(
-				this.app,
-				task.content,
-				textSpan,
-				task.file.path,
-				this,
-			).then(() => {
-				// Remove paragraph margins to keep it inline-like
-				const p = textSpan.querySelector("p");
-				if (p) {
-					p.style.margin = "0";
-					p.style.display = "inline";
-				}
-
-				// Handle internal links (preview and navigation)
-				const internalLinks =
-					textSpan.querySelectorAll("a.internal-link");
-				internalLinks.forEach((link) => {
-					// Hover preview
-					link.addEventListener("mouseenter", (e) => {
-						this.app.workspace.trigger("hover-link", {
-							event: e,
-							source: DASHBOARD_VIEW_TYPE,
-							hoverParent: textSpan,
-							targetEl: link,
-							linktext: link.getAttribute("data-href"),
-							sourcePath: task.file.path,
-						});
-					});
-
-					// Click navigation
-					link.addEventListener("click", (e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						const href = link.getAttribute("data-href");
-						if (href) {
-							this.app.workspace.openLinkText(
-								href,
-								task.file.path,
-								false, // open in same tab? or true for new tab? usually false for clicking link
-							);
-						}
-					});
-				});
-
-				// Handle external links (stop propagation to avoid opening task file)
-				const externalLinks =
-					textSpan.querySelectorAll("a.external-link");
-				externalLinks.forEach((link) => {
-					link.addEventListener("click", (e) => {
-						e.stopPropagation();
-					});
-				});
-			});
-
-			item.onclick = (e) => {
-				const target = e.target as HTMLElement;
-				// Prevent triggering if clicking checkbox directly
-				if (
-					target instanceof HTMLInputElement &&
-					target.type === "checkbox"
-				) {
-					return;
-				}
-				// Prevent triggering if clicking a link (internal or external)
-				if (target.tagName === "A" || target.closest("a")) {
-					return;
-				}
-
-				this.app.workspace.getLeaf(false).openFile(task.file, {
-					eState: { line: task.line },
-				});
-			};
-		});
+			},
+		).render();
 	}
 
 	async toggleTaskStatus(task: TaskItem) {
@@ -720,186 +417,48 @@ export class DashboardView extends ItemView {
 			// which would revert the status in the UI.
 			this.applyFilters();
 			this.renderMiddleColumn();
-			this.renderRightColumn();
 		}
 	}
 
 	renderRightColumn() {
-		this.rightContainer.empty();
-		this.rightContainer.createEl("h3", { text: t("FILTER_TITLE") });
-
-		const form = this.rightContainer.createDiv({ cls: "filter-form" });
-
-		// Name Filter
-		const nameDiv = form.createDiv({ cls: "filter-item" });
-		nameDiv.createEl("label", {
-			text:
-				this.activeTab === "Notes"
-					? t("FILTER_NAME_LABEL_NOTES")
-					: t("FILTER_NAME_LABEL_TASKS"),
-		});
-		new TextComponent(nameDiv)
-			.setValue(this.filters.name)
-			.setPlaceholder(t("FILTER_NAME_PLACEHOLDER"))
-			.onChange((val) => {
-				this.filters.name = val;
+		new RightSidebar(
+			this.rightContainer,
+			this.filters,
+			this.activeTab,
+			this.activeQueryId,
+			this.getAllProjects(),
+			(newFilters, shouldReRender) => {
+				this.filters = newFilters;
 				this.applyFilters();
 				this.renderMiddleColumn();
-			});
-
-		// Status Filter (Only for Tasks)
-		if (this.activeTab === "Tasks") {
-			const statusDiv = form.createDiv({ cls: "filter-item" });
-			statusDiv.createEl("label", { text: t("FILTER_STATUS_LABEL") });
-			new DropdownComponent(statusDiv)
-				.addOption("all", t("FILTER_STATUS_ALL"))
-				.addOption("completed", t("FILTER_STATUS_COMPLETED"))
-				.addOption("incomplete", t("FILTER_STATUS_INCOMPLETE"))
-				.setValue(this.filters.status)
-				.onChange((val: "all" | "completed" | "incomplete") => {
-					this.filters.status = val;
-					this.applyFilters();
-					this.renderMiddleColumn();
-				});
-		}
-
-		// Project Filter
-		const projectDiv = form.createDiv({ cls: "filter-item" });
-		projectDiv.createEl("label", { text: t("FILTER_PROJECT_LABEL") });
-
-		const allProjects = this.getAllProjects();
-		const dataListId = "project-list-" + Date.now();
-		const dataList = projectDiv.createEl("datalist", {
-			attr: { id: dataListId },
-		});
-		allProjects.forEach((p) => {
-			dataList.createEl("option", { attr: { value: p } });
-		});
-
-		const projectInput = new TextComponent(projectDiv)
-			.setValue(this.filters.project)
-			.setPlaceholder(t("FILTER_PROJECT_PLACEHOLDER"))
-			.onChange((val) => {
-				this.filters.project = val;
+				// Only re-render right column if structural changes are needed (e.g. Custom date fields)
+				if (shouldReRender) {
+					this.renderRightColumn();
+				}
+			},
+			() => {
+				// onReset
+				this.filters = {
+					name: "",
+					project: "",
+					dateType: "created",
+					dateStart: "",
+					dateEnd: "",
+					datePreset: "all",
+					status: "all",
+				};
+				this.activeQueryId = null;
 				this.applyFilters();
 				this.renderMiddleColumn();
-			});
-		projectInput.inputEl.setAttribute("list", dataListId);
-
-		// Date Type
-		const dateTypeDiv = form.createDiv({ cls: "filter-item" });
-		dateTypeDiv.createEl("label", { text: t("FILTER_DATE_TYPE_LABEL") });
-		new DropdownComponent(dateTypeDiv)
-			.addOption("created", t("FILTER_DATE_TYPE_CREATED"))
-			.addOption("modified", t("FILTER_DATE_TYPE_MODIFIED"))
-			.setValue(this.filters.dateType)
-			.onChange((val: "created" | "modified") => {
-				this.filters.dateType = val;
-				this.applyFilters();
-				this.renderMiddleColumn();
-			});
-
-		// Date Preset
-		const datePresetDiv = form.createDiv({ cls: "filter-item" });
-		datePresetDiv.createEl("label", {
-			text: t("FILTER_DATE_PRESET_LABEL"),
-		});
-		new DropdownComponent(datePresetDiv)
-			.addOption("all", t("FILTER_DATE_PRESET_ALL"))
-			.addOption("last3days", t("FILTER_DATE_PRESET_LAST_3_DAYS"))
-			.addOption("last7days", t("FILTER_DATE_PRESET_LAST_7_DAYS"))
-			.addOption("last14days", t("FILTER_DATE_PRESET_LAST_14_DAYS"))
-			.addOption("last30days", t("FILTER_DATE_PRESET_LAST_30_DAYS"))
-			.addOption("custom", t("FILTER_DATE_PRESET_CUSTOM"))
-			.setValue(this.filters.datePreset)
-			.onChange(
-				(
-					val:
-						| "all"
-						| "last3days"
-						| "last7days"
-						| "last14days"
-						| "last30days"
-						| "custom",
-				) => {
-					this.filters.datePreset = val;
-					this.applyFilters();
-					this.renderMiddleColumn();
-					this.renderRightColumn(); // Re-render to show/hide custom dates
-				},
-			);
-
-		// Date Start & End (Only if Custom)
-		if (this.filters.datePreset === "custom") {
-			const dateStartDiv = form.createDiv({ cls: "filter-item" });
-			dateStartDiv.createEl("label", {
-				text: t("FILTER_DATE_START_LABEL"),
-			});
-			const dateStartInput = dateStartDiv.createEl("input", {
-				type: "date",
-			});
-			dateStartInput.value = this.filters.dateStart;
-			dateStartInput.onchange = (e) => {
-				this.filters.dateStart = (e.target as HTMLInputElement).value;
-				this.applyFilters();
-				this.renderMiddleColumn();
-			};
-
-			const dateEndDiv = form.createDiv({ cls: "filter-item" });
-			dateEndDiv.createEl("label", { text: t("FILTER_DATE_END_LABEL") });
-			const dateEndInput = dateEndDiv.createEl("input", { type: "date" });
-			dateEndInput.value = this.filters.dateEnd;
-			dateEndInput.onchange = (e) => {
-				this.filters.dateEnd = (e.target as HTMLInputElement).value;
-				this.applyFilters();
-				this.renderMiddleColumn();
-			};
-		}
-
-		// Reset Button
-		const btnDiv = form.createDiv({ cls: "filter-actions" });
-		btnDiv.style.display = "flex";
-		btnDiv.style.gap = "10px";
-
-		const resetBtn = btnDiv.createEl("button", {
-			text: t("FILTER_RESET_BTN"),
-		});
-		resetBtn.style.flex = "1";
-		resetBtn.onclick = () => {
-			this.filters = {
-				name: "",
-				project: "",
-				dateType: "created",
-				dateStart: "",
-				dateEnd: "",
-				datePreset: "all",
-				status: "all",
-			};
-			this.activeQueryId = null;
-			this.applyFilters();
-			this.renderMiddleColumn();
-			this.renderRightColumn();
-			this.renderLeftColumn(
-				this.contentEl.querySelector(".dashboard-left") as HTMLElement,
-			);
-		};
-
-		if (this.activeQueryId) {
-			const updateBtn = btnDiv.createEl("button", {
-				text: t("BTN_UPDATE_QUERY"),
-				cls: "mod-cta",
-			});
-			updateBtn.style.flex = "1";
-			updateBtn.onclick = async () => {
-				await this.updateSavedQuery(this.activeQueryId!);
-			};
-		} else {
-			const saveBtn = btnDiv.createEl("button", {
-				text: t("BTN_SAVE_QUERY"),
-				cls: "mod-cta",
-			});
-			saveBtn.style.flex = "1";
-			saveBtn.onclick = () => {
+				this.renderRightColumn();
+				this.renderLeftColumn(
+					this.contentEl.querySelector(
+						".dashboard-left",
+					) as HTMLElement,
+				);
+			},
+			() => {
+				// onSaveQuery
 				new SaveQueryModal(
 					this.app,
 					t("MODAL_SAVE_TITLE"),
@@ -908,8 +467,12 @@ export class DashboardView extends ItemView {
 						await this.saveCurrentQuery(name);
 					},
 				).open();
-			};
-		}
+			},
+			async () => {
+				// onUpdateQuery
+				await this.updateSavedQuery(this.activeQueryId!);
+			},
+		).render();
 	}
 
 	async saveCurrentQuery(name: string) {
