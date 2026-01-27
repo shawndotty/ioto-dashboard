@@ -25,7 +25,7 @@ export default class IotoDashboardPlugin extends Plugin {
 			"layout-dashboard",
 			t("RIBBON_ICON_TITLE"),
 			(evt: MouseEvent) => {
-				this.activateView();
+				this.activateView(evt.shiftKey);
 			},
 		);
 
@@ -46,20 +46,29 @@ export default class IotoDashboardPlugin extends Plugin {
 		// View automatically unloads
 	}
 
-	async activateView() {
+	async activateView(newWindow = false) {
 		const { workspace } = this.app;
 
 		let leaf: WorkspaceLeaf | null = null;
-		const leaves = workspace.getLeavesOfType(DASHBOARD_VIEW_TYPE);
 
-		if (leaves.length > 0) {
-			leaf = leaves[0]!;
-		} else {
-			leaf = workspace.getLeaf(false);
+		if (newWindow) {
+			leaf = workspace.getLeaf("window");
 			await leaf.setViewState({
 				type: DASHBOARD_VIEW_TYPE,
 				active: true,
 			});
+		} else {
+			const leaves = workspace.getLeavesOfType(DASHBOARD_VIEW_TYPE);
+
+			if (leaves.length > 0) {
+				leaf = leaves[0]!;
+			} else {
+				leaf = workspace.getLeaf(false);
+				await leaf.setViewState({
+					type: DASHBOARD_VIEW_TYPE,
+					active: true,
+				});
+			}
 		}
 
 		if (leaf) {

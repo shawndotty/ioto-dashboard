@@ -1,10 +1,4 @@
-import {
-	App,
-	setIcon,
-	TFile,
-	MarkdownRenderer,
-	Component,
-} from "obsidian";
+import { App, setIcon, TFile, MarkdownRenderer, Component } from "obsidian";
 import { t } from "../../lang/helpers";
 import { Category, TaskItem } from "../../models/types";
 import { DASHBOARD_VIEW_TYPE } from "../../models/constants";
@@ -22,7 +16,7 @@ export class MiddleSection {
 		private onTabChange: (tab: "Notes" | "Tasks") => void,
 		private onEditQuery: (id: string) => void,
 		private onDeleteQuery: (id: string) => void,
-		private onTaskToggle: (task: TaskItem) => Promise<void>
+		private onTaskToggle: (task: TaskItem) => Promise<void>,
 	) {}
 
 	render() {
@@ -113,7 +107,7 @@ export class MiddleSection {
 
 		this.filteredFiles.forEach((file) => {
 			const item = container.createDiv({ cls: "file-item" });
-			item.createEl("h4", { text: file.basename });
+			item.createEl("h6", { text: file.basename });
 
 			item.addEventListener("mouseenter", (e) => {
 				this.app.workspace.trigger("hover-link", {
@@ -181,7 +175,7 @@ export class MiddleSection {
 				task.content,
 				textSpan,
 				task.file.path,
-				this.parentComponent
+				this.parentComponent,
 			).then(() => {
 				// Remove paragraph margins to keep it inline-like
 				const p = textSpan.querySelector("p");
@@ -215,7 +209,7 @@ export class MiddleSection {
 							this.app.workspace.openLinkText(
 								href,
 								task.file.path,
-								false // open in same tab? or true for new tab? usually false for clicking link
+								false, // open in same tab? or true for new tab? usually false for clicking link
 							);
 						}
 					});
