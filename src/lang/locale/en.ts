@@ -8,6 +8,18 @@ export default {
 	TAB_NOTES: "Notes",
 	TAB_TASKS: "Tasks",
 
+	// Saved Queries
+	NAV_USER_QUERIES: "Saved Queries",
+	BTN_SAVE_QUERY: "Save Current Query",
+	BTN_DELETE_QUERY: "Delete Query",
+	BTN_EDIT_QUERY: "Rename Query",
+	MODAL_SAVE_TITLE: "Save Query",
+	MODAL_SAVE_NAME_LABEL: "Query Name",
+	MODAL_SAVE_PLACEHOLDER: "Enter name...",
+	MODAL_EDIT_TITLE: "Rename Query",
+	CONFIRM_DELETE_TITLE: "Confirm Delete",
+	CONFIRM_DELETE_MSG: "Are you sure you want to delete this query?",
+
 	// Filters
 	FILTER_TITLE: "Filters",
 	FILTER_NAME_LABEL_NOTES: "Note Name",

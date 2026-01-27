@@ -2,11 +2,34 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import IotoDashboardPlugin from "./main";
 import { t } from "./lang/helpers";
 
+export interface SavedQuery {
+	id: string;
+	name: string;
+	category: "Input" | "Output" | "Outcome";
+	tab: "Notes" | "Tasks";
+	filters: {
+		name: string;
+		project: string;
+		dateType: "created" | "modified";
+		dateStart: string;
+		dateEnd: string;
+		datePreset:
+			| "all"
+			| "last3days"
+			| "last7days"
+			| "last14days"
+			| "last30days"
+			| "custom";
+		status: "all" | "completed" | "incomplete";
+	};
+}
+
 export interface IotoDashboardSettings {
 	inputFolder: string;
 	outputFolder: string;
 	taskFolder: string;
 	outcomeFolder: string;
+	savedQueries: SavedQuery[];
 }
 
 export const DEFAULT_SETTINGS: IotoDashboardSettings = {
@@ -14,6 +37,7 @@ export const DEFAULT_SETTINGS: IotoDashboardSettings = {
 	outputFolder: "2-输出",
 	taskFolder: "3-任务",
 	outcomeFolder: "4-成果",
+	savedQueries: [],
 };
 
 export class DashboardSettingTab extends PluginSettingTab {

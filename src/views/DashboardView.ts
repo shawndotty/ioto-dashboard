@@ -7,10 +7,14 @@ import {
 	TextComponent,
 	DropdownComponent,
 	MarkdownView,
+	Menu,
+	Notice,
 } from "obsidian";
 import { DASHBOARD_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
+import { SaveQueryModal } from "../ui/SaveQueryModal";
+import { SavedQuery } from "../settings";
 
 type Category = "Input" | "Output" | "Outcome";
 
@@ -41,6 +45,7 @@ export class DashboardView extends ItemView {
 	plugin: IotoDashboardPlugin;
 	activeCategory: Category = "Input";
 	activeTab: "Notes" | "Tasks" = "Notes";
+	activeQueryId: string | null = null;
 	leftPanelCollapsed = false;
 	rightPanelCollapsed = false;
 
@@ -382,6 +387,7 @@ export class DashboardView extends ItemView {
 
 			li.onclick = async () => {
 				this.activeCategory = item;
+				this.activeQueryId = null; // Reset active query when switching main category
 				container
 					.findAll(".nav-item")
 					.forEach((el) => el.removeClass("is-active"));
@@ -392,6 +398,53 @@ export class DashboardView extends ItemView {
 				this.renderRightColumn();
 			};
 		});
+
+		// Saved Queries
+		if (this.plugin.settings.savedQueries.length > 0) {
+			const divider = container.createDiv({ cls: "nav-divider" });
+			divider.style.borderTop =
+				"1px solid var(--background-modifier-border)";
+			divider.style.margin = "10px 0";
+
+			const queryHeader = container.createDiv({ cls: "nav-header" });
+			if (!this.leftPanelCollapsed) {
+				queryHeader.createEl("h3", { text: t("NAV_USER_QUERIES") });
+			}
+
+			const queryList = container.createEl("ul", { cls: "nav-list" });
+			this.plugin.settings.savedQueries.forEach((query) => {
+				const li = queryList.createEl("li", {
+					text: this.leftPanelCollapsed
+						? query.name.charAt(0)
+						: query.name,
+					cls: "nav-item",
+				});
+				if (this.activeQueryId === query.id) li.addClass("is-active");
+				// Add a tooltip if collapsed
+				if (this.leftPanelCollapsed) {
+					li.setAttribute("aria-label", query.name);
+				}
+
+				li.onclick = async () => {
+					this.loadSavedQuery(query);
+				};
+			});
+		}
+	}
+
+	async loadSavedQuery(query: SavedQuery) {
+		this.activeQueryId = query.id;
+		this.activeCategory = query.category;
+		this.activeTab = query.tab;
+		// Clone filters to avoid reference issues
+		this.filters = JSON.parse(JSON.stringify(query.filters));
+
+		await this.refreshFiles();
+		this.renderLeftColumn(
+			this.contentEl.querySelector(".dashboard-left") as HTMLElement,
+		);
+		this.renderMiddleColumn();
+		this.renderRightColumn();
 	}
 
 	renderMiddleColumn() {
@@ -642,6 +695,9 @@ export class DashboardView extends ItemView {
 
 		// Reset Button
 		const btnDiv = form.createDiv({ cls: "filter-actions" });
+		btnDiv.style.display = "flex";
+		btnDiv.style.gap = "10px";
+
 		const resetBtn = btnDiv.createEl("button", {
 			text: t("FILTER_RESET_BTN"),
 		});
@@ -655,9 +711,76 @@ export class DashboardView extends ItemView {
 				datePreset: "all",
 				status: "all",
 			};
+			this.activeQueryId = null;
 			this.applyFilters();
 			this.renderMiddleColumn();
 			this.renderRightColumn();
+			this.renderLeftColumn(this.contentEl.querySelector(".dashboard-left") as HTMLElement);
 		};
+
+		const saveBtn = btnDiv.createEl("button", {
+			text: t("BTN_SAVE_QUERY"),
+			cls: "mod-cta",
+		});
+		saveBtn.onclick = () => {
+			new SaveQueryModal(
+				this.app,
+				t("MODAL_SAVE_TITLE"),
+				"",
+				async (name) => {
+					await this.saveCurrentQuery(name);
+				}
+			).open();
+		};
+	}
+
+	async saveCurrentQuery(name: string) {
+		const newQuery: SavedQuery = {
+			id: Date.now().toString(),
+			name,
+			category: this.activeCategory,
+			tab: this.activeTab,
+			filters: JSON.parse(JSON.stringify(this.filters)),
+		};
+		this.plugin.settings.savedQueries.push(newQuery);
+		await this.plugin.saveSettings();
+		new Notice(`Query "${name}" saved.`);
+		this.activeQueryId = newQuery.id;
+		this.renderLeftColumn(
+			this.contentEl.querySelector(".dashboard-left") as HTMLElement
+		);
+		this.renderMiddleColumn();
+	}
+
+	async renameSavedQuery(id: string) {
+		const query = this.plugin.settings.savedQueries.find((q) => q.id === id);
+		if (!query) return;
+
+		new SaveQueryModal(
+			this.app,
+			t("MODAL_EDIT_TITLE"),
+			query.name,
+			async (newName) => {
+				query.name = newName;
+				await this.plugin.saveSettings();
+				this.renderLeftColumn(
+					this.contentEl.querySelector(".dashboard-left") as HTMLElement
+				);
+			}
+		).open();
+	}
+
+	async deleteSavedQuery(id: string) {
+		this.plugin.settings.savedQueries =
+			this.plugin.settings.savedQueries.filter((q) => q.id !== id);
+		await this.plugin.saveSettings();
+		new Notice("Query deleted.");
+		if (this.activeQueryId === id) {
+			this.activeQueryId = null;
+		}
+		this.renderLeftColumn(
+			this.contentEl.querySelector(".dashboard-left") as HTMLElement
+		);
+		this.renderMiddleColumn();
 	}
 }

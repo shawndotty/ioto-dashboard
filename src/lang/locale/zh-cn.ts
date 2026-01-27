@@ -8,6 +8,18 @@ export default {
 	TAB_NOTES: "笔记",
 	TAB_TASKS: "任务",
 
+	// Saved Queries
+	NAV_USER_QUERIES: "用户查询",
+	BTN_SAVE_QUERY: "保存当前查询",
+	BTN_DELETE_QUERY: "删除查询",
+	BTN_EDIT_QUERY: "重命名查询",
+	MODAL_SAVE_TITLE: "保存查询",
+	MODAL_SAVE_NAME_LABEL: "查询名称",
+	MODAL_SAVE_PLACEHOLDER: "输入名称...",
+	MODAL_EDIT_TITLE: "重命名查询",
+	CONFIRM_DELETE_TITLE: "确认删除",
+	CONFIRM_DELETE_MSG: "你确定要删除这个查询吗？",
+
 	// Filters
 	FILTER_TITLE: "过滤",
 	FILTER_NAME_LABEL_NOTES: "笔记名称",
