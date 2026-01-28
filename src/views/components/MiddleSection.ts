@@ -20,6 +20,7 @@ export class MiddleSection {
 	sortOption: SortOption;
 	sortOrder: SortOrder;
 	groupOption: GroupOption;
+	private collapsedGroups: Set<string> = new Set();
 
 	constructor(
 		private app: App,
@@ -336,14 +337,50 @@ export class MiddleSection {
 		}
 
 		groups.forEach((group) => {
-			const header = container.createEl("h5", {
+			const groupContainer = container.createDiv({
+				cls: "group-container",
+			});
+			const header = groupContainer.createDiv({
 				cls: "group-header",
 			});
-			header.style.padding = "8px 16px 4px 16px";
+			header.style.padding = "8px 16px 4px 0px";
 			header.style.marginBottom = "8px";
-			header.style.fontWeight = "bold";
-			header.setText(`${group.label} (${group.items.length})`);
-			this.renderNoteList(container, group.items as TFile[]);
+			header.style.display = "flex";
+			header.style.alignItems = "center";
+			header.style.cursor = "pointer";
+
+			const isCollapsed = this.collapsedGroups.has(group.label);
+
+			const iconSpan = header.createSpan({ cls: "group-icon" });
+			setIcon(iconSpan, isCollapsed ? "chevron-right" : "chevron-down");
+			iconSpan.style.marginRight = "8px";
+			iconSpan.style.display = "flex";
+
+			const title = header.createEl("h5", {
+				text: `${group.label} (${group.items.length})`,
+			});
+			title.style.margin = "0";
+
+			const itemsContainer = groupContainer.createDiv({
+				cls: "group-items",
+			});
+			if (isCollapsed) {
+				itemsContainer.style.display = "none";
+			}
+
+			header.onclick = () => {
+				if (this.collapsedGroups.has(group.label)) {
+					this.collapsedGroups.delete(group.label);
+					itemsContainer.style.display = "block";
+					setIcon(iconSpan, "chevron-down");
+				} else {
+					this.collapsedGroups.add(group.label);
+					itemsContainer.style.display = "none";
+					setIcon(iconSpan, "chevron-right");
+				}
+			};
+
+			this.renderNoteList(itemsContainer, group.items as TFile[]);
 		});
 	}
 
@@ -355,15 +392,50 @@ export class MiddleSection {
 		}
 
 		groups.forEach((group) => {
-			const header = container.createEl("h5", {
+			const groupContainer = container.createDiv({
+				cls: "group-container",
+			});
+			const header = groupContainer.createDiv({
 				cls: "group-header",
 			});
-			header.style.padding = "8px 16px 4px 16px";
+			header.style.padding = "8px 16px 4px 0px";
 			header.style.marginBottom = "8px";
-			header.style.fontWeight = "bold";
+			header.style.display = "flex";
+			header.style.alignItems = "center";
+			header.style.cursor = "pointer";
 
-			header.setText(`${group.label} (${group.items.length})`);
-			this.renderTaskList(container, group.items as TaskItem[]);
+			const isCollapsed = this.collapsedGroups.has(group.label);
+
+			const iconSpan = header.createSpan({ cls: "group-icon" });
+			setIcon(iconSpan, isCollapsed ? "chevron-right" : "chevron-down");
+			iconSpan.style.marginRight = "8px";
+			iconSpan.style.display = "flex";
+
+			const title = header.createEl("h5", {
+				text: `${group.label} (${group.items.length})`,
+			});
+			title.style.margin = "0";
+
+			const itemsContainer = groupContainer.createDiv({
+				cls: "group-items",
+			});
+			if (isCollapsed) {
+				itemsContainer.style.display = "none";
+			}
+
+			header.onclick = () => {
+				if (this.collapsedGroups.has(group.label)) {
+					this.collapsedGroups.delete(group.label);
+					itemsContainer.style.display = "block";
+					setIcon(iconSpan, "chevron-down");
+				} else {
+					this.collapsedGroups.add(group.label);
+					itemsContainer.style.display = "none";
+					setIcon(iconSpan, "chevron-right");
+				}
+			};
+
+			this.renderTaskList(itemsContainer, group.items as TaskItem[]);
 		});
 	}
 
