@@ -306,6 +306,12 @@ export class MiddleSection {
 					return;
 				}
 
+				// Handle selection state
+				container.querySelectorAll(".task-item").forEach((el) => {
+					el.removeClass("is-selected");
+				});
+				item.addClass("is-selected");
+
 				this.app.workspace.getLeaf(false).openFile(task.file, {
 					eState: { line: task.line },
 				});
