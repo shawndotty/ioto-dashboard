@@ -541,7 +541,10 @@ export class MiddleSection {
 			const sizeSpan = meta.createEl("p", { cls: "file-size" });
 			const sizeIconSpan = sizeSpan.createSpan({ cls: "meta-icon" });
 			setIcon(sizeIconSpan, "file-text");
-			sizeSpan.createSpan({ text: ` ${file.stat.size}` });
+			const sizeText = sizeSpan.createSpan({ text: "..." });
+			this.app.vault.cachedRead(file).then((content) => {
+				sizeText.setText(` ${content.length}`);
+			});
 
 			item.onclick = (e) => {
 				e.stopPropagation();
