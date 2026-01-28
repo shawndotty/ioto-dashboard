@@ -11,6 +11,7 @@ export class MiddleSection {
 		private activeCategory: Category,
 		private activeTab: "Notes" | "Tasks",
 		private activeQueryId: string | null,
+		private activeQueryName: string | null,
 		private filteredFiles: TFile[],
 		private filteredTasks: TaskItem[],
 		private isZenMode: boolean,
@@ -38,8 +39,13 @@ export class MiddleSection {
 				? this.filteredFiles.length
 				: this.filteredTasks.length;
 
+		let titleText = `${this.activeCategory} (${count})`;
+		if (this.activeQueryName) {
+			titleText = `${this.activeQueryName} - ${titleText}`;
+		}
+
 		const title = header.createEl("h2", {
-			text: `${this.activeCategory} (${count})`,
+			text: titleText,
 			cls: "view-header-title",
 		});
 		title.style.margin = "0";

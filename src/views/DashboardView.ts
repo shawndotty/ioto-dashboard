@@ -397,6 +397,16 @@ export class DashboardView extends ItemView {
 	}
 
 	renderMiddleColumn() {
+		let activeQueryName: string | null = null;
+		if (this.activeQueryId) {
+			const query = this.plugin.settings.savedQueries.find(
+				(q) => q.id === this.activeQueryId,
+			);
+			if (query) {
+				activeQueryName = query.name;
+			}
+		}
+
 		new MiddleSection(
 			this.app,
 			this.middleContainer,
@@ -404,6 +414,7 @@ export class DashboardView extends ItemView {
 			this.activeCategory,
 			this.activeTab,
 			this.activeQueryId,
+			activeQueryName,
 			this.filteredFiles,
 			this.filteredTasks,
 			this.isZenMode,
