@@ -68,6 +68,8 @@ export default {
 		"成果 (Outcome) 文件夹的路径 (例如: 4-Outcome)",
 	SETTINGS_TASK_FOLDER_NAME: "任务文件夹",
 	SETTINGS_TASK_FOLDER_DESC: "任务 (Task) 文件夹的路径 (例如: 3-Task)",
+	SETTINGS_PAGE_SIZE_NAME: "每页数量",
+	SETTINGS_PAGE_SIZE_DESC: "每页显示的条目数量 (20-300)。",
 
 	// Commands & Ribbon
 	RIBBON_ICON_TITLE: "打开 IOTO 仪表盘",
@@ -99,4 +101,9 @@ export default {
 	GROUP_PROJECT: "项目",
 	GROUP_CREATED: "创建日期",
 	GROUP_MODIFIED: "修改日期",
+
+	// Pagination
+	PAGINATION_PREV: "上一页",
+	PAGINATION_NEXT: "下一页",
+	PAGINATION_PAGE: "第 {0} 页 / 共 {1} 页",
 };

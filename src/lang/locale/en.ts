@@ -66,6 +66,8 @@ export default {
 	SETTINGS_OUTCOME_FOLDER_DESC: "Path to the Outcome folder (e.g. 4-Outcome)",
 	SETTINGS_TASK_FOLDER_NAME: "Task Folder",
 	SETTINGS_TASK_FOLDER_DESC: "Path to the Task folder (e.g. 3-Task)",
+	SETTINGS_PAGE_SIZE_NAME: "Page Size",
+	SETTINGS_PAGE_SIZE_DESC: "Number of items to show per page (20-300).",
 
 	// Commands & Ribbon
 	RIBBON_ICON_TITLE: "Open IOTO Dashboard",
@@ -97,4 +99,9 @@ export default {
 	GROUP_PROJECT: "Project",
 	GROUP_CREATED: "Created Date",
 	GROUP_MODIFIED: "Modified Date",
+
+	// Pagination
+	PAGINATION_PREV: "Previous",
+	PAGINATION_NEXT: "Next",
+	PAGINATION_PAGE: "Page {0} of {1}",
 };

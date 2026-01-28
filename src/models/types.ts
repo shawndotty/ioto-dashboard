@@ -28,3 +28,11 @@ export interface TaskItem {
 export type SortOption = "modified" | "created" | "name" | "size";
 export type SortOrder = "asc" | "desc";
 export type GroupOption = "none" | "project" | "created" | "modified";
+
+export interface PaginationInfo {
+	currentPage: number;
+	totalPages: number;
+	totalItems: number;
+	pageSize: number;
+	onPageChange: (page: number) => void;
+}

@@ -29,6 +29,7 @@ export interface IotoDashboardSettings {
 	outputFolder: string;
 	taskFolder: string;
 	outcomeFolder: string;
+	pageSize: number;
 	savedQueries: SavedQuery[];
 }
 
@@ -37,6 +38,7 @@ export const DEFAULT_SETTINGS: IotoDashboardSettings = {
 	outputFolder: t("OUTPUT_FOLDER"),
 	taskFolder: t("TASK_FOLDER"),
 	outcomeFolder: t("OUTCOME_FOLDER"),
+	pageSize: 100,
 	savedQueries: [],
 };
 
@@ -150,6 +152,22 @@ export class DashboardSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 							this.display();
 						}).open();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName(t("SETTINGS_PAGE_SIZE_NAME"))
+			.setDesc(t("SETTINGS_PAGE_SIZE_DESC"))
+			.addText((text) =>
+				text
+					.setValue(String(this.plugin.settings.pageSize))
+					.onChange(async (value) => {
+						let val = parseInt(value);
+						if (isNaN(val)) return;
+						if (val < 20) val = 20;
+						if (val > 300) val = 300;
+						this.plugin.settings.pageSize = val;
+						await this.plugin.saveSettings();
 					}),
 			);
 	}

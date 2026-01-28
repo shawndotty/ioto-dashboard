@@ -5,9 +5,6 @@ import {
 	MarkdownRenderer,
 	Component,
 	Menu,
-	debounce,
-	EventRef,
-	TAbstractFile,
 } from "obsidian";
 import { t } from "../../lang/helpers";
 import {
@@ -16,6 +13,7 @@ import {
 	SortOption,
 	SortOrder,
 	GroupOption,
+	PaginationInfo,
 } from "../../models/types";
 import { DASHBOARD_VIEW_TYPE } from "../../models/constants";
 
@@ -24,7 +22,6 @@ export class MiddleSection {
 	sortOrder: SortOrder;
 	groupOption: GroupOption;
 	private collapsedGroups: Set<string> = new Set();
-	private deleteEventRef: EventRef;
 
 	constructor(
 		private app: App,
@@ -51,64 +48,16 @@ export class MiddleSection {
 		private isQuickSearchVisible: boolean,
 		private searchText: string,
 		private onSearch: (val: string) => void,
+		private pagination: PaginationInfo,
 	) {
 		this.sortOption = sortOption;
 		this.sortOrder = sortOrder;
 		this.groupOption = groupOption;
-		this.deleteEventRef = this.app.vault.on("delete", this.onFileDelete);
 	}
 
 	private listContainer: HTMLElement;
 
-	unload() {
-		this.app.vault.offref(this.deleteEventRef);
-	}
-
-	onFileDelete = debounce(
-		(file: TAbstractFile) => {
-			if (!(file instanceof TFile)) return;
-
-			let changed = false;
-
-			// Update filteredFiles
-			const fileIndex = this.filteredFiles.findIndex(
-				(f) => f.path === file.path,
-			);
-			if (fileIndex !== -1) {
-				this.filteredFiles.splice(fileIndex, 1);
-				changed = true;
-			}
-
-			// Update filteredTasks
-			const initialTaskCount = this.filteredTasks.length;
-			this.filteredTasks = this.filteredTasks.filter(
-				(t) => t.file.path !== file.path,
-			);
-			if (this.filteredTasks.length !== initialTaskCount) {
-				changed = true;
-			}
-
-			if (changed) {
-				this.refreshList();
-				// Update header count
-				const titleEl =
-					this.container.querySelector(".view-header-title");
-				if (titleEl) {
-					const count =
-						this.activeTab === "Notes"
-							? this.filteredFiles.length
-							: this.filteredTasks.length;
-					let titleText = `${this.activeCategory} (${count})`;
-					if (this.activeQueryName) {
-						titleText = `${this.activeQueryName} - ${titleText}`;
-					}
-					titleEl.setText(titleText);
-				}
-			}
-		},
-		200,
-		true,
-	);
+	unload() {}
 
 	updateData(filteredFiles: TFile[], filteredTasks: TaskItem[]) {
 		this.filteredFiles = filteredFiles;
@@ -145,10 +94,7 @@ export class MiddleSection {
 		header.style.justifyContent = "space-between";
 		header.style.alignItems = "center";
 
-		const count =
-			this.activeTab === "Notes"
-				? this.filteredFiles.length
-				: this.filteredTasks.length;
+		const count = this.pagination.totalItems;
 
 		let titleText = `${this.activeCategory} (${count})`;
 		if (this.activeQueryName) {
@@ -287,6 +233,56 @@ export class MiddleSection {
 		// List
 		this.listContainer = this.container.createDiv({ cls: "file-list" });
 		this.refreshList();
+		this.renderPagination();
+	}
+
+	renderPagination() {
+		if (this.pagination.totalPages <= 1) return;
+
+		const paginationContainer = this.container.createDiv({
+			cls: "dashboard-pagination",
+		});
+		paginationContainer.style.display = "flex";
+		paginationContainer.style.justifyContent = "center";
+		paginationContainer.style.alignItems = "center";
+		paginationContainer.style.gap = "12px";
+		paginationContainer.style.padding = "10px 0";
+		paginationContainer.style.marginTop = "10px";
+		paginationContainer.style.borderTop =
+			"1px solid var(--background-modifier-border)";
+
+		// Prev Button
+		const prevBtn = paginationContainer.createEl("button", {
+			text: t("PAGINATION_PREV"),
+		});
+		prevBtn.disabled = this.pagination.currentPage <= 1;
+		prevBtn.onclick = () => {
+			if (this.pagination.currentPage > 1) {
+				this.pagination.onPageChange(this.pagination.currentPage - 1);
+			}
+		};
+
+		// Page Info
+		const pageInfo = paginationContainer.createSpan({
+			cls: "pagination-info",
+		});
+		pageInfo.setText(
+			t("PAGINATION_PAGE")
+				.replace("{0}", String(this.pagination.currentPage))
+				.replace("{1}", String(this.pagination.totalPages)),
+		);
+
+		// Next Button
+		const nextBtn = paginationContainer.createEl("button", {
+			text: t("PAGINATION_NEXT"),
+		});
+		nextBtn.disabled =
+			this.pagination.currentPage >= this.pagination.totalPages;
+		nextBtn.onclick = () => {
+			if (this.pagination.currentPage < this.pagination.totalPages) {
+				this.pagination.onPageChange(this.pagination.currentPage + 1);
+			}
+		};
 	}
 
 	showSortMenu(event: MouseEvent) {

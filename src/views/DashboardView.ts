@@ -5,6 +5,7 @@ import {
 	TFolder,
 	Notice,
 	debounce,
+	TAbstractFile,
 } from "obsidian";
 import { DASHBOARD_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
@@ -43,6 +44,10 @@ export class DashboardView extends ItemView {
 	tasks: TaskItem[] = [];
 	filteredTasks: TaskItem[] = [];
 
+	// Pagination
+	noteCurrentPage = 1;
+	taskCurrentPage = 1;
+
 	// Filters
 	filters: FilterState = {
 		name: "",
@@ -65,7 +70,7 @@ export class DashboardView extends ItemView {
 			if (isTaskFile) {
 				await this.updateTasksForFile(file);
 			}
-			this.applyFilters();
+			this.applyFilters(false);
 			this.renderMiddleColumn();
 		},
 		500,
@@ -119,6 +124,9 @@ export class DashboardView extends ItemView {
 		// Register file change listener
 		this.registerEvent(
 			this.app.metadataCache.on("changed", this.onFileChange.bind(this)),
+		);
+		this.registerEvent(
+			this.app.vault.on("delete", this.onFileDelete.bind(this)),
 		);
 	}
 
@@ -292,7 +300,12 @@ export class DashboardView extends ItemView {
 		}
 	}
 
-	applyFilters() {
+	applyFilters(resetPage = true) {
+		if (resetPage) {
+			this.noteCurrentPage = 1;
+			this.taskCurrentPage = 1;
+		}
+
 		// Filter Files
 		this.filteredFiles = this.files.filter((file) => {
 			return this.matchesFilter(file, file.basename);
@@ -466,6 +479,28 @@ export class DashboardView extends ItemView {
 			this.middleSection.unload();
 		}
 
+		// Pagination Logic
+		const pageSize = this.plugin.settings.pageSize;
+		const totalNotes = this.filteredFiles.length;
+		const totalTasks = this.filteredTasks.length;
+
+		// Clamp pages
+		const maxNotePage = Math.max(1, Math.ceil(totalNotes / pageSize));
+		const maxTaskPage = Math.max(1, Math.ceil(totalTasks / pageSize));
+
+		if (this.noteCurrentPage > maxNotePage)
+			this.noteCurrentPage = maxNotePage;
+		if (this.taskCurrentPage > maxTaskPage)
+			this.taskCurrentPage = maxTaskPage;
+
+		const noteStart = (this.noteCurrentPage - 1) * pageSize;
+		const noteEnd = noteStart + pageSize;
+		const paginatedFiles = this.filteredFiles.slice(noteStart, noteEnd);
+
+		const taskStart = (this.taskCurrentPage - 1) * pageSize;
+		const taskEnd = taskStart + pageSize;
+		const paginatedTasks = this.filteredTasks.slice(taskStart, taskEnd);
+
 		this.middleSection = new MiddleSection(
 			this.app,
 			this.middleContainer,
@@ -474,8 +509,8 @@ export class DashboardView extends ItemView {
 			this.activeTab,
 			this.activeQueryId,
 			activeQueryName,
-			this.filteredFiles,
-			this.filteredTasks,
+			paginatedFiles,
+			paginatedTasks,
 			this.isZenMode,
 			this.sortOption,
 			this.sortOrder,
@@ -521,12 +556,25 @@ export class DashboardView extends ItemView {
 			this.filters.name,
 			(val: string) => {
 				this.filters.name = val;
-				this.applyFilters();
-				this.middleSection?.updateData(
-					this.filteredFiles,
-					this.filteredTasks,
-				);
+				this.applyFilters(true);
+				this.renderMiddleColumn();
 				this.renderRightColumn();
+			},
+			{
+				currentPage:
+					this.activeTab === "Notes"
+						? this.noteCurrentPage
+						: this.taskCurrentPage,
+				totalPages:
+					this.activeTab === "Notes" ? maxNotePage : maxTaskPage,
+				totalItems:
+					this.activeTab === "Notes" ? totalNotes : totalTasks,
+				pageSize: pageSize,
+				onPageChange: (page: number) => {
+					if (this.activeTab === "Notes") this.noteCurrentPage = page;
+					else this.taskCurrentPage = page;
+					this.renderMiddleColumn();
+				},
 			},
 		);
 		this.middleSection.render();
@@ -741,5 +789,27 @@ export class DashboardView extends ItemView {
 		if (!isNoteFile && !isInTaskFolder) return;
 
 		this.requestRefresh(file, isInTaskFolder);
+	}
+
+	onFileDelete(file: TAbstractFile) {
+		if (!(file instanceof TFile)) return;
+
+		// Check if it's in our lists
+		const isNoteFile = this.files.some((f) => f.path === file.path);
+		const hasTasks = this.tasks.some((t) => t.file.path === file.path);
+
+		if (!isNoteFile && !hasTasks) return;
+
+		// Remove from source lists
+		if (isNoteFile) {
+			this.files = this.files.filter((f) => f.path !== file.path);
+		}
+		if (hasTasks) {
+			this.tasks = this.tasks.filter((t) => t.file.path !== file.path);
+		}
+
+		// Apply filters (which will update filtered lists)
+		this.applyFilters(false);
+		this.renderMiddleColumn();
 	}
 }
