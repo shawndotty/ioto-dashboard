@@ -13,11 +13,13 @@ export class MiddleSection {
 		private activeQueryId: string | null,
 		private filteredFiles: TFile[],
 		private filteredTasks: TaskItem[],
+		private isZenMode: boolean,
 		private onTabChange: (tab: "Notes" | "Tasks") => void,
 		private onEditQuery: (id: string) => void,
 		private onDeleteQuery: (id: string) => void,
 		private onTaskToggle: (task: TaskItem) => Promise<void>,
 		private onDeleteTask: (task: TaskItem) => Promise<void>,
+		private onToggleZenMode: () => void,
 	) {}
 
 	render() {
@@ -42,18 +44,33 @@ export class MiddleSection {
 		});
 		title.style.margin = "0";
 
+		// Actions
+		const actionsDiv = header.createDiv({ cls: "header-actions" });
+		actionsDiv.style.display = "flex";
+		actionsDiv.style.alignItems = "center";
+		actionsDiv.style.paddingBottom = "10px";
+
+		// Zen Mode Button
+		const zenBtn = actionsDiv.createEl("button", {
+			cls: "clickable-icon",
+		});
+		setIcon(zenBtn, this.isZenMode ? "minimize-2" : "maximize-2");
+		zenBtn.setAttribute(
+			"aria-label",
+			this.isZenMode ? t("ZEN_MODE_OFF") : t("ZEN_MODE_ON"),
+		);
+		zenBtn.onclick = () => {
+			this.onToggleZenMode();
+		};
+
 		// Query Actions
 		if (this.activeQueryId) {
-			const actionsDiv = header.createDiv({ cls: "header-actions" });
-			actionsDiv.style.display = "flex";
-			actionsDiv.style.alignItems = "center";
-			actionsDiv.style.paddingBottom = "10px";
-
 			const editBtn = actionsDiv.createEl("button", {
 				cls: "clickable-icon",
 			});
 			setIcon(editBtn, "pencil");
 			editBtn.setAttribute("aria-label", t("BTN_EDIT_QUERY"));
+			editBtn.style.marginLeft = "8px";
 			editBtn.onclick = () => {
 				this.onEditQuery(this.activeQueryId!);
 			};

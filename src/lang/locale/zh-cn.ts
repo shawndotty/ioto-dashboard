@@ -26,6 +26,8 @@ export default {
 	CONFIRM_DELETE_TASK_MSG:
 		"你确定要删除这个任务吗？此操作将从原文件中永久移除该行。",
 	TASK_DELETED: "任务已删除",
+	ZEN_MODE_ON: "进入禅模式",
+	ZEN_MODE_OFF: "退出禅模式",
 
 	// Filters
 	FILTER_TITLE: "过滤",

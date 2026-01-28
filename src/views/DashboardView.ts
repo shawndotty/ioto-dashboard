@@ -17,6 +17,7 @@ export class DashboardView extends ItemView {
 	activeQueryId: string | null = null;
 	leftPanelCollapsed = false;
 	rightPanelCollapsed = false;
+	isZenMode = false;
 
 	// Data
 	files: TFile[] = [];
@@ -64,6 +65,7 @@ export class DashboardView extends ItemView {
 		const grid = container.createDiv({ cls: "dashboard-grid" });
 		if (this.leftPanelCollapsed) grid.addClass("usages-collapsed");
 		if (this.rightPanelCollapsed) grid.addClass("right-collapsed");
+		if (this.isZenMode) grid.addClass("zen-mode");
 
 		// Left Column: Navigation
 		const leftCol = grid.createDiv({ cls: "dashboard-left" });
@@ -361,6 +363,7 @@ export class DashboardView extends ItemView {
 			this.activeQueryId,
 			this.filteredFiles,
 			this.filteredTasks,
+			this.isZenMode,
 			(tab) => {
 				this.activeTab = tab;
 				this.renderMiddleColumn();
@@ -385,7 +388,23 @@ export class DashboardView extends ItemView {
 			async (task) => {
 				await this.deleteTask(task);
 			},
+			() => {
+				this.toggleZenMode();
+			},
 		).render();
+	}
+
+	toggleZenMode() {
+		this.isZenMode = !this.isZenMode;
+		const grid = this.contentEl.querySelector(".dashboard-grid");
+		if (grid) {
+			if (this.isZenMode) {
+				grid.addClass("zen-mode");
+			} else {
+				grid.removeClass("zen-mode");
+			}
+		}
+		this.renderMiddleColumn();
 	}
 
 	async deleteTask(task: TaskItem) {

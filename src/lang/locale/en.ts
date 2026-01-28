@@ -25,6 +25,8 @@ export default {
 	CONFIRM_DELETE_TASK_TITLE: "Delete Task",
 	CONFIRM_DELETE_TASK_MSG: "Are you sure you want to delete this task?",
 	TASK_DELETED: "Task deleted",
+	ZEN_MODE_ON: "Enter Zen Mode",
+	ZEN_MODE_OFF: "Exit Zen Mode",
 
 	// Filters
 	FILTER_TITLE: "Filters",

@@ -24,6 +24,15 @@
     grid-template-columns: 40px 1fr 40px;
 }
 
+.dashboard-grid.zen-mode {
+    grid-template-columns: 1fr;
+}
+
+.dashboard-grid.zen-mode .dashboard-left,
+.dashboard-grid.zen-mode .dashboard-right {
+    display: none;
+}
+
 /* Left Column: Navigation */
 .dashboard-left {
     border-right: 1px solid var(--background-modifier-border);
