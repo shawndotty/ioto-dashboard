@@ -18,6 +18,7 @@ import {
 	TaskItem,
 	SortOption,
 	SortOrder,
+	GroupOption,
 } from "../models/types";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RightSidebar } from "./components/RightSidebar";
@@ -30,6 +31,7 @@ export class DashboardView extends ItemView {
 	activeQueryId: string | null = null;
 	sortOption: SortOption = "modified";
 	sortOrder: SortOrder = "desc";
+	groupOption: GroupOption = "none";
 	leftPanelCollapsed = false;
 	rightPanelCollapsed = false;
 	isZenMode = false;
@@ -462,6 +464,7 @@ export class DashboardView extends ItemView {
 			this.isZenMode,
 			this.sortOption,
 			this.sortOrder,
+			this.groupOption,
 			(tab: "Notes" | "Tasks") => {
 				this.activeTab = tab;
 				this.renderMiddleColumn();
@@ -471,6 +474,10 @@ export class DashboardView extends ItemView {
 				this.sortOption = option;
 				this.sortOrder = order;
 				this.applyFilters();
+				this.renderMiddleColumn();
+			},
+			(option: GroupOption) => {
+				this.groupOption = option;
 				this.renderMiddleColumn();
 			},
 			(id: string) => {

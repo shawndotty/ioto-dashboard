@@ -7,12 +7,19 @@ import {
 	Menu,
 } from "obsidian";
 import { t } from "../../lang/helpers";
-import { Category, TaskItem, SortOption, SortOrder } from "../../models/types";
+import {
+	Category,
+	TaskItem,
+	SortOption,
+	SortOrder,
+	GroupOption,
+} from "../../models/types";
 import { DASHBOARD_VIEW_TYPE } from "../../models/constants";
 
 export class MiddleSection {
 	sortOption: SortOption;
 	sortOrder: SortOrder;
+	groupOption: GroupOption;
 
 	constructor(
 		private app: App,
@@ -27,8 +34,10 @@ export class MiddleSection {
 		private isZenMode: boolean,
 		sortOption: SortOption,
 		sortOrder: SortOrder,
+		groupOption: GroupOption,
 		private onTabChange: (tab: "Notes" | "Tasks") => void,
 		private onSortChange: (option: SortOption, order: SortOrder) => void,
+		private onGroupChange: (option: GroupOption) => void,
 		private onEditQuery: (id: string) => void,
 		private onDeleteQuery: (id: string) => void,
 		private onTaskToggle: (task: TaskItem) => Promise<void>,
@@ -40,6 +49,7 @@ export class MiddleSection {
 	) {
 		this.sortOption = sortOption;
 		this.sortOrder = sortOrder;
+		this.groupOption = groupOption;
 	}
 
 	private listContainer: HTMLElement;
@@ -53,10 +63,18 @@ export class MiddleSection {
 	refreshList() {
 		if (!this.listContainer) return;
 		this.listContainer.empty();
-		if (this.activeTab === "Notes") {
-			this.renderNoteList(this.listContainer);
+		if (this.groupOption === "none") {
+			if (this.activeTab === "Notes") {
+				this.renderNoteList(this.listContainer);
+			} else {
+				this.renderTaskList(this.listContainer);
+			}
 		} else {
-			this.renderTaskList(this.listContainer);
+			if (this.activeTab === "Notes") {
+				this.renderGroupedNoteList(this.listContainer);
+			} else {
+				this.renderGroupedTaskList(this.listContainer);
+			}
 		}
 	}
 
@@ -164,6 +182,17 @@ export class MiddleSection {
 			this.showSortMenu(e as MouseEvent);
 		};
 
+		// Group Button
+		const groupBtn = tabs.createEl("button", {
+			cls: "clickable-icon",
+		});
+		groupBtn.setAttribute("aria-label", t("GROUP_LABEL"));
+		setIcon(groupBtn, "layers");
+		groupBtn.style.marginLeft = "4px";
+		groupBtn.onclick = (e) => {
+			this.showGroupMenu(e as MouseEvent);
+		};
+
 		// Quick Search
 		if (this.isQuickSearchVisible) {
 			const searchContainer = this.container.createDiv({
@@ -235,13 +264,119 @@ export class MiddleSection {
 		menu.showAtMouseEvent(event);
 	}
 
-	renderNoteList(container: HTMLElement) {
-		if (this.filteredFiles.length === 0) {
+	showGroupMenu(event: MouseEvent) {
+		const menu = new Menu();
+
+		const addGroupItem = (label: string, option: GroupOption) => {
+			menu.addItem((item) => {
+				item.setTitle(label)
+					.setChecked(this.groupOption === option)
+					.onClick(() => {
+						this.onGroupChange(option);
+					});
+			});
+		};
+
+		addGroupItem(t("GROUP_NONE"), "none");
+		menu.addSeparator();
+		addGroupItem(t("GROUP_PROJECT"), "project");
+		addGroupItem(t("GROUP_CREATED"), "created");
+		addGroupItem(t("GROUP_MODIFIED"), "modified");
+
+		menu.showAtMouseEvent(event);
+	}
+
+	getGroups(
+		items: (TFile | TaskItem)[],
+		type: "file" | "task",
+	): { label: string; items: (TFile | TaskItem)[] }[] {
+		const groups: { [key: string]: (TFile | TaskItem)[] } = {};
+
+		items.forEach((item) => {
+			let key = "";
+			const file =
+				type === "file" ? (item as TFile) : (item as TaskItem).file;
+
+			if (this.groupOption === "project") {
+				const cache = this.app.metadataCache.getFileCache(file);
+				key = cache?.frontmatter?.["Project"] || t("GROUP_NONE");
+			} else if (this.groupOption === "created") {
+				key = window.moment(file.stat.ctime).format("YYYY-MM-DD");
+			} else if (this.groupOption === "modified") {
+				key = window.moment(file.stat.mtime).format("YYYY-MM-DD");
+			} else {
+				key = t("GROUP_NONE");
+			}
+
+			if (!groups[key]) groups[key] = [];
+			groups[key]!.push(item);
+		});
+
+		const sortedKeys = Object.keys(groups).sort((a, b) => {
+			if (
+				this.groupOption === "created" ||
+				this.groupOption === "modified"
+			) {
+				return b.localeCompare(a); // Newest first
+			}
+			return a.localeCompare(b); // A-Z
+		});
+
+		return sortedKeys.map((key) => ({
+			label: key,
+			items: groups[key]!,
+		}));
+	}
+
+	renderGroupedNoteList(container: HTMLElement) {
+		const groups = this.getGroups(this.filteredFiles, "file");
+		if (groups.length === 0) {
 			container.createEl("p", { text: t("NO_NOTES_FOUND") });
 			return;
 		}
 
-		this.filteredFiles.forEach((file) => {
+		groups.forEach((group) => {
+			const header = container.createEl("h5", {
+				cls: "group-header",
+			});
+			header.style.padding = "8px 16px 4px 16px";
+			header.style.marginBottom = "8px";
+			header.style.fontWeight = "bold";
+			header.setText(`${group.label} (${group.items.length})`);
+			this.renderNoteList(container, group.items as TFile[]);
+		});
+	}
+
+	renderGroupedTaskList(container: HTMLElement) {
+		const groups = this.getGroups(this.filteredTasks, "task");
+		if (groups.length === 0) {
+			container.createEl("p", { text: t("NO_TASKS_FOUND") });
+			return;
+		}
+
+		groups.forEach((group) => {
+			const header = container.createEl("h5", {
+				cls: "group-header",
+			});
+			header.style.padding = "8px 16px 4px 16px";
+			header.style.marginBottom = "8px";
+			header.style.fontWeight = "bold";
+
+			header.setText(`${group.label} (${group.items.length})`);
+			this.renderTaskList(container, group.items as TaskItem[]);
+		});
+	}
+
+	renderNoteList(
+		container: HTMLElement,
+		files: TFile[] = this.filteredFiles,
+	) {
+		if (files.length === 0) {
+			container.createEl("p", { text: t("NO_NOTES_FOUND") });
+			return;
+		}
+
+		files.forEach((file) => {
 			const item = container.createDiv({ cls: "file-item" });
 			item.createEl("h6", { text: file.basename });
 
@@ -294,13 +429,16 @@ export class MiddleSection {
 		});
 	}
 
-	renderTaskList(container: HTMLElement) {
-		if (this.filteredTasks.length === 0) {
+	renderTaskList(
+		container: HTMLElement,
+		tasks: TaskItem[] = this.filteredTasks,
+	) {
+		if (tasks.length === 0) {
 			container.createEl("p", { text: t("NO_TASKS_FOUND") });
 			return;
 		}
 
-		this.filteredTasks.forEach((task) => {
+		tasks.forEach((task) => {
 			const item = container.createDiv({ cls: "task-item" });
 
 			const header = item.createDiv({ cls: "task-item-header" });

@@ -135,7 +135,7 @@
 
 /* Task Item Styles */
 .task-item {
-    padding: 10px;
+    padding: 10px 15px;
     border: 1px solid var(--background-modifier-border);
     border-radius: 6px;
     margin-bottom: 10px;
@@ -180,7 +180,7 @@
 }
 
 .file-item {
-    padding: 10px;
+    padding: 10px 15px;
     border: 1px solid var(--background-modifier-border);
     border-radius: 6px;
     margin-bottom: 10px;

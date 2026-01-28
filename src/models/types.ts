@@ -27,3 +27,4 @@ export interface TaskItem {
 
 export type SortOption = "modified" | "created" | "name";
 export type SortOrder = "asc" | "desc";
+export type GroupOption = "none" | "project" | "created" | "modified";

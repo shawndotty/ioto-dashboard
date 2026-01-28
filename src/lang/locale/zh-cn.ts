@@ -90,4 +90,11 @@ export default {
 	SORT_CREATED_ASC: "创建时间 (从旧到新)",
 	SORT_NAME_ASC: "文件名 (A 到 Z)",
 	SORT_NAME_DESC: "文件名 (Z 到 A)",
+
+	// Group
+	GROUP_LABEL: "分组",
+	GROUP_NONE: "无",
+	GROUP_PROJECT: "项目",
+	GROUP_CREATED: "创建日期",
+	GROUP_MODIFIED: "修改日期",
 };

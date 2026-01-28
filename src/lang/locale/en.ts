@@ -88,4 +88,11 @@ export default {
 	SORT_CREATED_ASC: "Created Time (Old to New)",
 	SORT_NAME_ASC: "File Name (A to Z)",
 	SORT_NAME_DESC: "File Name (Z to A)",
+
+	// Group
+	GROUP_LABEL: "Group",
+	GROUP_NONE: "None",
+	GROUP_PROJECT: "Project",
+	GROUP_CREATED: "Created Date",
+	GROUP_MODIFIED: "Modified Date",
 };

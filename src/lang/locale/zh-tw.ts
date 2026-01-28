@@ -89,4 +89,11 @@ export default {
 	SORT_CREATED_ASC: "建立時間 (從舊到新)",
 	SORT_NAME_ASC: "檔名 (A 到 Z)",
 	SORT_NAME_DESC: "檔名 (Z 到 A)",
+
+	// Group
+	GROUP_LABEL: "分組",
+	GROUP_NONE: "無",
+	GROUP_PROJECT: "專案",
+	GROUP_CREATED: "建立日期",
+	GROUP_MODIFIED: "修改日期",
 };
