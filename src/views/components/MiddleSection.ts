@@ -165,8 +165,14 @@ export class MiddleSection {
 			const date = new Date(file.stat.ctime).toLocaleDateString();
 			dateSpan.createSpan({ text: ` ${date}` });
 
-			item.onclick = () => {
-				this.app.workspace.getLeaf(false).openFile(file);
+			item.onclick = (e) => {
+				let leaf = this.app.workspace.getLeaf(false);
+				// Check for modifier keys to open in new split
+				// Mac: Cmd+Opt, Windows: Ctrl+Alt
+				if ((e.metaKey && e.altKey) || (e.ctrlKey && e.altKey)) {
+					leaf = this.app.workspace.getLeaf("split", "vertical");
+				}
+				leaf.openFile(file);
 			};
 		});
 	}
@@ -318,7 +324,14 @@ export class MiddleSection {
 				});
 				item.addClass("is-selected");
 
-				this.app.workspace.getLeaf(false).openFile(task.file, {
+				let leaf = this.app.workspace.getLeaf(false);
+				// Check for modifier keys to open in new split
+				// Mac: Cmd+Opt, Windows: Ctrl+Alt
+				if ((e.metaKey && e.altKey) || (e.ctrlKey && e.altKey)) {
+					leaf = this.app.workspace.getLeaf("split", "vertical");
+				}
+
+				leaf.openFile(task.file, {
 					eState: { line: task.line },
 				});
 			};
