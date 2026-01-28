@@ -539,6 +539,11 @@ export class MiddleSection {
 			const date = new Date(file.stat.ctime).toLocaleDateString();
 			dateSpan.createSpan({ text: ` ${date}` });
 
+			const sizeSpan = meta.createEl("p", { cls: "file-size" });
+			const sizeIconSpan = sizeSpan.createSpan({ cls: "meta-icon" });
+			setIcon(sizeIconSpan, "file-text");
+			sizeSpan.createSpan({ text: ` ${file.stat.size}` });
+
 			item.onclick = (e) => {
 				e.stopPropagation();
 				e.preventDefault();
