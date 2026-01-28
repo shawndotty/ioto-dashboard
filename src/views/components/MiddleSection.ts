@@ -166,11 +166,16 @@ export class MiddleSection {
 			dateSpan.createSpan({ text: ` ${date}` });
 
 			item.onclick = (e) => {
-				let leaf = this.app.workspace.getLeaf(false);
+				e.stopPropagation();
+				e.preventDefault();
+
+				let leaf;
 				// Check for modifier keys to open in new split
 				// Mac: Cmd+Opt, Windows: Ctrl+Alt
 				if ((e.metaKey && e.altKey) || (e.ctrlKey && e.altKey)) {
 					leaf = this.app.workspace.getLeaf("split", "vertical");
+				} else {
+					leaf = this.app.workspace.getLeaf(false);
 				}
 				leaf.openFile(file);
 			};
@@ -324,11 +329,16 @@ export class MiddleSection {
 				});
 				item.addClass("is-selected");
 
-				let leaf = this.app.workspace.getLeaf(false);
+				e.stopPropagation();
+				e.preventDefault();
+
+				let leaf;
 				// Check for modifier keys to open in new split
 				// Mac: Cmd+Opt, Windows: Ctrl+Alt
 				if ((e.metaKey && e.altKey) || (e.ctrlKey && e.altKey)) {
 					leaf = this.app.workspace.getLeaf("split", "vertical");
+				} else {
+					leaf = this.app.workspace.getLeaf(false);
 				}
 
 				leaf.openFile(task.file, {

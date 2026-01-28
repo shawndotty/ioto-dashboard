@@ -74,7 +74,7 @@ export class DashboardView extends ItemView {
 	}
 
 	getIcon() {
-		return "layout-dashboard";
+		return "columns-3";
 	}
 
 	async onOpen() {

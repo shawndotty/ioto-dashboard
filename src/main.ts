@@ -22,7 +22,7 @@ export default class IotoDashboardPlugin extends Plugin {
 
 		// Ribbon Icon
 		this.addRibbonIcon(
-			"layout-dashboard",
+			"columns-3",
 			t("RIBBON_ICON_TITLE"),
 			(evt: MouseEvent) => {
 				this.activateView(evt.shiftKey);
