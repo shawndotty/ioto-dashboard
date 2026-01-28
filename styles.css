@@ -141,12 +141,12 @@
     margin-bottom: 10px;
     background-color: var(--background-secondary);
     cursor: pointer;
-    transition: transform 0.1s, box-shadow 0.1s;
+    transition: all 0.2s ease;
 }
 
 .task-item:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background-color: var(--background-modifier-hover);
+    border-color: var(--interactive-accent);
 }
 
 .task-item.is-selected {
