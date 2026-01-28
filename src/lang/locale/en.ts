@@ -22,6 +22,9 @@ export default {
 	MODAL_EDIT_TITLE: "Rename Query",
 	CONFIRM_DELETE_TITLE: "Confirm Delete",
 	CONFIRM_DELETE_MSG: "Are you sure you want to delete this query?",
+	CONFIRM_DELETE_TASK_TITLE: "Delete Task",
+	CONFIRM_DELETE_TASK_MSG: "Are you sure you want to delete this task?",
+	TASK_DELETED: "Task deleted",
 
 	// Filters
 	FILTER_TITLE: "Filters",

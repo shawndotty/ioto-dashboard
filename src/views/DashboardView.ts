@@ -382,7 +382,35 @@ export class DashboardView extends ItemView {
 			async (task) => {
 				await this.toggleTaskStatus(task);
 			},
+			async (task) => {
+				await this.deleteTask(task);
+			},
 		).render();
+	}
+
+	async deleteTask(task: TaskItem) {
+		new ConfirmModal(
+			this.app,
+			t("CONFIRM_DELETE_TASK_TITLE"),
+			t("CONFIRM_DELETE_TASK_MSG"),
+			async () => {
+				const file = task.file;
+				const content = await this.app.vault.read(file);
+				const lines = content.split("\n");
+
+				if (task.line >= lines.length) return;
+
+				// Remove the line
+				lines.splice(task.line, 1);
+
+				await this.app.vault.modify(file, lines.join("\n"));
+				new Notice(t("TASK_DELETED"));
+
+				// Refresh UI
+				await this.refreshFiles();
+				this.renderMiddleColumn();
+			},
+		).open();
 	}
 
 	async toggleTaskStatus(task: TaskItem) {

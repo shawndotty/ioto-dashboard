@@ -22,6 +22,9 @@ export default {
 	MODAL_EDIT_TITLE: "重新命名查詢",
 	CONFIRM_DELETE_TITLE: "確認刪除",
 	CONFIRM_DELETE_MSG: "你確定要刪除這個查詢嗎？",
+	CONFIRM_DELETE_TASK_TITLE: "刪除任務",
+	CONFIRM_DELETE_TASK_MSG: "你確定要刪除這個任務嗎？此操作將從原文件中永久移除該行。",
+	TASK_DELETED: "任務已刪除",
 
 	// Filters
 	FILTER_TITLE: "過濾",

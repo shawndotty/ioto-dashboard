@@ -17,6 +17,7 @@ export class MiddleSection {
 		private onEditQuery: (id: string) => void,
 		private onDeleteQuery: (id: string) => void,
 		private onTaskToggle: (task: TaskItem) => Promise<void>,
+		private onDeleteTask: (task: TaskItem) => Promise<void>,
 	) {}
 
 	render() {
@@ -162,21 +163,63 @@ export class MiddleSection {
 			header.createEl("span", { text: date });
 
 			const content = item.createDiv({ cls: "task-content" });
-			const checkbox = content.createEl("input", {
+			content.style.display = "flex";
+			content.style.justifyContent = "space-between";
+			content.style.alignItems = "flex-start";
+
+			const leftContainer = content.createDiv({ cls: "task-left" });
+			leftContainer.style.display = "flex";
+			leftContainer.style.flex = "1";
+			leftContainer.style.alignItems = "flex-start";
+
+			const checkbox = leftContainer.createEl("input", {
 				type: "checkbox",
 				cls: "task-checkbox",
 			});
 			// Explicitly allow pointer events to ensure click is captured
 			checkbox.style.pointerEvents = "auto";
+			checkbox.style.marginTop = "5px"; // Visual alignment
 			checkbox.checked = task.status !== " ";
 			checkbox.onclick = async (e) => {
 				e.stopPropagation();
 				await this.onTaskToggle(task);
 			};
 
-			const textSpan = content.createEl("span", {
+			const textSpan = leftContainer.createEl("span", {
 				cls: "task-markdown-content",
 			});
+			textSpan.style.flex = "1";
+			textSpan.style.marginLeft = "8px";
+
+			const deleteBtn = content.createEl("button", {
+				cls: "task-delete-btn clickable-icon",
+			});
+			setIcon(deleteBtn, "trash");
+			deleteBtn.setAttribute(
+				"aria-label",
+				t("CONFIRM_DELETE_TASK_TITLE"),
+			);
+			deleteBtn.style.opacity = "0"; // Initially hidden
+			deleteBtn.style.transition = "opacity 0.2s ease";
+			deleteBtn.style.marginLeft = "8px";
+			deleteBtn.style.border = "none";
+			deleteBtn.style.background = "transparent";
+			deleteBtn.style.cursor = "pointer";
+
+			item.onmouseenter = () => {
+				deleteBtn.style.opacity = "0.7";
+			};
+			item.onmouseleave = () => {
+				deleteBtn.style.opacity = "0";
+			};
+			deleteBtn.onmouseenter = () => {
+				deleteBtn.style.opacity = "1";
+			};
+
+			deleteBtn.onclick = async (e) => {
+				e.stopPropagation();
+				await this.onDeleteTask(task);
+			};
 			MarkdownRenderer.render(
 				this.app,
 				task.content,

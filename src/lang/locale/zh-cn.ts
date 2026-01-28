@@ -22,6 +22,10 @@ export default {
 	MODAL_EDIT_TITLE: "重命名查询",
 	CONFIRM_DELETE_TITLE: "确认删除",
 	CONFIRM_DELETE_MSG: "你确定要删除这个查询吗？",
+	CONFIRM_DELETE_TASK_TITLE: "删除任务",
+	CONFIRM_DELETE_TASK_MSG:
+		"你确定要删除这个任务吗？此操作将从原文件中永久移除该行。",
+	TASK_DELETED: "任务已删除",
 
 	// Filters
 	FILTER_TITLE: "过滤",
