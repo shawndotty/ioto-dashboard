@@ -1,4 +1,11 @@
-import { ItemView, WorkspaceLeaf, TFile, TFolder, Notice } from "obsidian";
+import {
+	ItemView,
+	WorkspaceLeaf,
+	TFile,
+	TFolder,
+	Notice,
+	debounce,
+} from "obsidian";
 import { DASHBOARD_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
@@ -39,6 +46,19 @@ export class DashboardView extends ItemView {
 	// UI Elements
 	middleContainer: HTMLElement;
 	rightContainer: HTMLElement;
+
+	// Debounced refresh for file changes
+	requestRefresh = debounce(
+		async (file: TFile, isTaskFile: boolean) => {
+			if (isTaskFile) {
+				await this.updateTasksForFile(file);
+			}
+			this.applyFilters();
+			this.renderMiddleColumn();
+		},
+		500,
+		true,
+	);
 
 	constructor(leaf: WorkspaceLeaf, plugin: IotoDashboardPlugin) {
 		super(leaf);
@@ -81,6 +101,11 @@ export class DashboardView extends ItemView {
 		await this.refreshFiles();
 		this.renderMiddleColumn();
 		this.renderRightColumn();
+
+		// Register file change listener
+		this.registerEvent(
+			this.app.metadataCache.on("changed", this.onFileChange.bind(this)),
+		);
 	}
 
 	async refreshFiles() {
@@ -149,68 +174,86 @@ export class DashboardView extends ItemView {
 		}
 
 		const files = this.getAllFiles(taskFolder);
+		const results = await Promise.all(
+			files.map((f) => this.getTasksFromFile(f)),
+		);
+		this.tasks = results.flat();
+	}
+
+	async getTasksFromFile(file: TFile): Promise<TaskItem[]> {
+		const tasks: TaskItem[] = [];
 		const targetHeader = this.getTargetHeader(this.activeCategory);
 
-		for (const file of files) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			if (!cache || !cache.headings) continue;
+		const cache = this.app.metadataCache.getFileCache(file);
+		if (!cache || !cache.headings) return tasks;
 
-			const headings = cache.headings;
+		const headings = cache.headings;
 
-			// Find the target header
-			const headingIndex = headings.findIndex(
-				(h) => h.heading === targetHeader,
-			);
-			if (headingIndex === -1) continue;
+		// Find the target header
+		const headingIndex = headings.findIndex(
+			(h) => h.heading === targetHeader,
+		);
+		if (headingIndex === -1) return tasks;
 
-			const targetHeading = headings[headingIndex];
-			if (!targetHeading) continue;
+		const targetHeading = headings[headingIndex];
+		if (!targetHeading) return tasks;
 
-			const startLine = targetHeading.position.start.line;
+		const startLine = targetHeading.position.start.line;
 
-			// Find end line
-			let endLine = Infinity;
-			for (let i = headingIndex + 1; i < headings.length; i++) {
-				const h = headings[i];
-				if (!h) continue;
-				if (h.level <= targetHeading.level) {
-					endLine = h.position.start.line;
-					break;
-				}
-			}
-
-			// Get list items in range
-			if (!cache.listItems) continue;
-			const relevantItems = cache.listItems.filter(
-				(item) =>
-					item.position.start.line > startLine &&
-					item.position.start.line < endLine &&
-					item.task !== undefined,
-			);
-
-			if (relevantItems.length > 0) {
-				// Read file content
-				const content = await this.app.vault.read(file);
-				const lines = content.split("\n");
-
-				for (const item of relevantItems) {
-					let text = lines[item.position.start.line];
-					if (text === undefined) continue;
-
-					// Strip checkbox pattern like "- [ ] " or "* [x] "
-					text = text.replace(/^(\s*)[-*+]\s*\[.\]\s*/, "");
-
-					if (!text.trim()) continue;
-
-					this.tasks.push({
-						file: file,
-						content: text,
-						status: item.task!,
-						line: item.position.start.line,
-					});
-				}
+		// Find end line
+		let endLine = Infinity;
+		for (let i = headingIndex + 1; i < headings.length; i++) {
+			const h = headings[i];
+			if (!h) continue;
+			if (h.level <= targetHeading.level) {
+				endLine = h.position.start.line;
+				break;
 			}
 		}
+
+		// Get list items in range
+		if (!cache.listItems) return tasks;
+		const relevantItems = cache.listItems.filter(
+			(item) =>
+				item.position.start.line > startLine &&
+				item.position.start.line < endLine &&
+				item.task !== undefined,
+		);
+
+		if (relevantItems.length > 0) {
+			// Read file content
+			const content = await this.app.vault.read(file);
+			const lines = content.split("\n");
+
+			for (const item of relevantItems) {
+				let text = lines[item.position.start.line];
+				if (text === undefined) continue;
+
+				// Strip checkbox pattern like "- [ ] " or "* [x] "
+				text = text.replace(/^(\s*)[-*+]\s*\[.\]\s*/, "");
+
+				if (!text.trim()) continue;
+
+				tasks.push({
+					file: file,
+					content: text,
+					status: item.task!,
+					line: item.position.start.line,
+				});
+			}
+		}
+		return tasks;
+	}
+
+	async updateTasksForFile(file: TFile) {
+		// Remove existing tasks for this file
+		this.tasks = this.tasks.filter((t) => t.file.path !== file.path);
+
+		// Fetch new tasks
+		const newTasks = await this.getTasksFromFile(file);
+
+		// Add new tasks
+		this.tasks.push(...newTasks);
 	}
 
 	getTargetHeader(category: Category): string {
@@ -590,5 +633,18 @@ export class DashboardView extends ItemView {
 			this.contentEl.querySelector(".dashboard-left") as HTMLElement,
 		);
 		this.renderMiddleColumn();
+	}
+
+	onFileChange(file: TFile) {
+		const isNoteFile = this.files.includes(file);
+
+		const taskFolderPath = this.plugin.settings.taskFolder;
+		const isInTaskFolder = file.path.startsWith(
+			taskFolderPath === "/" ? "" : taskFolderPath,
+		);
+
+		if (!isNoteFile && !isInTaskFolder) return;
+
+		this.requestRefresh(file, isInTaskFolder);
 	}
 }
