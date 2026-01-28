@@ -72,4 +72,5 @@ export default {
 	// Commands & Ribbon
 	RIBBON_ICON_TITLE: "打开 IOTO 仪表盘",
 	COMMAND_OPEN_DASHBOARD: "打开仪表盘",
+	COMMAND_TOGGLE_QUICK_SEARCH: "在仪表盘中切换快速搜索",
 };

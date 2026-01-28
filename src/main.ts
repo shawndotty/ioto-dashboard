@@ -40,7 +40,7 @@ export default class IotoDashboardPlugin extends Plugin {
 
 		this.addCommand({
 			id: "toggle-dashboard-quick-search",
-			name: "Toggle Quick Search in Dashboard",
+			name: t("COMMAND_TOGGLE_QUICK_SEARCH"),
 			checkCallback: (checking: boolean) => {
 				const dashboardLeaf =
 					this.app.workspace.getLeavesOfType(DASHBOARD_VIEW_TYPE)[0];
