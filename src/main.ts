@@ -38,6 +38,35 @@ export default class IotoDashboardPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "toggle-dashboard-quick-search",
+			name: "Toggle Quick Search in Dashboard",
+			checkCallback: (checking: boolean) => {
+				const dashboardLeaf =
+					this.app.workspace.getLeavesOfType(DASHBOARD_VIEW_TYPE)[0];
+				if (
+					dashboardLeaf &&
+					dashboardLeaf.view instanceof DashboardView
+				) {
+					// Also check if it's the active view to avoid overriding when not focused?
+					// But user wants global shortcut behavior when in dashboard.
+					// Obsidian's "active view" is usually what we want.
+					// checkCallback is called often.
+					// If we want to restrict to when dashboard is ACTIVE, use app.workspace.getActiveViewOfType.
+
+					const activeView =
+						this.app.workspace.getActiveViewOfType(DashboardView);
+					if (activeView) {
+						if (!checking) {
+							activeView.toggleQuickSearch();
+						}
+						return true;
+					}
+				}
+				return false;
+			},
+		});
+
 		// Settings Tab
 		this.addSettingTab(new DashboardSettingTab(this.app, this));
 	}

@@ -83,6 +83,8 @@ export class DashboardView extends ItemView {
 		const container = this.contentEl;
 		container.empty();
 		container.addClass("dashboard-container");
+		// Allow container to receive focus for keyboard events
+		container.setAttr("tabindex", "0");
 
 		const grid = container.createDiv({ cls: "dashboard-grid" });
 		if (this.leftPanelCollapsed) grid.addClass("usages-collapsed");
@@ -108,23 +110,11 @@ export class DashboardView extends ItemView {
 		this.registerEvent(
 			this.app.metadataCache.on("changed", this.onFileChange.bind(this)),
 		);
+	}
 
-		// Register Quick Search shortcut (Cmd+F / Ctrl+F)
-		if (this.scope) {
-			this.scope.register(["Mod"], "f", (evt) => {
-				evt.preventDefault();
-				this.isQuickSearchVisible = !this.isQuickSearchVisible;
-				// If hiding, maybe clear the filter?
-				// User said "When user presses shortcut again, hide search box".
-				// "Filter results" implies the box is the interface for the filter.
-				// If hidden, usually the filter should be cleared or persisted?
-				// The Right Sidebar filter persists.
-				// If I hide the box, I'll just hide it. The filter remains active.
-				// This matches "Right sidebar search" behavior (if I collapsed right sidebar, filter remains).
-				this.renderMiddleColumn();
-				return false;
-			});
-		}
+	toggleQuickSearch() {
+		this.isQuickSearchVisible = !this.isQuickSearchVisible;
+		this.renderMiddleColumn();
 	}
 
 	async refreshFiles() {
