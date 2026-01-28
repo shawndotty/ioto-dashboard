@@ -23,7 +23,8 @@ export default {
 	CONFIRM_DELETE_TITLE: "確認刪除",
 	CONFIRM_DELETE_MSG: "你確定要刪除這個查詢嗎？",
 	CONFIRM_DELETE_TASK_TITLE: "刪除任務",
-	CONFIRM_DELETE_TASK_MSG: "你確定要刪除這個任務嗎？此操作將從原文件中永久移除該行。",
+	CONFIRM_DELETE_TASK_MSG:
+		"你確定要刪除這個任務嗎？此操作將從原文件中永久移除該行。",
 	TASK_DELETED: "任務已刪除",
 	ZEN_MODE_ON: "進入禪模式",
 	ZEN_MODE_OFF: "退出禪模式",
@@ -72,4 +73,11 @@ export default {
 	RIBBON_ICON_TITLE: "開啟 IOTO 儀表板",
 	COMMAND_OPEN_DASHBOARD: "開啟儀表板",
 	COMMAND_TOGGLE_QUICK_SEARCH: "在儀表板中切換快速搜尋",
+	PICKER_NO_FOLDERS_FOUND: `沒有找到符合條件的資料夾`,
+
+	INPUT_FOLDER: "1-輸入",
+	OUTPUT_FOLDER: "2-輸出",
+	TASK_FOLDER: "3-任務",
+	OUTCOME_FOLDER: "4-成果",
+	CHOOSE_A_FOLDER: "選擇一個資料夾",
 };

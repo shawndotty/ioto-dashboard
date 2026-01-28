@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import IotoDashboardPlugin from "./main";
 import { t } from "./lang/helpers";
-
+import { FolderPickerModal } from "./ui/pickers/folder-picker";
 export interface SavedQuery {
 	id: string;
 	name: string;
@@ -33,10 +33,10 @@ export interface IotoDashboardSettings {
 }
 
 export const DEFAULT_SETTINGS: IotoDashboardSettings = {
-	inputFolder: "1-输入",
-	outputFolder: "2-输出",
-	taskFolder: "3-任务",
-	outcomeFolder: "4-成果",
+	inputFolder: t("INPUT_FOLDER"),
+	outputFolder: t("OUTPUT_FOLDER"),
+	taskFolder: t("TASK_FOLDER"),
+	outcomeFolder: t("OUTCOME_FOLDER"),
 	savedQueries: [],
 };
 
@@ -64,6 +64,18 @@ export class DashboardSettingTab extends PluginSettingTab {
 						this.plugin.settings.inputFolder = value;
 						await this.plugin.saveSettings();
 					}),
+			)
+			.addButton((btn) =>
+				btn
+					.setIcon("folder")
+					.setTooltip(t("CHOOSE_A_FOLDER"))
+					.onClick(() => {
+						new FolderPickerModal(this.app, async (folder) => {
+							this.plugin.settings.inputFolder = folder.path;
+							await this.plugin.saveSettings();
+							this.display();
+						}).open();
+					}),
 			);
 
 		new Setting(containerEl)
@@ -76,6 +88,18 @@ export class DashboardSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.outputFolder = value;
 						await this.plugin.saveSettings();
+					}),
+			)
+			.addButton((btn) =>
+				btn
+					.setIcon("folder")
+					.setTooltip(t("CHOOSE_A_FOLDER"))
+					.onClick(() => {
+						new FolderPickerModal(this.app, async (folder) => {
+							this.plugin.settings.outputFolder = folder.path;
+							await this.plugin.saveSettings();
+							this.display();
+						}).open();
 					}),
 			);
 
@@ -90,6 +114,18 @@ export class DashboardSettingTab extends PluginSettingTab {
 						this.plugin.settings.taskFolder = value;
 						await this.plugin.saveSettings();
 					}),
+			)
+			.addButton((btn) =>
+				btn
+					.setIcon("folder")
+					.setTooltip(t("CHOOSE_A_FOLDER"))
+					.onClick(() => {
+						new FolderPickerModal(this.app, async (folder) => {
+							this.plugin.settings.taskFolder = folder.path;
+							await this.plugin.saveSettings();
+							this.display();
+						}).open();
+					}),
 			);
 
 		new Setting(containerEl)
@@ -102,6 +138,18 @@ export class DashboardSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.outcomeFolder = value;
 						await this.plugin.saveSettings();
+					}),
+			)
+			.addButton((btn) =>
+				btn
+					.setIcon("folder")
+					.setTooltip(t("CHOOSE_A_FOLDER"))
+					.onClick(() => {
+						new FolderPickerModal(this.app, async (folder) => {
+							this.plugin.settings.outcomeFolder = folder.path;
+							await this.plugin.saveSettings();
+							this.display();
+						}).open();
 					}),
 			);
 	}

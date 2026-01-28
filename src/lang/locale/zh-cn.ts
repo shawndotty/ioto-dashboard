@@ -73,4 +73,12 @@ export default {
 	RIBBON_ICON_TITLE: "打开 IOTO 仪表盘",
 	COMMAND_OPEN_DASHBOARD: "打开仪表盘",
 	COMMAND_TOGGLE_QUICK_SEARCH: "在仪表盘中切换快速搜索",
+	PICKER_NO_FOLDERS_FOUND: `没有找到符合条件的文件夹`,
+
+	INPUT_FOLDER: "1-输入",
+	OUTPUT_FOLDER: "2-输出",
+	TASK_FOLDER: "3-任务",
+	OUTCOME_FOLDER: "4-成果",
+
+	CHOOSE_A_FOLDER: "选择一个文件夹",
 };

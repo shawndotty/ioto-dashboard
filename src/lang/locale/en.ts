@@ -71,4 +71,12 @@ export default {
 	RIBBON_ICON_TITLE: "Open IOTO Dashboard",
 	COMMAND_OPEN_DASHBOARD: "Open Dashboard",
 	COMMAND_TOGGLE_QUICK_SEARCH: "Toggle Quick Search in Dashboard",
+	PICKER_NO_FOLDERS_FOUND: `No folders found`,
+
+	INPUT_FOLDER: "1-Input",
+	OUTPUT_FOLDER: "2-Output",
+	TASK_FOLDER: "3-Task",
+	OUTCOME_FOLDER: "4-Outcome",
+
+	CHOOSE_A_FOLDER: "Choose a folder",
 };
