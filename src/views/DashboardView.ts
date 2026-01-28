@@ -122,6 +122,12 @@ export class DashboardView extends ItemView {
 		);
 	}
 
+	async onClose() {
+		if (this.middleSection) {
+			this.middleSection.unload();
+		}
+	}
+
 	toggleQuickSearch() {
 		this.isQuickSearchVisible = !this.isQuickSearchVisible;
 		this.renderMiddleColumn();
@@ -449,6 +455,10 @@ export class DashboardView extends ItemView {
 			if (query) {
 				activeQueryName = query.name;
 			}
+		}
+
+		if (this.middleSection) {
+			this.middleSection.unload();
 		}
 
 		this.middleSection = new MiddleSection(

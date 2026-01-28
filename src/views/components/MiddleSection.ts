@@ -5,6 +5,9 @@ import {
 	MarkdownRenderer,
 	Component,
 	Menu,
+	debounce,
+	EventRef,
+	TAbstractFile,
 } from "obsidian";
 import { t } from "../../lang/helpers";
 import {
@@ -21,6 +24,7 @@ export class MiddleSection {
 	sortOrder: SortOrder;
 	groupOption: GroupOption;
 	private collapsedGroups: Set<string> = new Set();
+	private deleteEventRef: EventRef;
 
 	constructor(
 		private app: App,
@@ -51,9 +55,60 @@ export class MiddleSection {
 		this.sortOption = sortOption;
 		this.sortOrder = sortOrder;
 		this.groupOption = groupOption;
+		this.deleteEventRef = this.app.vault.on("delete", this.onFileDelete);
 	}
 
 	private listContainer: HTMLElement;
+
+	unload() {
+		this.app.vault.offref(this.deleteEventRef);
+	}
+
+	onFileDelete = debounce(
+		(file: TAbstractFile) => {
+			if (!(file instanceof TFile)) return;
+
+			let changed = false;
+
+			// Update filteredFiles
+			const fileIndex = this.filteredFiles.findIndex(
+				(f) => f.path === file.path,
+			);
+			if (fileIndex !== -1) {
+				this.filteredFiles.splice(fileIndex, 1);
+				changed = true;
+			}
+
+			// Update filteredTasks
+			const initialTaskCount = this.filteredTasks.length;
+			this.filteredTasks = this.filteredTasks.filter(
+				(t) => t.file.path !== file.path,
+			);
+			if (this.filteredTasks.length !== initialTaskCount) {
+				changed = true;
+			}
+
+			if (changed) {
+				this.refreshList();
+				// Update header count
+				const titleEl =
+					this.container.querySelector(".view-header-title");
+				if (titleEl) {
+					const count =
+						this.activeTab === "Notes"
+							? this.filteredFiles.length
+							: this.filteredTasks.length;
+					let titleText = `${this.activeCategory} (${count})`;
+					if (this.activeQueryName) {
+						titleText = `${this.activeQueryName} - ${titleText}`;
+					}
+					titleEl.setText(titleText);
+				}
+			}
+		},
+		200,
+		true,
+	);
 
 	updateData(filteredFiles: TFile[], filteredTasks: TaskItem[]) {
 		this.filteredFiles = filteredFiles;
