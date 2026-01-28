@@ -17,7 +17,7 @@ import {
 } from "../../models/types";
 import { DASHBOARD_VIEW_TYPE } from "../../models/constants";
 
-export class MiddleSection {
+export class MiddleSection extends Component {
 	sortOption: SortOption;
 	sortOrder: SortOrder;
 	groupOption: GroupOption;
@@ -26,7 +26,6 @@ export class MiddleSection {
 	constructor(
 		private app: App,
 		private container: HTMLElement,
-		private parentComponent: Component,
 		private activeCategory: Category,
 		private activeTab: "Notes" | "Tasks",
 		private activeQueryId: string | null,
@@ -50,14 +49,13 @@ export class MiddleSection {
 		private onSearch: (val: string) => void,
 		private pagination: PaginationInfo,
 	) {
+		super();
 		this.sortOption = sortOption;
 		this.sortOrder = sortOrder;
 		this.groupOption = groupOption;
 	}
 
 	private listContainer: HTMLElement;
-
-	unload() {}
 
 	updateData(filteredFiles: TFile[], filteredTasks: TaskItem[]) {
 		this.filteredFiles = filteredFiles;
@@ -643,7 +641,7 @@ export class MiddleSection {
 				task.content,
 				textSpan,
 				task.file.path,
-				this.parentComponent,
+				this,
 			).then(() => {
 				// Remove paragraph margins to keep it inline-like
 				const p = textSpan.querySelector("p");

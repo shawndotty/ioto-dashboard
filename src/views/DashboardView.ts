@@ -255,7 +255,7 @@ export class DashboardView extends ItemView {
 
 		if (relevantItems.length > 0) {
 			// Read file content
-			const content = await this.app.vault.read(file);
+			const content = await this.app.vault.cachedRead(file);
 			const lines = content.split("\n");
 
 			for (const item of relevantItems) {
@@ -476,7 +476,7 @@ export class DashboardView extends ItemView {
 		}
 
 		if (this.middleSection) {
-			this.middleSection.unload();
+			this.removeChild(this.middleSection);
 		}
 
 		// Pagination Logic
@@ -504,7 +504,6 @@ export class DashboardView extends ItemView {
 		this.middleSection = new MiddleSection(
 			this.app,
 			this.middleContainer,
-			this,
 			this.activeCategory,
 			this.activeTab,
 			this.activeQueryId,
@@ -577,6 +576,7 @@ export class DashboardView extends ItemView {
 				},
 			},
 		);
+		this.addChild(this.middleSection);
 		this.middleSection.render();
 	}
 
