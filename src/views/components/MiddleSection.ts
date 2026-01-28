@@ -316,6 +316,9 @@ export class MiddleSection {
 		menu.addSeparator();
 		addSortItem(t("SORT_NAME_ASC"), "name", "asc");
 		addSortItem(t("SORT_NAME_DESC"), "name", "desc");
+		menu.addSeparator();
+		addSortItem(t("SORT_SIZE_DESC"), "size", "desc");
+		addSortItem(t("SORT_SIZE_ASC"), "size", "asc");
 
 		menu.showAtMouseEvent(event);
 	}

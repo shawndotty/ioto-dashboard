@@ -88,6 +88,8 @@ export default {
 	SORT_CREATED_ASC: "Created Time (Old to New)",
 	SORT_NAME_ASC: "File Name (A to Z)",
 	SORT_NAME_DESC: "File Name (Z to A)",
+	SORT_SIZE_DESC: "Content Length (High to Low)",
+	SORT_SIZE_ASC: "Content Length (Low to High)",
 
 	// Group
 	GROUP_LABEL: "Group",

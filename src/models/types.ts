@@ -25,6 +25,6 @@ export interface TaskItem {
 	line: number;
 }
 
-export type SortOption = "modified" | "created" | "name";
+export type SortOption = "modified" | "created" | "name" | "size";
 export type SortOrder = "asc" | "desc";
 export type GroupOption = "none" | "project" | "created" | "modified";

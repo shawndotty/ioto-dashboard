@@ -90,6 +90,8 @@ export default {
 	SORT_CREATED_ASC: "创建时间 (从旧到新)",
 	SORT_NAME_ASC: "文件名 (A 到 Z)",
 	SORT_NAME_DESC: "文件名 (Z 到 A)",
+	SORT_SIZE_DESC: "笔记长度 (从多到少)",
+	SORT_SIZE_ASC: "笔记长度 (从少到多)",
 
 	// Group
 	GROUP_LABEL: "分组",

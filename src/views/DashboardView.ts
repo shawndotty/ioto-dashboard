@@ -326,6 +326,8 @@ export class DashboardView extends ItemView {
 				result = a.stat.ctime - b.stat.ctime;
 			} else if (this.sortOption === "name") {
 				result = a.basename.localeCompare(b.basename);
+			} else if (this.sortOption === "size") {
+				result = a.stat.size - b.stat.size;
 			}
 			return this.sortOrder === "asc" ? result : -result;
 		});
@@ -340,6 +342,9 @@ export class DashboardView extends ItemView {
 				result = a.file.stat.ctime - b.file.stat.ctime;
 			} else if (this.sortOption === "name") {
 				result = a.file.basename.localeCompare(b.file.basename);
+			} else if (this.sortOption === "size") {
+				// Sort by task file size
+				result = a.file.stat.size - b.file.stat.size;
 			}
 			return this.sortOrder === "asc" ? result : -result;
 		});
