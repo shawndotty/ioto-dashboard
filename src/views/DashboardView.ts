@@ -12,7 +12,13 @@ import { t } from "../lang/helpers";
 import { SaveQueryModal } from "../ui/SaveQueryModal";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { SavedQuery } from "../settings";
-import { Category, FilterState, TaskItem } from "../models/types";
+import {
+	Category,
+	FilterState,
+	TaskItem,
+	SortOption,
+	SortOrder,
+} from "../models/types";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RightSidebar } from "./components/RightSidebar";
 import { MiddleSection } from "./components/MiddleSection";
@@ -22,6 +28,8 @@ export class DashboardView extends ItemView {
 	activeCategory: Category = "Input";
 	activeTab: "Notes" | "Tasks" = "Notes";
 	activeQueryId: string | null = null;
+	sortOption: SortOption = "modified";
+	sortOrder: SortOrder = "desc";
 	leftPanelCollapsed = false;
 	rightPanelCollapsed = false;
 	isZenMode = false;
@@ -281,7 +289,7 @@ export class DashboardView extends ItemView {
 		this.filteredFiles = this.files.filter((file) => {
 			return this.matchesFilter(file, file.basename);
 		});
-		this.filteredFiles.sort((a, b) => b.stat.ctime - a.stat.ctime);
+		this.sortFiles(this.filteredFiles);
 
 		// Filter Tasks
 		this.filteredTasks = this.tasks.filter((task) => {
@@ -298,10 +306,35 @@ export class DashboardView extends ItemView {
 
 			return true;
 		});
-		// Sort tasks? Maybe by file creation date?
-		this.filteredTasks.sort(
-			(a, b) => b.file.stat.ctime - a.file.stat.ctime,
-		);
+		this.sortTasks(this.filteredTasks);
+	}
+
+	sortFiles(files: TFile[]) {
+		files.sort((a, b) => {
+			let result = 0;
+			if (this.sortOption === "modified") {
+				result = a.stat.mtime - b.stat.mtime;
+			} else if (this.sortOption === "created") {
+				result = a.stat.ctime - b.stat.ctime;
+			} else if (this.sortOption === "name") {
+				result = a.basename.localeCompare(b.basename);
+			}
+			return this.sortOrder === "asc" ? result : -result;
+		});
+	}
+
+	sortTasks(tasks: TaskItem[]) {
+		tasks.sort((a, b) => {
+			let result = 0;
+			if (this.sortOption === "modified") {
+				result = a.file.stat.mtime - b.file.stat.mtime;
+			} else if (this.sortOption === "created") {
+				result = a.file.stat.ctime - b.file.stat.ctime;
+			} else if (this.sortOption === "name") {
+				result = a.file.basename.localeCompare(b.file.basename);
+			}
+			return this.sortOrder === "asc" ? result : -result;
+		});
 	}
 
 	matchesFilter(file: TFile, textContent: string): boolean {
@@ -427,15 +460,23 @@ export class DashboardView extends ItemView {
 			this.filteredFiles,
 			this.filteredTasks,
 			this.isZenMode,
-			(tab) => {
+			this.sortOption,
+			this.sortOrder,
+			(tab: "Notes" | "Tasks") => {
 				this.activeTab = tab;
 				this.renderMiddleColumn();
 				this.renderRightColumn();
 			},
-			(id) => {
+			(option: SortOption, order: SortOrder) => {
+				this.sortOption = option;
+				this.sortOrder = order;
+				this.applyFilters();
+				this.renderMiddleColumn();
+			},
+			(id: string) => {
 				this.renameSavedQuery(id);
 			},
-			(id) => {
+			(id: string) => {
 				new ConfirmModal(
 					this.app,
 					t("CONFIRM_DELETE_TITLE"),
@@ -445,10 +486,10 @@ export class DashboardView extends ItemView {
 					},
 				).open();
 			},
-			async (task) => {
+			async (task: TaskItem) => {
 				await this.toggleTaskStatus(task);
 			},
-			async (task) => {
+			async (task: TaskItem) => {
 				await this.deleteTask(task);
 			},
 			() => {
@@ -456,7 +497,7 @@ export class DashboardView extends ItemView {
 			},
 			this.isQuickSearchVisible,
 			this.filters.name,
-			(val) => {
+			(val: string) => {
 				this.filters.name = val;
 				this.applyFilters();
 				this.middleSection?.updateData(

@@ -1,9 +1,19 @@
-import { App, setIcon, TFile, MarkdownRenderer, Component } from "obsidian";
+import {
+	App,
+	setIcon,
+	TFile,
+	MarkdownRenderer,
+	Component,
+	Menu,
+} from "obsidian";
 import { t } from "../../lang/helpers";
-import { Category, TaskItem } from "../../models/types";
+import { Category, TaskItem, SortOption, SortOrder } from "../../models/types";
 import { DASHBOARD_VIEW_TYPE } from "../../models/constants";
 
 export class MiddleSection {
+	sortOption: SortOption;
+	sortOrder: SortOrder;
+
 	constructor(
 		private app: App,
 		private container: HTMLElement,
@@ -15,7 +25,10 @@ export class MiddleSection {
 		private filteredFiles: TFile[],
 		private filteredTasks: TaskItem[],
 		private isZenMode: boolean,
+		sortOption: SortOption,
+		sortOrder: SortOrder,
 		private onTabChange: (tab: "Notes" | "Tasks") => void,
+		private onSortChange: (option: SortOption, order: SortOrder) => void,
 		private onEditQuery: (id: string) => void,
 		private onDeleteQuery: (id: string) => void,
 		private onTaskToggle: (task: TaskItem) => Promise<void>,
@@ -24,7 +37,10 @@ export class MiddleSection {
 		private isQuickSearchVisible: boolean,
 		private searchText: string,
 		private onSearch: (val: string) => void,
-	) {}
+	) {
+		this.sortOption = sortOption;
+		this.sortOrder = sortOrder;
+	}
 
 	private listContainer: HTMLElement;
 
@@ -134,6 +150,20 @@ export class MiddleSection {
 			this.onTabChange("Tasks");
 		};
 
+		// Spacer
+		const spacer = tabs.createDiv();
+		spacer.style.flex = "1";
+
+		// Sort Button
+		const sortBtn = tabs.createEl("button", {
+			cls: "clickable-icon",
+		});
+		sortBtn.setAttribute("aria-label", t("SORT_LABEL"));
+		setIcon(sortBtn, "arrow-up-down");
+		sortBtn.onclick = (e) => {
+			this.showSortMenu(e as MouseEvent);
+		};
+
 		// Quick Search
 		if (this.isQuickSearchVisible) {
 			const searchContainer = this.container.createDiv({
@@ -172,6 +202,37 @@ export class MiddleSection {
 		// List
 		this.listContainer = this.container.createDiv({ cls: "file-list" });
 		this.refreshList();
+	}
+
+	showSortMenu(event: MouseEvent) {
+		const menu = new Menu();
+
+		const addSortItem = (
+			label: string,
+			option: SortOption,
+			order: SortOrder,
+		) => {
+			menu.addItem((item) => {
+				item.setTitle(label)
+					.setChecked(
+						this.sortOption === option && this.sortOrder === order,
+					)
+					.onClick(() => {
+						this.onSortChange(option, order);
+					});
+			});
+		};
+
+		addSortItem(t("SORT_MODIFIED_DESC"), "modified", "desc");
+		addSortItem(t("SORT_MODIFIED_ASC"), "modified", "asc");
+		menu.addSeparator();
+		addSortItem(t("SORT_CREATED_DESC"), "created", "desc");
+		addSortItem(t("SORT_CREATED_ASC"), "created", "asc");
+		menu.addSeparator();
+		addSortItem(t("SORT_NAME_ASC"), "name", "asc");
+		addSortItem(t("SORT_NAME_DESC"), "name", "desc");
+
+		menu.showAtMouseEvent(event);
 	}
 
 	renderNoteList(container: HTMLElement) {

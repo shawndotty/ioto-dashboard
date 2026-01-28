@@ -80,4 +80,13 @@ export default {
 	TASK_FOLDER: "3-任務",
 	OUTCOME_FOLDER: "4-成果",
 	CHOOSE_A_FOLDER: "選擇一個資料夾",
+
+	// Sort
+	SORT_LABEL: "排序",
+	SORT_MODIFIED_DESC: "更新時間 (從新到舊)",
+	SORT_MODIFIED_ASC: "更新時間 (從舊到新)",
+	SORT_CREATED_DESC: "建立時間 (從新到舊)",
+	SORT_CREATED_ASC: "建立時間 (從舊到新)",
+	SORT_NAME_ASC: "檔名 (A 到 Z)",
+	SORT_NAME_DESC: "檔名 (Z 到 A)",
 };

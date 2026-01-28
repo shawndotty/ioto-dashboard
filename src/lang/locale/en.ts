@@ -79,4 +79,13 @@ export default {
 	OUTCOME_FOLDER: "4-Outcome",
 
 	CHOOSE_A_FOLDER: "Choose a folder",
+
+	// Sort
+	SORT_LABEL: "Sort",
+	SORT_MODIFIED_DESC: "Modified Time (New to Old)",
+	SORT_MODIFIED_ASC: "Modified Time (Old to New)",
+	SORT_CREATED_DESC: "Created Time (New to Old)",
+	SORT_CREATED_ASC: "Created Time (Old to New)",
+	SORT_NAME_ASC: "File Name (A to Z)",
+	SORT_NAME_DESC: "File Name (Z to A)",
 };

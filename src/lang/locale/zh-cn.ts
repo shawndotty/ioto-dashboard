@@ -81,4 +81,13 @@ export default {
 	OUTCOME_FOLDER: "4-成果",
 
 	CHOOSE_A_FOLDER: "选择一个文件夹",
+
+	// Sort
+	SORT_LABEL: "排序",
+	SORT_MODIFIED_DESC: "更新时间 (从新到旧)",
+	SORT_MODIFIED_ASC: "更新时间 (从旧到新)",
+	SORT_CREATED_DESC: "创建时间 (从新到旧)",
+	SORT_CREATED_ASC: "创建时间 (从旧到新)",
+	SORT_NAME_ASC: "文件名 (A 到 Z)",
+	SORT_NAME_DESC: "文件名 (Z 到 A)",
 };
