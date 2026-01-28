@@ -92,7 +92,7 @@ export class DashboardView extends ItemView {
 	async onOpen() {
 		const container = this.contentEl;
 		container.empty();
-		container.addClass("dashboard-container");
+		container.addClass("ioto-dashboard-view");
 		// Allow container to receive focus for keyboard events
 		container.setAttr("tabindex", "0");
 
