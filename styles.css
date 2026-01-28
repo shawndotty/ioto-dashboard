@@ -204,20 +204,28 @@
     gap: 15px;
     font-size: 0.85em;
     color: var(--text-muted);
+    align-items: center;
 }
 
 .file-meta p {
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 4px;
 }
 
-.file-project {
-    color: var(--text-accent);
+.meta-icon {
+    display: flex;
+    align-items: center;
+    margin-right: 4px;
 }
 
-/* Right Column: Info/Help */
+.meta-icon svg {
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+}
+
+/* Right Column: Filters */
 .dashboard-right {
     border-left: 1px solid var(--background-modifier-border);
     padding: 20px;
@@ -226,25 +234,72 @@
     border-radius: 10px;
 }
 
+.filter-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
 .filter-item {
-    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }
 
 .filter-item label {
-    display: block;
-    margin-bottom: 5px;
     font-weight: 600;
     font-size: 0.9em;
+    color: var(--text-normal);
 }
 
-.filter-item input[type="text"],
-.filter-item select,
-.filter-item input[type="date"] {
+.filter-item input,
+.filter-item select {
     width: 100%;
 }
 
 .filter-actions {
-    margin-top: 20px;
-    display: flex;
-    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.header-actions {
+    gap: 8px;
+}
+
+.clickable-icon {
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: color 0.2s;
+    background: transparent;
+    border: none;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.clickable-icon:hover {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+
+.view-header-title {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: var(--text-normal);
+}
+
+/* Quick Search */
+.dashboard-search-container {
+    margin-bottom: 10px;
+}
+
+.dashboard-search-input {
+    background-color: var(--background-modifier-form-field);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 6px 12px;
+    transition: all 0.2s ease;
+}
+
+.dashboard-search-input:focus {
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }

@@ -21,7 +21,28 @@ export class MiddleSection {
 		private onTaskToggle: (task: TaskItem) => Promise<void>,
 		private onDeleteTask: (task: TaskItem) => Promise<void>,
 		private onToggleZenMode: () => void,
+		private isQuickSearchVisible: boolean,
+		private searchText: string,
+		private onSearch: (val: string) => void,
 	) {}
+
+	private listContainer: HTMLElement;
+
+	updateData(filteredFiles: TFile[], filteredTasks: TaskItem[]) {
+		this.filteredFiles = filteredFiles;
+		this.filteredTasks = filteredTasks;
+		this.refreshList();
+	}
+
+	refreshList() {
+		if (!this.listContainer) return;
+		this.listContainer.empty();
+		if (this.activeTab === "Notes") {
+			this.renderNoteList(this.listContainer);
+		} else {
+			this.renderTaskList(this.listContainer);
+		}
+	}
 
 	render() {
 		this.container.empty();
@@ -113,14 +134,44 @@ export class MiddleSection {
 			this.onTabChange("Tasks");
 		};
 
-		// List
-		const list = this.container.createDiv({ cls: "file-list" });
+		// Quick Search
+		if (this.isQuickSearchVisible) {
+			const searchContainer = this.container.createDiv({
+				cls: "dashboard-search-container",
+			});
+			searchContainer.style.padding = "0 16px 8px 16px";
 
-		if (this.activeTab === "Notes") {
-			this.renderNoteList(list);
-		} else {
-			this.renderTaskList(list);
+			const searchInput = searchContainer.createEl("input", {
+				type: "text",
+				cls: "dashboard-search-input",
+			});
+			searchInput.style.width = "100%";
+			searchInput.placeholder = t("FILTER_NAME_PLACEHOLDER");
+			searchInput.value = this.searchText;
+
+			// Auto-focus logic
+			setTimeout(() => {
+				searchInput.focus();
+				// Optional: select text? Or just cursor at end?
+				// To put cursor at end:
+				const len = searchInput.value.length;
+				searchInput.setSelectionRange(len, len);
+			}, 0);
+
+			searchInput.oninput = (e) => {
+				const val = (e.target as HTMLInputElement).value;
+				this.onSearch(val);
+			};
+
+			// Handle Escape to close?
+			// User didn't ask, but it's good UX.
+			// "When user presses shortcut again, hide search box" -> Mod+F
+			// I'll stick to just Mod+F for now to be safe with user instructions.
 		}
+
+		// List
+		this.listContainer = this.container.createDiv({ cls: "file-list" });
+		this.refreshList();
 	}
 
 	renderNoteList(container: HTMLElement) {

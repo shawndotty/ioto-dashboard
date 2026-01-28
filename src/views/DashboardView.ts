@@ -25,6 +25,7 @@ export class DashboardView extends ItemView {
 	leftPanelCollapsed = false;
 	rightPanelCollapsed = false;
 	isZenMode = false;
+	isQuickSearchVisible = false;
 
 	// Data
 	files: TFile[] = [];
@@ -46,6 +47,7 @@ export class DashboardView extends ItemView {
 	// UI Elements
 	middleContainer: HTMLElement;
 	rightContainer: HTMLElement;
+	middleSection: MiddleSection | null = null;
 
 	// Debounced refresh for file changes
 	requestRefresh = debounce(
@@ -106,6 +108,23 @@ export class DashboardView extends ItemView {
 		this.registerEvent(
 			this.app.metadataCache.on("changed", this.onFileChange.bind(this)),
 		);
+
+		// Register Quick Search shortcut (Cmd+F / Ctrl+F)
+		if (this.scope) {
+			this.scope.register(["Mod"], "f", (evt) => {
+				evt.preventDefault();
+				this.isQuickSearchVisible = !this.isQuickSearchVisible;
+				// If hiding, maybe clear the filter?
+				// User said "When user presses shortcut again, hide search box".
+				// "Filter results" implies the box is the interface for the filter.
+				// If hidden, usually the filter should be cleared or persisted?
+				// The Right Sidebar filter persists.
+				// If I hide the box, I'll just hide it. The filter remains active.
+				// This matches "Right sidebar search" behavior (if I collapsed right sidebar, filter remains).
+				this.renderMiddleColumn();
+				return false;
+			});
+		}
 	}
 
 	async refreshFiles() {
@@ -407,7 +426,7 @@ export class DashboardView extends ItemView {
 			}
 		}
 
-		new MiddleSection(
+		this.middleSection = new MiddleSection(
 			this.app,
 			this.middleContainer,
 			this,
@@ -445,7 +464,19 @@ export class DashboardView extends ItemView {
 			() => {
 				this.toggleZenMode();
 			},
-		).render();
+			this.isQuickSearchVisible,
+			this.filters.name,
+			(val) => {
+				this.filters.name = val;
+				this.applyFilters();
+				this.middleSection?.updateData(
+					this.filteredFiles,
+					this.filteredTasks,
+				);
+				this.renderRightColumn();
+			},
+		);
+		this.middleSection.render();
 	}
 
 	toggleZenMode() {
