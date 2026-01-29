@@ -7,6 +7,7 @@ import {
 	IotoDashboardSettings,
 	DashboardSettingTab,
 } from "./settings";
+import { IotoSettingsService } from "services/ioto-settings-services";
 
 export default class IotoDashboardPlugin extends Plugin {
 	settings: IotoDashboardSettings;
