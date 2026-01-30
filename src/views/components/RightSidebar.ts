@@ -9,6 +9,7 @@ export class RightSidebar {
 		private activeTab: "Notes" | "Tasks",
 		private activeQueryId: string | null,
 		private allProjects: string[],
+		private allStatuses: string[],
 		private onFilterChange: (
 			newFilters: FilterState,
 			shouldReRender: boolean,
@@ -82,13 +83,23 @@ export class RightSidebar {
 			fileStatusDiv.createEl("label", {
 				text: t("FILTER_FILE_STATUS_LABEL"),
 			});
-			new TextComponent(fileStatusDiv)
+
+			const statusDataListId = "status-list-" + Date.now();
+			const statusDataList = fileStatusDiv.createEl("datalist", {
+				attr: { id: statusDataListId },
+			});
+			this.allStatuses.forEach((s) => {
+				statusDataList.createEl("option", { attr: { value: s } });
+			});
+
+			const statusInput = new TextComponent(fileStatusDiv)
 				.setValue(this.filters.fileStatus || "")
 				.setPlaceholder(t("FILTER_FILE_STATUS_PLACEHOLDER"))
 				.onChange((val) => {
 					this.filters.fileStatus = val;
 					this.onFilterChange(this.filters, false);
 				});
+			statusInput.inputEl.setAttribute("list", statusDataListId);
 		}
 
 		// Date Type

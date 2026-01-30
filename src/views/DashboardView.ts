@@ -199,6 +199,19 @@ export class DashboardView extends ItemView {
 		return Array.from(projects).sort();
 	}
 
+	getAllStatuses(): string[] {
+		const statuses = new Set<string>();
+		const files = this.app.vault.getMarkdownFiles();
+		for (const file of files) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const status = cache?.frontmatter?.["Status"];
+			if (status) {
+				statuses.add(String(status));
+			}
+		}
+		return Array.from(statuses).sort();
+	}
+
 	async fetchTasks() {
 		this.tasks = [];
 		const taskFolderPath = this.plugin.settings.taskFolder;
@@ -695,6 +708,7 @@ export class DashboardView extends ItemView {
 			this.activeTab,
 			this.activeQueryId,
 			this.getAllProjects(),
+			this.getAllStatuses(),
 			(newFilters, shouldReRender) => {
 				this.filters = newFilters;
 				this.applyFilters();
