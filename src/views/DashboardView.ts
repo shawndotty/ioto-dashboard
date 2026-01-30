@@ -24,6 +24,7 @@ import {
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RightSidebar } from "./components/RightSidebar";
 import { MiddleSection } from "./components/MiddleSection";
+import { IotoSettingsService } from "../services/ioto-settings-services";
 
 export class DashboardView extends ItemView {
 	plugin: IotoDashboardPlugin;
@@ -290,13 +291,24 @@ export class DashboardView extends ItemView {
 	}
 
 	getTargetHeader(category: Category): string {
+		const iotoServices = new IotoSettingsService(this.app);
+		const iotoSettings = iotoServices.getSettings();
 		switch (category) {
 			case "Input":
-				return "输入 LEARN";
+				return (
+					iotoSettings?.LTDListInputSectionHeading ||
+					t("TDL_INPUT_HEADING")
+				);
 			case "Output":
-				return "输出 THINK";
+				return (
+					iotoSettings?.LTDListOutputSectionHeading ||
+					t("TDL_OUTPUT_HEADING")
+				);
 			case "Outcome":
-				return "成果 DO";
+				return (
+					iotoSettings?.LTDListOutcomeSectionHeading ||
+					t("TDL_OUTCOME_HEADING")
+				);
 		}
 	}
 

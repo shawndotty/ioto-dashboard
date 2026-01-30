@@ -96,4 +96,16 @@ export default {
 	GROUP_PROJECT: "專案",
 	GROUP_CREATED: "建立日期",
 	GROUP_MODIFIED: "修改日期",
+
+	// Pagination
+	PAGINATION_PREV: "上一頁",
+	PAGINATION_NEXT: "下一頁",
+	PAGINATION_PAGE: "第 {0} 頁 / 共 {1} 頁",
+
+	// TDL Input Heading
+	TDL_INPUT_HEADING: "輸入 LEARN",
+	// TDL Output Heading
+	TDL_OUTPUT_HEADING: "輸出 THINK",
+	// TDL Outcome Heading
+	TDL_OUTCOME_HEADING: "成果 DO",
 };

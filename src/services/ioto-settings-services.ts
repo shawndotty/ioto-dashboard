@@ -36,6 +36,10 @@ export interface IotoSettings {
 	useUserTemplate?: boolean;
 	userTemplatePrefix?: string;
 
+	LTDListInputSectionHeading: string;
+	LTDListOutputSectionHeading: string;
+	LTDListOutcomeSectionHeading: string;
+
 	// Other dynamic keys
 	[key: string]: any;
 }

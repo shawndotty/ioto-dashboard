@@ -104,4 +104,11 @@ export default {
 	PAGINATION_PREV: "Previous",
 	PAGINATION_NEXT: "Next",
 	PAGINATION_PAGE: "Page {0} of {1}",
+
+	// TDL Input Heading
+	TDL_INPUT_HEADING: "Input (LEARN)",
+	// TDL Output Heading
+	TDL_OUTPUT_HEADING: "Output (THINK)",
+	// TDL Outcome Heading
+	TDL_OUTCOME_HEADING: "Outcome (DO)",
 };

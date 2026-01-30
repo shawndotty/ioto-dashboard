@@ -106,4 +106,11 @@ export default {
 	PAGINATION_PREV: "上一页",
 	PAGINATION_NEXT: "下一页",
 	PAGINATION_PAGE: "第 {0} 页 / 共 {1} 页",
+
+	// TDL Input Heading
+	TDL_INPUT_HEADING: "输入 LEARN",
+	// TDL Output Heading
+	TDL_OUTPUT_HEADING: "输出 THINK",
+	// TDL Outcome Heading
+	TDL_OUTCOME_HEADING: "成果 DO",
 };
