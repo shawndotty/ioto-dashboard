@@ -48,6 +48,7 @@ export class MiddleSection extends Component {
 		private isQuickSearchVisible: boolean,
 		private searchText: string,
 		private onSearch: (val: string) => void,
+		private onCloseSearch: () => void,
 		private pagination: PaginationInfo,
 	) {
 		super();
@@ -132,7 +133,6 @@ export class MiddleSection extends Component {
 			});
 			setIcon(editBtn, "pencil");
 			editBtn.setAttribute("aria-label", t("BTN_EDIT_QUERY"));
-			editBtn.style.marginLeft = "8px";
 			editBtn.onclick = () => {
 				this.onEditQuery(this.activeQueryId!);
 			};
@@ -142,7 +142,6 @@ export class MiddleSection extends Component {
 			});
 			setIcon(deleteBtn, "trash");
 			deleteBtn.setAttribute("aria-label", t("BTN_DELETE_QUERY"));
-			deleteBtn.style.marginLeft = "8px";
 			deleteBtn.onclick = () => {
 				this.onDeleteQuery(this.activeQueryId!);
 			};
@@ -189,7 +188,7 @@ export class MiddleSection extends Component {
 		});
 		groupBtn.setAttribute("aria-label", t("GROUP_LABEL"));
 		setIcon(groupBtn, "layers");
-		groupBtn.style.marginLeft = "4px";
+		groupBtn.style.marginLeft = "8px";
 		groupBtn.onclick = (e) => {
 			this.showGroupMenu(e as MouseEvent);
 		};
@@ -199,15 +198,48 @@ export class MiddleSection extends Component {
 			const searchContainer = this.container.createDiv({
 				cls: "dashboard-search-container",
 			});
-			searchContainer.style.padding = "0 16px 8px 16px";
+			searchContainer.style.padding = "0 1px 8px 1px";
 
-			const searchInput = searchContainer.createEl("input", {
+			const wrapper = searchContainer.createDiv({
+				cls: "search-input-wrapper",
+			});
+			wrapper.style.position = "relative";
+			wrapper.style.display = "flex";
+			wrapper.style.alignItems = "center";
+
+			const searchIcon = wrapper.createSpan({ cls: "search-icon" });
+			setIcon(searchIcon, "search");
+			searchIcon.style.position = "absolute";
+			searchIcon.style.left = "10px";
+			searchIcon.style.color = "var(--text-muted)";
+			searchIcon.style.pointerEvents = "none";
+			searchIcon.style.display = "flex";
+
+			const searchInput = wrapper.createEl("input", {
 				type: "text",
 				cls: "dashboard-search-input",
 			});
 			searchInput.style.width = "100%";
+			searchInput.style.paddingLeft = "32px";
+			searchInput.style.paddingRight = "32px";
 			searchInput.placeholder = t("FILTER_NAME_PLACEHOLDER");
 			searchInput.value = this.searchText;
+
+			if (this.searchText) {
+				const clearIcon = wrapper.createSpan({
+					cls: "search-clear-icon clickable-icon",
+				});
+				setIcon(clearIcon, "x");
+				clearIcon.style.position = "absolute";
+				clearIcon.style.right = "10px";
+				clearIcon.style.cursor = "pointer";
+				clearIcon.style.color = "var(--text-muted)";
+				clearIcon.style.display = "flex";
+
+				clearIcon.onclick = () => {
+					this.onSearch("");
+				};
+			}
 
 			// Auto-focus logic
 			setTimeout(() => {
@@ -234,10 +266,13 @@ export class MiddleSection extends Component {
 				this.onSearch(val);
 			};
 
-			// Handle Escape to close?
-			// User didn't ask, but it's good UX.
-			// "When user presses shortcut again, hide search box" -> Mod+F
-			// I'll stick to just Mod+F for now to be safe with user instructions.
+			searchInput.onkeydown = (e) => {
+				if (e.key === "Escape") {
+					e.preventDefault();
+					e.stopPropagation();
+					this.onCloseSearch();
+				}
+			};
 		}
 
 		// List

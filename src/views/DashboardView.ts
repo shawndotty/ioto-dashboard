@@ -571,6 +571,9 @@ export class DashboardView extends ItemView {
 				this.renderMiddleColumn();
 				this.renderRightColumn();
 			},
+			() => {
+				this.toggleQuickSearch();
+			},
 			{
 				currentPage:
 					this.activeTab === "Notes"
