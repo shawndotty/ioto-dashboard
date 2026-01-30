@@ -66,12 +66,34 @@ export class DashboardView extends ItemView {
 	rightContainer: HTMLElement;
 	middleSection: MiddleSection | null = null;
 
+	// Caches
+	projectCache: string[] | null = null;
+	statusCache: string[] | null = null;
+
 	// Debounced refresh for file changes
 	requestRefresh = debounce(
 		async (file: TFile, isTaskFile: boolean) => {
+			// Invalidate caches
+			this.projectCache = null;
+			this.statusCache = null;
+
 			if (isTaskFile) {
 				await this.updateTasksForFile(file);
 			}
+			this.applyFilters(false);
+			this.renderMiddleColumn();
+		},
+		500,
+		true,
+	);
+
+	// Debounced refresh for file deletion
+	debouncedDeleteRefresh = debounce(
+		() => {
+			// Invalidate caches
+			this.projectCache = null;
+			this.statusCache = null;
+
 			this.applyFilters(false);
 			this.renderMiddleColumn();
 		},
@@ -187,6 +209,8 @@ export class DashboardView extends ItemView {
 	}
 
 	getAllProjects(): string[] {
+		if (this.projectCache) return this.projectCache;
+
 		const projects = new Set<string>();
 		const files = this.app.vault.getMarkdownFiles();
 		for (const file of files) {
@@ -196,10 +220,13 @@ export class DashboardView extends ItemView {
 				projects.add(String(project));
 			}
 		}
-		return Array.from(projects).sort();
+		this.projectCache = Array.from(projects).sort();
+		return this.projectCache;
 	}
 
 	getAllStatuses(): string[] {
+		if (this.statusCache) return this.statusCache;
+
 		const statuses = new Set<string>();
 		const files = this.app.vault.getMarkdownFiles();
 		for (const file of files) {
@@ -209,7 +236,8 @@ export class DashboardView extends ItemView {
 				statuses.add(String(status));
 			}
 		}
-		return Array.from(statuses).sort();
+		this.statusCache = Array.from(statuses).sort();
+		return this.statusCache;
 	}
 
 	async fetchTasks() {
@@ -859,7 +887,6 @@ export class DashboardView extends ItemView {
 		}
 
 		// Apply filters (which will update filtered lists)
-		this.applyFilters(false);
-		this.renderMiddleColumn();
+		this.debouncedDeleteRefresh();
 	}
 }
