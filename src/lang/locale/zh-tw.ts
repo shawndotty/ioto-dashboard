@@ -113,7 +113,8 @@ export default {
 
 	// Custom Filters Settings
 	SETTINGS_CUSTOM_FILTERS_NAME: "自訂過濾",
-	SETTINGS_CUSTOM_FILTERS_DESC: "新增基於前置屬性 (Frontmatter) 的自訂過濾條件。",
+	SETTINGS_CUSTOM_FILTERS_DESC:
+		"新增基於前置屬性 (Frontmatter) 的自訂過濾條件。",
 	SETTINGS_ADD_FILTER_BTN: "新增過濾條件",
 	SETTINGS_FILTER_NAME_PLACEHOLDER: "屬性名稱",
 	SETTINGS_FILTER_TYPE_TEXT: "文字",
@@ -122,4 +123,6 @@ export default {
 	SETTINGS_FILTER_TYPE_DATE: "日期",
 	SETTINGS_FILTER_TYPE_LIST: "列表",
 	SETTINGS_DELETE_FILTER_BTN: "刪除",
+
+	SETTINGS_BASIC_NAME: "基本設定",
 };

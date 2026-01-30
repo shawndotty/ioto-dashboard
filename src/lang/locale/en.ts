@@ -116,7 +116,8 @@ export default {
 
 	// Custom Filters Settings
 	SETTINGS_CUSTOM_FILTERS_NAME: "Custom Filters",
-	SETTINGS_CUSTOM_FILTERS_DESC: "Add custom filters based on frontmatter properties.",
+	SETTINGS_CUSTOM_FILTERS_DESC:
+		"Add custom filters based on frontmatter properties.",
 	SETTINGS_ADD_FILTER_BTN: "Add Filter",
 	SETTINGS_FILTER_NAME_PLACEHOLDER: "Property Name",
 	SETTINGS_FILTER_TYPE_TEXT: "Text",
@@ -125,4 +126,6 @@ export default {
 	SETTINGS_FILTER_TYPE_DATE: "Date",
 	SETTINGS_FILTER_TYPE_LIST: "List",
 	SETTINGS_DELETE_FILTER_BTN: "Delete",
+
+	SETTINGS_BASIC_NAME: "Basic Settings",
 };

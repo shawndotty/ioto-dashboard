@@ -2,6 +2,7 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import IotoDashboardPlugin from "./main";
 import { t } from "./lang/helpers";
 import { FolderPickerModal } from "./ui/pickers/folder-picker";
+import { TabbedSettings } from "ui/tabbed-settings";
 export interface SavedQuery {
 	id: string;
 	name: string;
@@ -52,6 +53,7 @@ export const DEFAULT_SETTINGS: IotoDashboardSettings = {
 
 export class DashboardSettingTab extends PluginSettingTab {
 	plugin: IotoDashboardPlugin;
+	private currentTabIndex = 0;
 
 	constructor(app: App, plugin: IotoDashboardPlugin) {
 		super(app, plugin);
@@ -63,6 +65,33 @@ export class DashboardSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
+		const tabbedSettings = new TabbedSettings(containerEl);
+
+		const tabConfigs = [
+			{
+				title: "SETTINGS_BASIC_NAME",
+				renderMethod: (container: HTMLElement) =>
+					this.renderBasicSettings(container),
+			},
+			{
+				title: "SETTINGS_CUSTOM_FILTERS_NAME",
+				renderMethod: (container: HTMLElement) =>
+					this.renderCustomFiltersSettings(container),
+			},
+		];
+
+		tabConfigs.forEach((config) => {
+			const title =
+				t(config.title as any) === config.title
+					? config.title
+					: t(config.title as any);
+			tabbedSettings.addTab(title, config.renderMethod);
+		});
+
+		tabbedSettings.activateTab(this.currentTabIndex);
+	}
+
+	private renderBasicSettings(containerEl: HTMLElement) {
 		new Setting(containerEl)
 			.setName(t("SETTINGS_INPUT_FOLDER_NAME"))
 			.setDesc(t("SETTINGS_INPUT_FOLDER_DESC"))
@@ -178,37 +207,10 @@ export class DashboardSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 			);
+	}
 
-		containerEl.createEl("h3", { text: t("SETTINGS_CUSTOM_FILTERS_NAME") });
+	private renderCustomFiltersSettings(containerEl: HTMLElement) {
 		containerEl.createEl("p", { text: t("SETTINGS_CUSTOM_FILTERS_DESC") });
-
-		// List existing filters
-		this.plugin.settings.customFilters.forEach((filter, index) => {
-			new Setting(containerEl)
-				.setName(filter.name)
-				.setDesc(
-					filter.type === "text"
-						? t("SETTINGS_FILTER_TYPE_TEXT")
-						: filter.type === "number"
-							? t("SETTINGS_FILTER_TYPE_NUMBER")
-							: filter.type === "boolean"
-								? t("SETTINGS_FILTER_TYPE_BOOLEAN")
-								: filter.type === "date"
-									? t("SETTINGS_FILTER_TYPE_DATE")
-									: t("SETTINGS_FILTER_TYPE_LIST"),
-				)
-				.addButton((btn) =>
-					btn
-						.setButtonText(t("SETTINGS_DELETE_FILTER_BTN"))
-						.setWarning()
-						.onClick(async () => {
-							this.plugin.settings.customFilters.splice(index, 1);
-							await this.plugin.saveSettings();
-							this.display();
-						}),
-				);
-		});
-
 		// Add new filter
 		let newFilterName = "";
 		let newFilterType: CustomFilter["type"] = "text";
@@ -250,9 +252,37 @@ export class DashboardSettingTab extends PluginSettingTab {
 								type: newFilterType,
 							});
 							await this.plugin.saveSettings();
+							this.currentTabIndex = 1;
 							this.display();
 						}
 					}),
 			);
+		// List existing filters
+		this.plugin.settings.customFilters.forEach((filter, index) => {
+			new Setting(containerEl)
+				.setName(filter.name)
+				.setDesc(
+					filter.type === "text"
+						? t("SETTINGS_FILTER_TYPE_TEXT")
+						: filter.type === "number"
+							? t("SETTINGS_FILTER_TYPE_NUMBER")
+							: filter.type === "boolean"
+								? t("SETTINGS_FILTER_TYPE_BOOLEAN")
+								: filter.type === "date"
+									? t("SETTINGS_FILTER_TYPE_DATE")
+									: t("SETTINGS_FILTER_TYPE_LIST"),
+				)
+				.addButton((btn) =>
+					btn
+						.setButtonText(t("SETTINGS_DELETE_FILTER_BTN"))
+						.setWarning()
+						.onClick(async () => {
+							this.plugin.settings.customFilters.splice(index, 1);
+							await this.plugin.saveSettings();
+							this.currentTabIndex = 1;
+							this.display();
+						}),
+				);
+		});
 	}
 }
