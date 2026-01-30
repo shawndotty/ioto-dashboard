@@ -21,7 +21,13 @@ export interface SavedQuery {
 			| "last30days"
 			| "custom";
 		status: "all" | "completed" | "incomplete";
+		custom?: Record<string, any>;
 	};
+}
+
+export interface CustomFilter {
+	name: string;
+	type: "text" | "number" | "boolean" | "date" | "list";
 }
 
 export interface IotoDashboardSettings {
@@ -31,6 +37,7 @@ export interface IotoDashboardSettings {
 	outcomeFolder: string;
 	pageSize: number;
 	savedQueries: SavedQuery[];
+	customFilters: CustomFilter[];
 }
 
 export const DEFAULT_SETTINGS: IotoDashboardSettings = {
@@ -40,6 +47,7 @@ export const DEFAULT_SETTINGS: IotoDashboardSettings = {
 	outcomeFolder: t("OUTCOME_FOLDER"),
 	pageSize: 100,
 	savedQueries: [],
+	customFilters: [],
 };
 
 export class DashboardSettingTab extends PluginSettingTab {
@@ -168,6 +176,82 @@ export class DashboardSettingTab extends PluginSettingTab {
 						if (val > 300) val = 300;
 						this.plugin.settings.pageSize = val;
 						await this.plugin.saveSettings();
+					}),
+			);
+
+		containerEl.createEl("h3", { text: t("SETTINGS_CUSTOM_FILTERS_NAME") });
+		containerEl.createEl("p", { text: t("SETTINGS_CUSTOM_FILTERS_DESC") });
+
+		// List existing filters
+		this.plugin.settings.customFilters.forEach((filter, index) => {
+			new Setting(containerEl)
+				.setName(filter.name)
+				.setDesc(
+					filter.type === "text"
+						? t("SETTINGS_FILTER_TYPE_TEXT")
+						: filter.type === "number"
+							? t("SETTINGS_FILTER_TYPE_NUMBER")
+							: filter.type === "boolean"
+								? t("SETTINGS_FILTER_TYPE_BOOLEAN")
+								: filter.type === "date"
+									? t("SETTINGS_FILTER_TYPE_DATE")
+									: t("SETTINGS_FILTER_TYPE_LIST"),
+				)
+				.addButton((btn) =>
+					btn
+						.setButtonText(t("SETTINGS_DELETE_FILTER_BTN"))
+						.setWarning()
+						.onClick(async () => {
+							this.plugin.settings.customFilters.splice(index, 1);
+							await this.plugin.saveSettings();
+							this.display();
+						}),
+				);
+		});
+
+		// Add new filter
+		let newFilterName = "";
+		let newFilterType: CustomFilter["type"] = "text";
+
+		new Setting(containerEl)
+			.setName(t("SETTINGS_ADD_FILTER_BTN"))
+			.addText((text) =>
+				text
+					.setPlaceholder(t("SETTINGS_FILTER_NAME_PLACEHOLDER"))
+					.onChange((val) => (newFilterName = val)),
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("text", t("SETTINGS_FILTER_TYPE_TEXT"))
+					.addOption("number", t("SETTINGS_FILTER_TYPE_NUMBER"))
+					.addOption("boolean", t("SETTINGS_FILTER_TYPE_BOOLEAN"))
+					.addOption("date", t("SETTINGS_FILTER_TYPE_DATE"))
+					.addOption("list", t("SETTINGS_FILTER_TYPE_LIST"))
+					.setValue("text")
+					.onChange((val) => (newFilterType = val as any)),
+			)
+			.addButton((btn) =>
+				btn
+					.setButtonText(t("SETTINGS_ADD_FILTER_BTN"))
+					.setCta()
+					.onClick(async () => {
+						if (newFilterName) {
+							// Check for duplicates
+							if (
+								this.plugin.settings.customFilters.some(
+									(f) => f.name === newFilterName,
+								)
+							) {
+								return;
+							}
+
+							this.plugin.settings.customFilters.push({
+								name: newFilterName,
+								type: newFilterType,
+							});
+							await this.plugin.saveSettings();
+							this.display();
+						}
 					}),
 			);
 	}

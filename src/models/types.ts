@@ -33,6 +33,7 @@ export interface FilterState {
 		| "custom";
 	status: "all" | "completed" | "incomplete";
 	fileStatus: string;
+	custom?: Record<string, any>;
 }
 
 export interface TaskItem {

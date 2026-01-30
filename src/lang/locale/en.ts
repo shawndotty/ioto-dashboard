@@ -113,4 +113,16 @@ export default {
 	TDL_OUTPUT_HEADING: "Output (THINK)",
 	// TDL Outcome Heading
 	TDL_OUTCOME_HEADING: "Outcome (DO)",
+
+	// Custom Filters Settings
+	SETTINGS_CUSTOM_FILTERS_NAME: "Custom Filters",
+	SETTINGS_CUSTOM_FILTERS_DESC: "Add custom filters based on frontmatter properties.",
+	SETTINGS_ADD_FILTER_BTN: "Add Filter",
+	SETTINGS_FILTER_NAME_PLACEHOLDER: "Property Name",
+	SETTINGS_FILTER_TYPE_TEXT: "Text",
+	SETTINGS_FILTER_TYPE_NUMBER: "Number",
+	SETTINGS_FILTER_TYPE_BOOLEAN: "Boolean",
+	SETTINGS_FILTER_TYPE_DATE: "Date",
+	SETTINGS_FILTER_TYPE_LIST: "List",
+	SETTINGS_DELETE_FILTER_BTN: "Delete",
 };

@@ -59,6 +59,7 @@ export class DashboardView extends ItemView {
 		datePreset: "all",
 		status: "all",
 		fileStatus: "",
+		custom: {},
 	};
 
 	// UI Elements
@@ -495,6 +496,54 @@ export class DashboardView extends ItemView {
 			}
 		}
 
+		// 5. Custom Filters
+		if (
+			this.plugin.settings.customFilters &&
+			this.plugin.settings.customFilters.length > 0 &&
+			this.filters.custom
+		) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const frontmatter = cache?.frontmatter;
+
+			for (const filter of this.plugin.settings.customFilters) {
+				const filterValue = this.filters.custom[filter.name];
+				if (
+					filterValue === undefined ||
+					filterValue === "" ||
+					filterValue === "all"
+				)
+					continue;
+
+				const fileValue = frontmatter
+					? frontmatter[filter.name]
+					: undefined;
+
+				if (filter.type === "text" || filter.type === "list") {
+					// For text/list, we do a partial match or inclusion check
+					if (!fileValue) return false;
+
+					const fileValStr = String(fileValue).toLowerCase();
+					const filterValStr = String(filterValue).toLowerCase();
+
+					if (!fileValStr.includes(filterValStr)) return false;
+				} else if (filter.type === "number") {
+					if (fileValue === undefined) return false;
+					if (Number(fileValue) !== Number(filterValue)) return false;
+				} else if (filter.type === "boolean") {
+					const boolFilter = filterValue === "true";
+					// Loose equality for boolean check in frontmatter
+					const boolFileValue =
+						fileValue === true ||
+						fileValue === "true" ||
+						fileValue === "True";
+					if (boolFileValue !== boolFilter) return false;
+				} else if (filter.type === "date") {
+					if (!fileValue) return false;
+					if (String(fileValue) !== String(filterValue)) return false;
+				}
+			}
+		}
+
 		return true;
 	}
 
@@ -737,6 +786,7 @@ export class DashboardView extends ItemView {
 			this.activeQueryId,
 			this.getAllProjects(),
 			this.getAllStatuses(),
+			this.plugin.settings.customFilters,
 			(newFilters, shouldReRender) => {
 				this.filters = newFilters;
 				this.applyFilters();
@@ -757,6 +807,7 @@ export class DashboardView extends ItemView {
 					datePreset: "all",
 					status: "all",
 					fileStatus: "",
+					custom: {},
 				};
 				this.activeQueryId = null;
 				this.applyFilters();
