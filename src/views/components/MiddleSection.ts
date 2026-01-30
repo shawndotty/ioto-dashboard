@@ -5,6 +5,7 @@ import {
 	MarkdownRenderer,
 	Component,
 	Menu,
+	debounce,
 } from "obsidian";
 import { t } from "../../lang/helpers";
 import {
@@ -260,10 +261,19 @@ export class MiddleSection extends Component {
 				this.onSearch(val);
 			});
 
+			const debouncedOnSearch = debounce(
+				(val: string) => {
+					if (this.isComposing) return;
+					this.onSearch(val);
+				},
+				300,
+				true,
+			);
+
 			searchInput.oninput = (e) => {
 				if (this.isComposing) return;
 				const val = (e.target as HTMLInputElement).value;
-				this.onSearch(val);
+				debouncedOnSearch(val);
 			};
 
 			searchInput.onkeydown = (e) => {

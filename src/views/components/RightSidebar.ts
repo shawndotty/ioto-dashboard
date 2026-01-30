@@ -1,4 +1,4 @@
-import { DropdownComponent, TextComponent } from "obsidian";
+import { DropdownComponent, TextComponent, debounce } from "obsidian";
 import { t } from "../../lang/helpers";
 import { FilterState } from "../../models/types";
 
@@ -36,10 +36,16 @@ export class RightSidebar {
 		new TextComponent(nameDiv)
 			.setValue(this.filters.name)
 			.setPlaceholder(t("FILTER_NAME_PLACEHOLDER"))
-			.onChange((val) => {
-				this.filters.name = val;
-				this.onFilterChange(this.filters, false);
-			});
+			.onChange(
+				debounce(
+					(val) => {
+						this.filters.name = val;
+						this.onFilterChange(this.filters, false);
+					},
+					300,
+					true,
+				),
+			);
 
 		// Status Filter (Only for Tasks)
 		if (this.activeTab === "Tasks") {
@@ -71,10 +77,16 @@ export class RightSidebar {
 		const projectInput = new TextComponent(projectDiv)
 			.setValue(this.filters.project)
 			.setPlaceholder(t("FILTER_PROJECT_PLACEHOLDER"))
-			.onChange((val) => {
-				this.filters.project = val;
-				this.onFilterChange(this.filters, false);
-			});
+			.onChange(
+				debounce(
+					(val) => {
+						this.filters.project = val;
+						this.onFilterChange(this.filters, false);
+					},
+					300,
+					true,
+				),
+			);
 		projectInput.inputEl.setAttribute("list", dataListId);
 
 		// File Status Filter (For Notes only)
@@ -95,10 +107,16 @@ export class RightSidebar {
 			const statusInput = new TextComponent(fileStatusDiv)
 				.setValue(this.filters.fileStatus || "")
 				.setPlaceholder(t("FILTER_FILE_STATUS_PLACEHOLDER"))
-				.onChange((val) => {
-					this.filters.fileStatus = val;
-					this.onFilterChange(this.filters, false);
-				});
+				.onChange(
+					debounce(
+						(val) => {
+							this.filters.fileStatus = val;
+							this.onFilterChange(this.filters, false);
+						},
+						300,
+						true,
+					),
+				);
 			statusInput.inputEl.setAttribute("list", statusDataListId);
 		}
 
