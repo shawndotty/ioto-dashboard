@@ -22,6 +22,7 @@ export class MiddleSection extends Component {
 	sortOrder: SortOrder;
 	groupOption: GroupOption;
 	private collapsedGroups: Set<string> = new Set();
+	private isComposing = false;
 
 	constructor(
 		private app: App,
@@ -217,7 +218,18 @@ export class MiddleSection extends Component {
 				searchInput.setSelectionRange(len, len);
 			}, 0);
 
+			searchInput.addEventListener("compositionstart", () => {
+				this.isComposing = true;
+			});
+
+			searchInput.addEventListener("compositionend", (e) => {
+				this.isComposing = false;
+				const val = (e.target as HTMLInputElement).value;
+				this.onSearch(val);
+			});
+
 			searchInput.oninput = (e) => {
+				if (this.isComposing) return;
 				const val = (e.target as HTMLInputElement).value;
 				this.onSearch(val);
 			};
