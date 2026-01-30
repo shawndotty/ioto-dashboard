@@ -32,6 +32,7 @@ export interface FilterState {
 		| "last30days"
 		| "custom";
 	status: "all" | "completed" | "incomplete";
+	fileStatus: string;
 }
 
 export interface TaskItem {

@@ -11,11 +11,11 @@ export class RightSidebar {
 		private allProjects: string[],
 		private onFilterChange: (
 			newFilters: FilterState,
-			shouldReRender: boolean
+			shouldReRender: boolean,
 		) => void,
 		private onReset: () => void,
 		private onSaveQuery: () => void,
-		private onUpdateQuery: () => void
+		private onUpdateQuery: () => void,
 	) {}
 
 	render() {
@@ -76,6 +76,21 @@ export class RightSidebar {
 			});
 		projectInput.inputEl.setAttribute("list", dataListId);
 
+		// File Status Filter (For Notes only)
+		if (this.activeTab === "Notes") {
+			const fileStatusDiv = form.createDiv({ cls: "filter-item" });
+			fileStatusDiv.createEl("label", {
+				text: t("FILTER_FILE_STATUS_LABEL"),
+			});
+			new TextComponent(fileStatusDiv)
+				.setValue(this.filters.fileStatus || "")
+				.setPlaceholder(t("FILTER_FILE_STATUS_PLACEHOLDER"))
+				.onChange((val) => {
+					this.filters.fileStatus = val;
+					this.onFilterChange(this.filters, false);
+				});
+		}
+
 		// Date Type
 		const dateTypeDiv = form.createDiv({ cls: "filter-item" });
 		dateTypeDiv.createEl("label", { text: t("FILTER_DATE_TYPE_LABEL") });
@@ -109,11 +124,11 @@ export class RightSidebar {
 						| "last7days"
 						| "last14days"
 						| "last30days"
-						| "custom"
+						| "custom",
 				) => {
 					this.filters.datePreset = val;
 					this.onFilterChange(this.filters, true);
-				}
+				},
 			);
 
 		// Date Start & End (Only if Custom)

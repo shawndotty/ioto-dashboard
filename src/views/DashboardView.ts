@@ -58,6 +58,7 @@ export class DashboardView extends ItemView {
 		dateEnd: "",
 		datePreset: "all",
 		status: "all",
+		fileStatus: "",
 	};
 
 	// UI Elements
@@ -320,13 +321,14 @@ export class DashboardView extends ItemView {
 
 		// Filter Files
 		this.filteredFiles = this.files.filter((file) => {
-			return this.matchesFilter(file, file.basename);
+			return this.matchesFilter(file, file.basename, true);
 		});
 		this.sortFiles(this.filteredFiles);
 
 		// Filter Tasks
 		this.filteredTasks = this.tasks.filter((task) => {
-			if (!this.matchesFilter(task.file, task.content)) return false;
+			if (!this.matchesFilter(task.file, task.content, false))
+				return false;
 
 			// Status Filter
 			if (this.filters.status !== "all") {
@@ -375,7 +377,11 @@ export class DashboardView extends ItemView {
 		});
 	}
 
-	matchesFilter(file: TFile, textContent: string): boolean {
+	matchesFilter(
+		file: TFile,
+		textContent: string,
+		includeFileStatus: boolean = true,
+	): boolean {
 		// 1. Name Filter (applies to File Name or Task Content)
 		if (
 			this.filters.name &&
@@ -431,6 +437,20 @@ export class DashboardView extends ItemView {
 				const endDate = new Date(this.filters.dateEnd);
 				endDate.setHours(23, 59, 59, 999);
 				if (date > endDate) return false;
+			}
+		}
+
+		// 4. File Status Filter (new)
+		if (includeFileStatus && this.filters.fileStatus) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const status = cache?.frontmatter?.["Status"];
+			if (
+				!status ||
+				!String(status)
+					.toLowerCase()
+					.includes(this.filters.fileStatus.toLowerCase())
+			) {
+				return false;
 			}
 		}
 
@@ -694,6 +714,7 @@ export class DashboardView extends ItemView {
 					dateEnd: "",
 					datePreset: "all",
 					status: "all",
+					fileStatus: "",
 				};
 				this.activeQueryId = null;
 				this.applyFilters();
