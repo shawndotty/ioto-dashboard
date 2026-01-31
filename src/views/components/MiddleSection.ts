@@ -637,12 +637,12 @@ export class MiddleSection extends Component {
 			const content = item.createDiv({ cls: "task-content" });
 			content.style.display = "flex";
 			content.style.justifyContent = "space-between";
-			content.style.alignItems = "flex-start";
+			content.style.alignItems = "center";
 
 			const leftContainer = content.createDiv({ cls: "task-left" });
 			leftContainer.style.display = "flex";
 			leftContainer.style.flex = "1";
-			leftContainer.style.alignItems = "flex-start";
+			leftContainer.style.alignItems = "center";
 
 			const checkbox = leftContainer.createEl("input", {
 				type: "checkbox",
@@ -650,14 +650,14 @@ export class MiddleSection extends Component {
 			});
 			// Explicitly allow pointer events to ensure click is captured
 			checkbox.style.pointerEvents = "auto";
-			checkbox.style.marginTop = "5px"; // Visual alignment
+			checkbox.style.marginTop = "0";
 			checkbox.checked = task.status !== " ";
 			checkbox.onclick = async (e) => {
 				e.stopPropagation();
 				await this.onTaskToggle(task);
 			};
 
-			const textSpan = leftContainer.createEl("span", {
+			const textSpan = leftContainer.createEl("div", {
 				cls: "task-markdown-content",
 			});
 			textSpan.style.flex = "1";

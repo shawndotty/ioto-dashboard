@@ -134,6 +134,11 @@
 }
 
 /* Task Item Styles */
+
+.ioto-dashboard-view .task-item .task-markdown-content a {
+    text-decoration: none;
+}
+
 .ioto-dashboard-view .task-item {
     padding: 10px 15px;
     border: 1px solid var(--background-modifier-border);
