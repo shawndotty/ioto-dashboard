@@ -77,10 +77,10 @@ export default {
 	COMMAND_TOGGLE_QUICK_SEARCH: "Toggle Quick Search in Dashboard",
 	PICKER_NO_FOLDERS_FOUND: `No folders found`,
 
-	INPUT_FOLDER: "1-Input",
-	OUTPUT_FOLDER: "2-Output",
-	TASK_FOLDER: "3-Task",
-	OUTCOME_FOLDER: "4-Outcome",
+	INPUT_FOLDER: "1-Inputs",
+	OUTPUT_FOLDER: "2-Outputs",
+	TASK_FOLDER: "3-Tasks",
+	OUTCOME_FOLDER: "4-Outcomes",
 
 	CHOOSE_A_FOLDER: "Choose a folder",
 
