@@ -97,8 +97,17 @@
 /* Middle Column: Content */
 .ioto-dashboard-view .dashboard-middle {
     padding: 30px;
-    overflow-y: auto;
+    padding-bottom: 0;
+    overflow: hidden;
     background-color: var(--background-primary);
+    display: flex;
+    flex-direction: column;
+}
+
+.ioto-dashboard-view .file-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 .ioto-dashboard-view .dashboard-middle h2 {

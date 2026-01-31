@@ -301,10 +301,11 @@ export class MiddleSection extends Component {
 		paginationContainer.style.justifyContent = "center";
 		paginationContainer.style.alignItems = "center";
 		paginationContainer.style.gap = "12px";
-		paginationContainer.style.padding = "10px 0";
+		paginationContainer.style.padding = "10px 0 30px 0";
 		paginationContainer.style.marginTop = "10px";
 		paginationContainer.style.borderTop =
 			"1px solid var(--background-modifier-border)";
+		paginationContainer.style.flexShrink = "0";
 
 		// Prev Button
 		const prevBtn = paginationContainer.createEl("button", {
