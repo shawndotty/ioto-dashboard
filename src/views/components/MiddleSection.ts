@@ -737,16 +737,34 @@ export class MiddleSection extends Component {
 					});
 
 					// Click navigation
-					link.addEventListener("click", (e) => {
+					link.addEventListener("click", async (e) => {
 						e.preventDefault();
 						e.stopPropagation();
 						const href = link.getAttribute("data-href");
 						if (href) {
-							this.app.workspace.openLinkText(
+							await this.app.workspace.openLinkText(
 								href,
 								task.file.path,
-								false, // open in same tab? or true for new tab? usually false for clicking link
+								true, // open in same tab? or true for new tab? usually false for clicking link
 							);
+
+							const view =
+								this.app.workspace.getActiveViewOfType(
+									MarkdownView,
+								);
+							if (view) {
+								console.dir(view);
+								const editor = view.editor;
+								const lastLine = editor.lineCount() - 1;
+								const lastLineContent =
+									editor.getLine(lastLine);
+								console.dir(lastLineContent);
+								editor.setCursor({
+									line: lastLine,
+									ch: lastLineContent.length,
+								});
+								editor.focus();
+							}
 						}
 					});
 				});
