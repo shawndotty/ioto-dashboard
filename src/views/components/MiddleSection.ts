@@ -7,6 +7,7 @@ import {
 	Menu,
 	debounce,
 	MarkdownView,
+	parseLinktext,
 } from "obsidian";
 import { t } from "../../lang/helpers";
 import {
@@ -737,33 +738,56 @@ export class MiddleSection extends Component {
 					});
 
 					// Click navigation
-					link.addEventListener("click", async (e) => {
+					link.addEventListener("click", async (evt) => {
+						const e = evt as MouseEvent;
 						e.preventDefault();
 						e.stopPropagation();
 						const href = link.getAttribute("data-href");
 						if (href) {
-							await this.app.workspace.openLinkText(
-								href,
-								task.file.path,
-								true, // open in same tab? or true for new tab? usually false for clicking link
-							);
-
-							const view =
-								this.app.workspace.getActiveViewOfType(
-									MarkdownView,
+							const { path } = parseLinktext(href);
+							const file =
+								this.app.metadataCache.getFirstLinkpathDest(
+									path,
+									task.file.path,
 								);
-							if (view) {
-								console.dir(view);
-								const editor = view.editor;
-								const lastLine = editor.lineCount() - 1;
-								const lastLineContent =
-									editor.getLine(lastLine);
-								console.dir(lastLineContent);
-								editor.setCursor({
-									line: lastLine,
-									ch: lastLineContent.length,
-								});
-								editor.focus();
+
+							if (file) {
+								let leaf;
+								if (
+									(e.metaKey && e.altKey) ||
+									(e.ctrlKey && e.altKey)
+								) {
+									leaf = this.app.workspace.getLeaf(
+										"split",
+										"vertical",
+									);
+								} else if (e.metaKey || e.ctrlKey) {
+									leaf = this.app.workspace.getLeaf(true);
+								} else {
+									leaf = this.app.workspace.getLeaf(false);
+								}
+
+								await leaf.openFile(file);
+
+								const view = leaf.view;
+								if (view instanceof MarkdownView) {
+									const editor = view.editor;
+									const lastLine = editor.lineCount() - 1;
+									const lastLineContent =
+										editor.getLine(lastLine);
+									editor.setCursor({
+										line: lastLine,
+										ch: lastLineContent.length,
+									});
+									editor.focus();
+								}
+							} else {
+								// Fallback for non-existent files
+								this.app.workspace.openLinkText(
+									href,
+									task.file.path,
+									e.metaKey || e.ctrlKey,
+								);
 							}
 						}
 					});
