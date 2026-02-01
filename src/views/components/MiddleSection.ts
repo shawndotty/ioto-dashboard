@@ -6,6 +6,7 @@ import {
 	Component,
 	Menu,
 	debounce,
+	MarkdownView,
 } from "obsidian";
 import { t } from "../../lang/helpers";
 import {
@@ -748,7 +749,7 @@ export class MiddleSection extends Component {
 				});
 			});
 
-			item.onclick = (e) => {
+			item.onclick = async (e) => {
 				const target = e.target as HTMLElement;
 				// Prevent triggering if clicking checkbox directly
 				if (
@@ -780,9 +781,20 @@ export class MiddleSection extends Component {
 					leaf = this.app.workspace.getLeaf(false);
 				}
 
-				leaf.openFile(task.file, {
+				await leaf.openFile(task.file, {
 					eState: { line: task.line },
 				});
+
+				const view = leaf.view;
+				if (view instanceof MarkdownView) {
+					const editor = view.editor;
+					const lineContent = editor.getLine(task.line);
+					editor.setCursor({
+						line: task.line,
+						ch: lineContent.length,
+					});
+					editor.focus();
+				}
 			};
 		});
 	}
