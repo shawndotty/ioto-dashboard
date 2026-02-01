@@ -602,7 +602,7 @@ export class MiddleSection extends Component {
 				text: ` ${file.stat.size}`,
 			});
 
-			item.onclick = (e) => {
+			item.onclick = async (e) => {
 				e.stopPropagation();
 				e.preventDefault();
 
@@ -614,7 +614,19 @@ export class MiddleSection extends Component {
 				} else {
 					leaf = this.app.workspace.getLeaf(false);
 				}
-				leaf.openFile(file);
+				await leaf.openFile(file);
+
+				const view = leaf.view;
+				if (view instanceof MarkdownView) {
+					const editor = view.editor;
+					const lastLine = editor.lineCount() - 1;
+					const lastLineContent = editor.getLine(lastLine);
+					editor.setCursor({
+						line: lastLine,
+						ch: lastLineContent.length,
+					});
+					editor.focus();
+				}
 			};
 		});
 	}
