@@ -48,6 +48,8 @@ export default {
 	FILTER_DATE_START_LABEL: "From Date",
 	FILTER_DATE_END_LABEL: "To Date",
 	FILTER_STATUS_LABEL: "Status",
+	FILTER_FILE_STATUS_LABEL: "Note Status",
+	FILTER_FILE_STATUS_PLACEHOLDER: "Status...",
 	FILTER_STATUS_ALL: "All",
 	FILTER_STATUS_COMPLETED: "Completed",
 	FILTER_STATUS_INCOMPLETE: "Incomplete",
@@ -75,10 +77,10 @@ export default {
 	COMMAND_TOGGLE_QUICK_SEARCH: "Toggle Quick Search in Dashboard",
 	PICKER_NO_FOLDERS_FOUND: `No folders found`,
 
-	INPUT_FOLDER: "1-Input",
-	OUTPUT_FOLDER: "2-Output",
-	TASK_FOLDER: "3-Task",
-	OUTCOME_FOLDER: "4-Outcome",
+	INPUT_FOLDER: "1-Inputs",
+	OUTPUT_FOLDER: "2-Outputs",
+	TASK_FOLDER: "3-Tasks",
+	OUTCOME_FOLDER: "4-Outcomes",
 
 	CHOOSE_A_FOLDER: "Choose a folder",
 
@@ -104,4 +106,26 @@ export default {
 	PAGINATION_PREV: "Previous",
 	PAGINATION_NEXT: "Next",
 	PAGINATION_PAGE: "Page {0} of {1}",
+
+	// TDL Input Heading
+	TDL_INPUT_HEADING: "Input (LEARN)",
+	// TDL Output Heading
+	TDL_OUTPUT_HEADING: "Output (THINK)",
+	// TDL Outcome Heading
+	TDL_OUTCOME_HEADING: "Outcome (DO)",
+
+	// Custom Filters Settings
+	SETTINGS_CUSTOM_FILTERS_NAME: "Custom Filters",
+	SETTINGS_CUSTOM_FILTERS_DESC:
+		"Add custom filters based on frontmatter properties.",
+	SETTINGS_ADD_FILTER_BTN: "Add Filter",
+	SETTINGS_FILTER_NAME_PLACEHOLDER: "Property Name",
+	SETTINGS_FILTER_TYPE_TEXT: "Text",
+	SETTINGS_FILTER_TYPE_NUMBER: "Number",
+	SETTINGS_FILTER_TYPE_BOOLEAN: "Boolean",
+	SETTINGS_FILTER_TYPE_DATE: "Date",
+	SETTINGS_FILTER_TYPE_LIST: "List",
+	SETTINGS_DELETE_FILTER_BTN: "Delete",
+
+	SETTINGS_BASIC_NAME: "Basic Settings",
 };

@@ -8,6 +8,8 @@ import {
 	DashboardSettingTab,
 } from "./settings";
 
+import { IotoSettingsService } from "./services/ioto-settings-services";
+
 export default class IotoDashboardPlugin extends Plugin {
 	settings: IotoDashboardSettings;
 
@@ -111,6 +113,37 @@ export default class IotoDashboardPlugin extends Plugin {
 			DEFAULT_SETTINGS,
 			(await this.loadData()) as Partial<IotoDashboardSettings>,
 		);
+
+		const iotoSettingsService = new IotoSettingsService(this.app);
+
+		// 统一获取 IOTO 设置，避免重复调用
+		if (iotoSettingsService.isAvailable()) {
+			const iotoSettings = iotoSettingsService.getSettings();
+			const base = iotoSettings?.extraFolder;
+			if (base) {
+				const paths = {
+					inputFolder:
+						iotoSettings.inputFolder ||
+						DEFAULT_SETTINGS.inputFolder,
+					outputFolder:
+						iotoSettings.outputFolder ||
+						DEFAULT_SETTINGS.outputFolder,
+					taskFolder:
+						iotoSettings.taskFolder || DEFAULT_SETTINGS.taskFolder,
+					outcomeFolder:
+						iotoSettings.outcomeFolder ||
+						DEFAULT_SETTINGS.outcomeFolder,
+				} as const;
+
+				(Object.keys(paths) as Array<keyof typeof paths>).forEach(
+					(key) => {
+						if (!this.settings[key]) {
+							this.settings[key] = paths[key];
+						}
+					},
+				);
+			}
+		}
 	}
 
 	async saveSettings() {

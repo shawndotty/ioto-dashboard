@@ -1,6 +1,12 @@
-import { DropdownComponent, TextComponent } from "obsidian";
+import {
+	DropdownComponent,
+	TextComponent,
+	debounce,
+	ToggleComponent,
+} from "obsidian";
 import { t } from "../../lang/helpers";
 import { FilterState } from "../../models/types";
+import { CustomFilter } from "../../settings";
 
 export class RightSidebar {
 	constructor(
@@ -9,13 +15,15 @@ export class RightSidebar {
 		private activeTab: "Notes" | "Tasks",
 		private activeQueryId: string | null,
 		private allProjects: string[],
+		private allStatuses: string[],
+		private customFilters: CustomFilter[],
 		private onFilterChange: (
 			newFilters: FilterState,
-			shouldReRender: boolean
+			shouldReRender: boolean,
 		) => void,
 		private onReset: () => void,
 		private onSaveQuery: () => void,
-		private onUpdateQuery: () => void
+		private onUpdateQuery: () => void,
 	) {}
 
 	render() {
@@ -35,10 +43,16 @@ export class RightSidebar {
 		new TextComponent(nameDiv)
 			.setValue(this.filters.name)
 			.setPlaceholder(t("FILTER_NAME_PLACEHOLDER"))
-			.onChange((val) => {
-				this.filters.name = val;
-				this.onFilterChange(this.filters, false);
-			});
+			.onChange(
+				debounce(
+					(val) => {
+						this.filters.name = val;
+						this.onFilterChange(this.filters, false);
+					},
+					300,
+					true,
+				),
+			);
 
 		// Status Filter (Only for Tasks)
 		if (this.activeTab === "Tasks") {
@@ -70,11 +84,48 @@ export class RightSidebar {
 		const projectInput = new TextComponent(projectDiv)
 			.setValue(this.filters.project)
 			.setPlaceholder(t("FILTER_PROJECT_PLACEHOLDER"))
-			.onChange((val) => {
-				this.filters.project = val;
-				this.onFilterChange(this.filters, false);
-			});
+			.onChange(
+				debounce(
+					(val) => {
+						this.filters.project = val;
+						this.onFilterChange(this.filters, false);
+					},
+					300,
+					true,
+				),
+			);
 		projectInput.inputEl.setAttribute("list", dataListId);
+
+		// File Status Filter (For Notes only)
+		if (this.activeTab === "Notes") {
+			const fileStatusDiv = form.createDiv({ cls: "filter-item" });
+			fileStatusDiv.createEl("label", {
+				text: t("FILTER_FILE_STATUS_LABEL"),
+			});
+
+			const statusDataListId = "status-list-" + Date.now();
+			const statusDataList = fileStatusDiv.createEl("datalist", {
+				attr: { id: statusDataListId },
+			});
+			this.allStatuses.forEach((s) => {
+				statusDataList.createEl("option", { attr: { value: s } });
+			});
+
+			const statusInput = new TextComponent(fileStatusDiv)
+				.setValue(this.filters.fileStatus || "")
+				.setPlaceholder(t("FILTER_FILE_STATUS_PLACEHOLDER"))
+				.onChange(
+					debounce(
+						(val) => {
+							this.filters.fileStatus = val;
+							this.onFilterChange(this.filters, false);
+						},
+						300,
+						true,
+					),
+				);
+			statusInput.inputEl.setAttribute("list", statusDataListId);
+		}
 
 		// Date Type
 		const dateTypeDiv = form.createDiv({ cls: "filter-item" });
@@ -109,11 +160,11 @@ export class RightSidebar {
 						| "last7days"
 						| "last14days"
 						| "last30days"
-						| "custom"
+						| "custom",
 				) => {
 					this.filters.datePreset = val;
 					this.onFilterChange(this.filters, true);
-				}
+				},
 			);
 
 		// Date Start & End (Only if Custom)
@@ -139,6 +190,69 @@ export class RightSidebar {
 				this.filters.dateEnd = (e.target as HTMLInputElement).value;
 				this.onFilterChange(this.filters, false);
 			};
+		}
+
+		// Custom Filters
+		if (this.customFilters && this.customFilters.length > 0) {
+			form.createEl("h4", {
+				text: t("SETTINGS_CUSTOM_FILTERS_NAME"),
+				cls: "filter-section-title",
+			});
+
+			this.customFilters.forEach((filter) => {
+				const div = form.createDiv({ cls: "filter-item" });
+				div.createEl("label", { text: filter.name });
+
+				if (!this.filters.custom) this.filters.custom = {};
+
+				const currentValue = this.filters.custom[filter.name];
+
+				if (filter.type === "text" || filter.type === "list") {
+					new TextComponent(div)
+						.setValue(currentValue || "")
+						.setPlaceholder(filter.name)
+						.onChange(
+							debounce(
+								(val) => {
+									this.filters.custom![filter.name] = val;
+									this.onFilterChange(this.filters, false);
+								},
+								300,
+								true,
+							),
+						);
+				} else if (filter.type === "number") {
+					const input = div.createEl("input", { type: "number" });
+					input.value = currentValue || "";
+					input.style.width = "100%";
+					input.onchange = (e) => {
+						this.filters.custom![filter.name] = (
+							e.target as HTMLInputElement
+						).value;
+						this.onFilterChange(this.filters, false);
+					};
+				} else if (filter.type === "boolean") {
+					new DropdownComponent(div)
+						.addOption("all", t("FILTER_STATUS_ALL"))
+						.addOption("true", "True")
+						.addOption("false", "False")
+						.setValue(currentValue || "all")
+						.onChange((val) => {
+							this.filters.custom![filter.name] = val;
+							this.onFilterChange(this.filters, false);
+						});
+				} else if (filter.type === "date") {
+					const input = div.createEl("input", { type: "date" });
+					input.value = currentValue || "";
+					input.style.width = "100%";
+					input.onchange = (e) => {
+						this.filters.custom![filter.name] = (
+							e.target as HTMLInputElement
+						).value;
+						this.onFilterChange(this.filters, false);
+					};
+				}
+			});
 		}
 
 		// Reset Button

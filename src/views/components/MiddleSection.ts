@@ -5,6 +5,9 @@ import {
 	MarkdownRenderer,
 	Component,
 	Menu,
+	debounce,
+	MarkdownView,
+	parseLinktext,
 } from "obsidian";
 import { t } from "../../lang/helpers";
 import {
@@ -22,6 +25,7 @@ export class MiddleSection extends Component {
 	sortOrder: SortOrder;
 	groupOption: GroupOption;
 	private collapsedGroups: Set<string> = new Set();
+	private isComposing = false;
 
 	constructor(
 		private app: App,
@@ -47,6 +51,7 @@ export class MiddleSection extends Component {
 		private isQuickSearchVisible: boolean,
 		private searchText: string,
 		private onSearch: (val: string) => void,
+		private onCloseSearch: () => void,
 		private pagination: PaginationInfo,
 	) {
 		super();
@@ -131,7 +136,6 @@ export class MiddleSection extends Component {
 			});
 			setIcon(editBtn, "pencil");
 			editBtn.setAttribute("aria-label", t("BTN_EDIT_QUERY"));
-			editBtn.style.marginLeft = "8px";
 			editBtn.onclick = () => {
 				this.onEditQuery(this.activeQueryId!);
 			};
@@ -141,7 +145,6 @@ export class MiddleSection extends Component {
 			});
 			setIcon(deleteBtn, "trash");
 			deleteBtn.setAttribute("aria-label", t("BTN_DELETE_QUERY"));
-			deleteBtn.style.marginLeft = "8px";
 			deleteBtn.onclick = () => {
 				this.onDeleteQuery(this.activeQueryId!);
 			};
@@ -188,7 +191,7 @@ export class MiddleSection extends Component {
 		});
 		groupBtn.setAttribute("aria-label", t("GROUP_LABEL"));
 		setIcon(groupBtn, "layers");
-		groupBtn.style.marginLeft = "4px";
+		groupBtn.style.marginLeft = "8px";
 		groupBtn.onclick = (e) => {
 			this.showGroupMenu(e as MouseEvent);
 		};
@@ -198,15 +201,48 @@ export class MiddleSection extends Component {
 			const searchContainer = this.container.createDiv({
 				cls: "dashboard-search-container",
 			});
-			searchContainer.style.padding = "0 16px 8px 16px";
+			searchContainer.style.padding = "0 1px 8px 1px";
 
-			const searchInput = searchContainer.createEl("input", {
+			const wrapper = searchContainer.createDiv({
+				cls: "search-input-wrapper",
+			});
+			wrapper.style.position = "relative";
+			wrapper.style.display = "flex";
+			wrapper.style.alignItems = "center";
+
+			const searchIcon = wrapper.createSpan({ cls: "search-icon" });
+			setIcon(searchIcon, "search");
+			searchIcon.style.position = "absolute";
+			searchIcon.style.left = "10px";
+			searchIcon.style.color = "var(--text-muted)";
+			searchIcon.style.pointerEvents = "none";
+			searchIcon.style.display = "flex";
+
+			const searchInput = wrapper.createEl("input", {
 				type: "text",
 				cls: "dashboard-search-input",
 			});
 			searchInput.style.width = "100%";
+			searchInput.style.paddingLeft = "32px";
+			searchInput.style.paddingRight = "32px";
 			searchInput.placeholder = t("FILTER_NAME_PLACEHOLDER");
 			searchInput.value = this.searchText;
+
+			if (this.searchText) {
+				const clearIcon = wrapper.createSpan({
+					cls: "search-clear-icon clickable-icon",
+				});
+				setIcon(clearIcon, "x");
+				clearIcon.style.position = "absolute";
+				clearIcon.style.right = "10px";
+				clearIcon.style.cursor = "pointer";
+				clearIcon.style.color = "var(--text-muted)";
+				clearIcon.style.display = "flex";
+
+				clearIcon.onclick = () => {
+					this.onSearch("");
+				};
+			}
 
 			// Auto-focus logic
 			setTimeout(() => {
@@ -217,15 +253,38 @@ export class MiddleSection extends Component {
 				searchInput.setSelectionRange(len, len);
 			}, 0);
 
-			searchInput.oninput = (e) => {
+			searchInput.addEventListener("compositionstart", () => {
+				this.isComposing = true;
+			});
+
+			searchInput.addEventListener("compositionend", (e) => {
+				this.isComposing = false;
 				const val = (e.target as HTMLInputElement).value;
 				this.onSearch(val);
+			});
+
+			const debouncedOnSearch = debounce(
+				(val: string) => {
+					if (this.isComposing) return;
+					this.onSearch(val);
+				},
+				300,
+				true,
+			);
+
+			searchInput.oninput = (e) => {
+				if (this.isComposing) return;
+				const val = (e.target as HTMLInputElement).value;
+				debouncedOnSearch(val);
 			};
 
-			// Handle Escape to close?
-			// User didn't ask, but it's good UX.
-			// "When user presses shortcut again, hide search box" -> Mod+F
-			// I'll stick to just Mod+F for now to be safe with user instructions.
+			searchInput.onkeydown = (e) => {
+				if (e.key === "Escape") {
+					e.preventDefault();
+					e.stopPropagation();
+					this.onCloseSearch();
+				}
+			};
 		}
 
 		// List
@@ -244,10 +303,11 @@ export class MiddleSection extends Component {
 		paginationContainer.style.justifyContent = "center";
 		paginationContainer.style.alignItems = "center";
 		paginationContainer.style.gap = "12px";
-		paginationContainer.style.padding = "10px 0";
+		paginationContainer.style.padding = "10px 0 30px 0";
 		paginationContainer.style.marginTop = "10px";
 		paginationContainer.style.borderTop =
 			"1px solid var(--background-modifier-border)";
+		paginationContainer.style.flexShrink = "0";
 
 		// Prev Button
 		const prevBtn = paginationContainer.createEl("button", {
@@ -539,12 +599,11 @@ export class MiddleSection extends Component {
 			const sizeSpan = meta.createEl("p", { cls: "file-size" });
 			const sizeIconSpan = sizeSpan.createSpan({ cls: "meta-icon" });
 			setIcon(sizeIconSpan, "file-text");
-			const sizeText = sizeSpan.createSpan({ text: "..." });
-			this.app.vault.cachedRead(file).then((content) => {
-				sizeText.setText(` ${content.length}`);
+			const sizeText = sizeSpan.createSpan({
+				text: ` ${file.stat.size}`,
 			});
 
-			item.onclick = (e) => {
+			item.onclick = async (e) => {
 				e.stopPropagation();
 				e.preventDefault();
 
@@ -556,7 +615,19 @@ export class MiddleSection extends Component {
 				} else {
 					leaf = this.app.workspace.getLeaf(false);
 				}
-				leaf.openFile(file);
+				await leaf.openFile(file);
+
+				const view = leaf.view;
+				if (view instanceof MarkdownView) {
+					const editor = view.editor;
+					const lastLine = editor.lineCount() - 1;
+					const lastLineContent = editor.getLine(lastLine);
+					editor.setCursor({
+						line: lastLine,
+						ch: lastLineContent.length,
+					});
+					editor.focus();
+				}
 			};
 		});
 	}
@@ -581,12 +652,12 @@ export class MiddleSection extends Component {
 			const content = item.createDiv({ cls: "task-content" });
 			content.style.display = "flex";
 			content.style.justifyContent = "space-between";
-			content.style.alignItems = "flex-start";
+			content.style.alignItems = "center";
 
 			const leftContainer = content.createDiv({ cls: "task-left" });
 			leftContainer.style.display = "flex";
 			leftContainer.style.flex = "1";
-			leftContainer.style.alignItems = "flex-start";
+			leftContainer.style.alignItems = "center";
 
 			const checkbox = leftContainer.createEl("input", {
 				type: "checkbox",
@@ -594,14 +665,14 @@ export class MiddleSection extends Component {
 			});
 			// Explicitly allow pointer events to ensure click is captured
 			checkbox.style.pointerEvents = "auto";
-			checkbox.style.marginTop = "5px"; // Visual alignment
+			checkbox.style.marginTop = "0";
 			checkbox.checked = task.status !== " ";
 			checkbox.onclick = async (e) => {
 				e.stopPropagation();
 				await this.onTaskToggle(task);
 			};
 
-			const textSpan = leftContainer.createEl("span", {
+			const textSpan = leftContainer.createEl("div", {
 				cls: "task-markdown-content",
 			});
 			textSpan.style.flex = "1";
@@ -667,16 +738,57 @@ export class MiddleSection extends Component {
 					});
 
 					// Click navigation
-					link.addEventListener("click", (e) => {
+					link.addEventListener("click", async (evt) => {
+						const e = evt as MouseEvent;
 						e.preventDefault();
 						e.stopPropagation();
 						const href = link.getAttribute("data-href");
 						if (href) {
-							this.app.workspace.openLinkText(
-								href,
-								task.file.path,
-								false, // open in same tab? or true for new tab? usually false for clicking link
-							);
+							const { path } = parseLinktext(href);
+							const file =
+								this.app.metadataCache.getFirstLinkpathDest(
+									path,
+									task.file.path,
+								);
+
+							if (file) {
+								let leaf;
+								if (
+									(e.metaKey && e.altKey) ||
+									(e.ctrlKey && e.altKey)
+								) {
+									leaf = this.app.workspace.getLeaf(
+										"split",
+										"vertical",
+									);
+								} else if (e.metaKey || e.ctrlKey) {
+									leaf = this.app.workspace.getLeaf(true);
+								} else {
+									leaf = this.app.workspace.getLeaf(false);
+								}
+
+								await leaf.openFile(file);
+
+								const view = leaf.view;
+								if (view instanceof MarkdownView) {
+									const editor = view.editor;
+									const lastLine = editor.lineCount() - 1;
+									const lastLineContent =
+										editor.getLine(lastLine);
+									editor.setCursor({
+										line: lastLine,
+										ch: lastLineContent.length,
+									});
+									editor.focus();
+								}
+							} else {
+								// Fallback for non-existent files
+								this.app.workspace.openLinkText(
+									href,
+									task.file.path,
+									e.metaKey || e.ctrlKey,
+								);
+							}
 						}
 					});
 				});
@@ -691,7 +803,7 @@ export class MiddleSection extends Component {
 				});
 			});
 
-			item.onclick = (e) => {
+			item.onclick = async (e) => {
 				const target = e.target as HTMLElement;
 				// Prevent triggering if clicking checkbox directly
 				if (
@@ -723,9 +835,20 @@ export class MiddleSection extends Component {
 					leaf = this.app.workspace.getLeaf(false);
 				}
 
-				leaf.openFile(task.file, {
+				await leaf.openFile(task.file, {
 					eState: { line: task.line },
 				});
+
+				const view = leaf.view;
+				if (view instanceof MarkdownView) {
+					const editor = view.editor;
+					const lineContent = editor.getLine(task.line);
+					editor.setCursor({
+						line: task.line,
+						ch: lineContent.length,
+					});
+					editor.focus();
+				}
 			};
 		});
 	}

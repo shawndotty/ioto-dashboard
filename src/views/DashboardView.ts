@@ -24,6 +24,7 @@ import {
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RightSidebar } from "./components/RightSidebar";
 import { MiddleSection } from "./components/MiddleSection";
+import { IotoSettingsService } from "../services/ioto-settings-services";
 
 export class DashboardView extends ItemView {
 	plugin: IotoDashboardPlugin;
@@ -57,6 +58,8 @@ export class DashboardView extends ItemView {
 		dateEnd: "",
 		datePreset: "all",
 		status: "all",
+		fileStatus: "",
+		custom: {},
 	};
 
 	// UI Elements
@@ -64,12 +67,34 @@ export class DashboardView extends ItemView {
 	rightContainer: HTMLElement;
 	middleSection: MiddleSection | null = null;
 
+	// Caches
+	projectCache: string[] | null = null;
+	statusCache: string[] | null = null;
+
 	// Debounced refresh for file changes
 	requestRefresh = debounce(
 		async (file: TFile, isTaskFile: boolean) => {
+			// Invalidate caches
+			this.projectCache = null;
+			this.statusCache = null;
+
 			if (isTaskFile) {
 				await this.updateTasksForFile(file);
 			}
+			this.applyFilters(false);
+			this.renderMiddleColumn();
+		},
+		500,
+		true,
+	);
+
+	// Debounced refresh for file deletion
+	debouncedDeleteRefresh = debounce(
+		() => {
+			// Invalidate caches
+			this.projectCache = null;
+			this.statusCache = null;
+
 			this.applyFilters(false);
 			this.renderMiddleColumn();
 		},
@@ -185,6 +210,8 @@ export class DashboardView extends ItemView {
 	}
 
 	getAllProjects(): string[] {
+		if (this.projectCache) return this.projectCache;
+
 		const projects = new Set<string>();
 		const files = this.app.vault.getMarkdownFiles();
 		for (const file of files) {
@@ -194,7 +221,24 @@ export class DashboardView extends ItemView {
 				projects.add(String(project));
 			}
 		}
-		return Array.from(projects).sort();
+		this.projectCache = Array.from(projects).sort();
+		return this.projectCache;
+	}
+
+	getAllStatuses(): string[] {
+		if (this.statusCache) return this.statusCache;
+
+		const statuses = new Set<string>();
+		const files = this.app.vault.getMarkdownFiles();
+		for (const file of files) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const status = cache?.frontmatter?.["Status"];
+			if (status) {
+				statuses.add(String(status));
+			}
+		}
+		this.statusCache = Array.from(statuses).sort();
+		return this.statusCache;
 	}
 
 	async fetchTasks() {
@@ -290,13 +334,24 @@ export class DashboardView extends ItemView {
 	}
 
 	getTargetHeader(category: Category): string {
+		const iotoServices = new IotoSettingsService(this.app);
+		const iotoSettings = iotoServices.getSettings();
 		switch (category) {
 			case "Input":
-				return "输入 LEARN";
+				return (
+					iotoSettings?.LTDListInputSectionHeading ||
+					t("TDL_INPUT_HEADING")
+				);
 			case "Output":
-				return "输出 THINK";
+				return (
+					iotoSettings?.LTDListOutputSectionHeading ||
+					t("TDL_OUTPUT_HEADING")
+				);
 			case "Outcome":
-				return "成果 DO";
+				return (
+					iotoSettings?.LTDListOutcomeSectionHeading ||
+					t("TDL_OUTCOME_HEADING")
+				);
 		}
 	}
 
@@ -308,13 +363,14 @@ export class DashboardView extends ItemView {
 
 		// Filter Files
 		this.filteredFiles = this.files.filter((file) => {
-			return this.matchesFilter(file, file.basename);
+			return this.matchesFilter(file, file.basename, true);
 		});
 		this.sortFiles(this.filteredFiles);
 
 		// Filter Tasks
 		this.filteredTasks = this.tasks.filter((task) => {
-			if (!this.matchesFilter(task.file, task.content)) return false;
+			if (!this.matchesFilter(task.file, task.content, false))
+				return false;
 
 			// Status Filter
 			if (this.filters.status !== "all") {
@@ -363,7 +419,11 @@ export class DashboardView extends ItemView {
 		});
 	}
 
-	matchesFilter(file: TFile, textContent: string): boolean {
+	matchesFilter(
+		file: TFile,
+		textContent: string,
+		includeFileStatus: boolean = true,
+	): boolean {
 		// 1. Name Filter (applies to File Name or Task Content)
 		if (
 			this.filters.name &&
@@ -419,6 +479,68 @@ export class DashboardView extends ItemView {
 				const endDate = new Date(this.filters.dateEnd);
 				endDate.setHours(23, 59, 59, 999);
 				if (date > endDate) return false;
+			}
+		}
+
+		// 4. File Status Filter (new)
+		if (includeFileStatus && this.filters.fileStatus) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const status = cache?.frontmatter?.["Status"];
+			if (
+				!status ||
+				!String(status)
+					.toLowerCase()
+					.includes(this.filters.fileStatus.toLowerCase())
+			) {
+				return false;
+			}
+		}
+
+		// 5. Custom Filters
+		if (
+			this.plugin.settings.customFilters &&
+			this.plugin.settings.customFilters.length > 0 &&
+			this.filters.custom
+		) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const frontmatter = cache?.frontmatter;
+
+			for (const filter of this.plugin.settings.customFilters) {
+				const filterValue = this.filters.custom[filter.name];
+				if (
+					filterValue === undefined ||
+					filterValue === "" ||
+					filterValue === "all"
+				)
+					continue;
+
+				const fileValue = frontmatter
+					? frontmatter[filter.name]
+					: undefined;
+
+				if (filter.type === "text" || filter.type === "list") {
+					// For text/list, we do a partial match or inclusion check
+					if (!fileValue) return false;
+
+					const fileValStr = String(fileValue).toLowerCase();
+					const filterValStr = String(filterValue).toLowerCase();
+
+					if (!fileValStr.includes(filterValStr)) return false;
+				} else if (filter.type === "number") {
+					if (fileValue === undefined) return false;
+					if (Number(fileValue) !== Number(filterValue)) return false;
+				} else if (filter.type === "boolean") {
+					const boolFilter = filterValue === "true";
+					// Loose equality for boolean check in frontmatter
+					const boolFileValue =
+						fileValue === true ||
+						fileValue === "true" ||
+						fileValue === "True";
+					if (boolFileValue !== boolFilter) return false;
+				} else if (filter.type === "date") {
+					if (!fileValue) return false;
+					if (String(fileValue) !== String(filterValue)) return false;
+				}
 			}
 		}
 
@@ -559,6 +681,9 @@ export class DashboardView extends ItemView {
 				this.renderMiddleColumn();
 				this.renderRightColumn();
 			},
+			() => {
+				this.toggleQuickSearch();
+			},
 			{
 				currentPage:
 					this.activeTab === "Notes"
@@ -660,6 +785,8 @@ export class DashboardView extends ItemView {
 			this.activeTab,
 			this.activeQueryId,
 			this.getAllProjects(),
+			this.getAllStatuses(),
+			this.plugin.settings.customFilters,
 			(newFilters, shouldReRender) => {
 				this.filters = newFilters;
 				this.applyFilters();
@@ -679,6 +806,8 @@ export class DashboardView extends ItemView {
 					dateEnd: "",
 					datePreset: "all",
 					status: "all",
+					fileStatus: "",
+					custom: {},
 				};
 				this.activeQueryId = null;
 				this.applyFilters();
@@ -809,7 +938,6 @@ export class DashboardView extends ItemView {
 		}
 
 		// Apply filters (which will update filtered lists)
-		this.applyFilters(false);
-		this.renderMiddleColumn();
+		this.debouncedDeleteRefresh();
 	}
 }

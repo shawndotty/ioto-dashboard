@@ -2,6 +2,22 @@ import { TFile } from "obsidian";
 
 export type Category = "Input" | "Output" | "Outcome";
 
+declare module "obsidian" {
+	interface App {
+		commands: {
+			executeCommandById(id: string): void;
+		};
+		plugins: {
+			plugins: {
+				[key: string]: any;
+			};
+		};
+		dom: {
+			appContainerEl: HTMLElement;
+		};
+	}
+}
+
 export interface FilterState {
 	name: string;
 	project: string;
@@ -16,6 +32,8 @@ export interface FilterState {
 		| "last30days"
 		| "custom";
 	status: "all" | "completed" | "incomplete";
+	fileStatus: string;
+	custom?: Record<string, any>;
 }
 
 export interface TaskItem {
