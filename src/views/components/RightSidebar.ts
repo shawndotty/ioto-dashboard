@@ -146,6 +146,7 @@ export class RightSidebar {
 		});
 		new DropdownComponent(datePresetDiv)
 			.addOption("all", t("FILTER_DATE_PRESET_ALL"))
+			.addOption("last1day", t("FILTER_DATE_PRESET_LAST_1_DAY"))
 			.addOption("last3days", t("FILTER_DATE_PRESET_LAST_3_DAYS"))
 			.addOption("last7days", t("FILTER_DATE_PRESET_LAST_7_DAYS"))
 			.addOption("last14days", t("FILTER_DATE_PRESET_LAST_14_DAYS"))
@@ -156,6 +157,7 @@ export class RightSidebar {
 				(
 					val:
 						| "all"
+						| "last1day"
 						| "last3days"
 						| "last7days"
 						| "last14days"

@@ -26,6 +26,7 @@ export interface FilterState {
 	dateEnd: string;
 	datePreset:
 		| "all"
+		| "last1day"
 		| "last3days"
 		| "last7days"
 		| "last14days"

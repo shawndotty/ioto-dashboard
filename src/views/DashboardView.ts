@@ -460,6 +460,7 @@ export class DashboardView extends ItemView {
 			const now = new Date();
 			let days = 0;
 			if (this.filters.datePreset === "last3days") days = 3;
+			else if (this.filters.datePreset === "last1day") days = 1;
 			else if (this.filters.datePreset === "last7days") days = 7;
 			else if (this.filters.datePreset === "last14days") days = 14;
 			else if (this.filters.datePreset === "last30days") days = 30;
