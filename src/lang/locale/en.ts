@@ -4,6 +4,7 @@ export default {
 	NAV_INPUT: "Input",
 	NAV_OUTPUT: "Output",
 	NAV_OUTCOME: "Outcome",
+	NAV_TASKS: "IOTO Tasks",
 	NAV_TITLE: "Navigation",
 	TAB_NOTES: "Notes",
 	TAB_TASKS: "Tasks",
@@ -35,6 +36,8 @@ export default {
 	FILTER_NAME_PLACEHOLDER: "Search...",
 	FILTER_PROJECT_LABEL: "Project",
 	FILTER_PROJECT_PLACEHOLDER: "Project name...",
+	FILTER_TASK_TYPE_LABEL: "Task Type",
+	FILTER_TASK_TYPE_REQUIRED: "At least one task type must be selected.",
 	FILTER_DATE_TYPE_LABEL: "Date Type",
 	FILTER_DATE_TYPE_CREATED: "Created",
 	FILTER_DATE_TYPE_MODIFIED: "Modified",
@@ -74,8 +77,10 @@ export default {
 
 	// Commands & Ribbon
 	RIBBON_ICON_TITLE: "Open IOTO Dashboard",
-	COMMAND_OPEN_DASHBOARD: "Open Dashboard",
-	COMMAND_TOGGLE_QUICK_SEARCH: "Toggle Quick Search in Dashboard",
+	RIBBON_TASK_VIEW_TITLE: "Open IOTO Task View",
+	COMMAND_OPEN_DASHBOARD: "Open IOTO Dashboard",
+	COMMAND_OPEN_TASK_VIEW: "Open IOTO Task View",
+	COMMAND_TOGGLE_QUICK_SEARCH: "Toggle Quick Search",
 	PICKER_NO_FOLDERS_FOUND: `No folders found`,
 
 	INPUT_FOLDER: "1-Inputs",
@@ -102,6 +107,7 @@ export default {
 	GROUP_PROJECT: "Project",
 	GROUP_CREATED: "Created Date",
 	GROUP_MODIFIED: "Modified Date",
+	GROUP_TYPE: "Task Type",
 
 	// Pagination
 	PAGINATION_PREV: "Previous",

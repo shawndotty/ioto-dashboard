@@ -6,7 +6,7 @@ import { TabbedSettings } from "ui/tabbed-settings";
 export interface SavedQuery {
 	id: string;
 	name: string;
-	category: "Input" | "Output" | "Outcome";
+	category: "Input" | "Output" | "Outcome" | "Tasks";
 	tab: "Notes" | "Tasks";
 	filters: {
 		name: string;

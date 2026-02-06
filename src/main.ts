@@ -1,6 +1,7 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
 import { DashboardView } from "./views/DashboardView";
-import { DASHBOARD_VIEW_TYPE } from "./models/constants";
+import { TaskView } from "./views/TaskView";
+import { DASHBOARD_VIEW_TYPE, TASK_VIEW_TYPE } from "./models/constants";
 import { t } from "./lang/helpers";
 import {
 	DEFAULT_SETTINGS,
@@ -21,6 +22,7 @@ export default class IotoDashboardPlugin extends Plugin {
 			DASHBOARD_VIEW_TYPE,
 			(leaf) => new DashboardView(leaf, this),
 		);
+		this.registerView(TASK_VIEW_TYPE, (leaf) => new TaskView(leaf, this));
 
 		// Ribbon Icon
 		this.addRibbonIcon(
@@ -31,12 +33,28 @@ export default class IotoDashboardPlugin extends Plugin {
 			},
 		);
 
+		this.addRibbonIcon(
+			"check-square",
+			t("RIBBON_TASK_VIEW_TITLE"),
+			(evt: MouseEvent) => {
+				this.activateTaskView(evt.shiftKey);
+			},
+		);
+
 		// Command
 		this.addCommand({
 			id: "open-ioto-dashboard",
 			name: t("COMMAND_OPEN_DASHBOARD"),
 			callback: () => {
 				this.activateView();
+			},
+		});
+
+		this.addCommand({
+			id: "open-ioto-task-view",
+			name: t("COMMAND_OPEN_TASK_VIEW"),
+			callback: () => {
+				this.activateTaskView();
 			},
 		});
 
@@ -97,6 +115,36 @@ export default class IotoDashboardPlugin extends Plugin {
 				leaf = workspace.getLeaf(false);
 				await leaf.setViewState({
 					type: DASHBOARD_VIEW_TYPE,
+					active: true,
+				});
+			}
+		}
+
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
+	}
+
+	async activateTaskView(newWindow = false) {
+		const { workspace } = this.app;
+
+		let leaf: WorkspaceLeaf | null = null;
+
+		if (newWindow) {
+			leaf = workspace.getLeaf("window");
+			await leaf.setViewState({
+				type: TASK_VIEW_TYPE,
+				active: true,
+			});
+		} else {
+			const leaves = workspace.getLeavesOfType(TASK_VIEW_TYPE);
+
+			if (leaves.length > 0) {
+				leaf = leaves[0]!;
+			} else {
+				leaf = workspace.getLeaf(false);
+				await leaf.setViewState({
+					type: TASK_VIEW_TYPE,
 					active: true,
 				});
 			}

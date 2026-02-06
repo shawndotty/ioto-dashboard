@@ -4,6 +4,7 @@ export default {
 	NAV_INPUT: "输入 Input",
 	NAV_OUTPUT: "输出 Output",
 	NAV_OUTCOME: "成果 Outcome",
+	NAV_TASKS: "IOTO 任务",
 	NAV_TITLE: "导航",
 	TAB_NOTES: "笔记",
 	TAB_TASKS: "任务",
@@ -36,6 +37,8 @@ export default {
 	FILTER_NAME_PLACEHOLDER: "搜索...",
 	FILTER_PROJECT_LABEL: "项目",
 	FILTER_PROJECT_PLACEHOLDER: "项目名称...",
+	FILTER_TASK_TYPE_LABEL: "任务类型",
+	FILTER_TASK_TYPE_REQUIRED: "必须选择至少一种任务类型。",
 	FILTER_DATE_TYPE_LABEL: "日期类型",
 	FILTER_DATE_TYPE_CREATED: "创建时间",
 	FILTER_DATE_TYPE_MODIFIED: "修改时间",
@@ -76,8 +79,10 @@ export default {
 
 	// Commands & Ribbon
 	RIBBON_ICON_TITLE: "打开 IOTO 仪表盘",
-	COMMAND_OPEN_DASHBOARD: "打开仪表盘",
-	COMMAND_TOGGLE_QUICK_SEARCH: "在仪表盘中切换快速搜索",
+	RIBBON_TASK_VIEW_TITLE: "打开 IOTO 任务仪表盘",
+	COMMAND_OPEN_DASHBOARD: "打开 IOTO 仪表盘",
+	COMMAND_OPEN_TASK_VIEW: "打开 IOTO 任务视图",
+	COMMAND_TOGGLE_QUICK_SEARCH: "切换快速搜索",
 	PICKER_NO_FOLDERS_FOUND: `没有找到符合条件的文件夹`,
 
 	INPUT_FOLDER: "1-输入",
@@ -100,10 +105,11 @@ export default {
 
 	// Group
 	GROUP_LABEL: "分组",
-	GROUP_NONE: "无",
 	GROUP_PROJECT: "项目",
 	GROUP_CREATED: "创建日期",
 	GROUP_MODIFIED: "修改日期",
+	GROUP_TYPE: "任务类型",
+	GROUP_NONE: "无",
 
 	// Pagination
 	PAGINATION_PREV: "上一页",

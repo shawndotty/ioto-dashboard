@@ -1,6 +1,6 @@
 import { TFile } from "obsidian";
 
-export type Category = "Input" | "Output" | "Outcome";
+export type Category = "Input" | "Output" | "Outcome" | "Tasks";
 
 declare module "obsidian" {
 	interface App {
@@ -34,6 +34,7 @@ export interface FilterState {
 		| "custom";
 	status: "all" | "completed" | "incomplete";
 	fileStatus: string;
+	taskType?: string[]; // "Input" | "Output" | "Outcome"
 	custom?: Record<string, any>;
 }
 
@@ -42,11 +43,12 @@ export interface TaskItem {
 	content: string;
 	status: string;
 	line: number;
+	type?: "Input" | "Output" | "Outcome";
 }
 
 export type SortOption = "modified" | "created" | "name" | "size";
 export type SortOrder = "asc" | "desc";
-export type GroupOption = "none" | "project" | "created" | "modified";
+export type GroupOption = "none" | "project" | "created" | "modified" | "type";
 
 export interface PaginationInfo {
 	currentPage: number;

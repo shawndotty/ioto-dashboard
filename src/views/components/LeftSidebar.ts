@@ -10,7 +10,8 @@ export class LeftSidebar {
 		private leftPanelCollapsed: boolean,
 		private savedQueries: SavedQuery[],
 		private onCategoryClick: (category: Category) => void,
-		private onQueryClick: (query: SavedQuery) => void
+		private onQueryClick: (query: SavedQuery) => void,
+		private navItems: Category[] = ["Input", "Output", "Outcome"]
 	) {}
 
 	render() {
@@ -23,14 +24,14 @@ export class LeftSidebar {
 
 		// Optional: Add toggle button logic if needed here, or keep it controlled by parent
 
-		const navItems: Category[] = ["Input", "Output", "Outcome"];
 		const list = this.container.createEl("ul", { cls: "nav-list" });
 
-		navItems.forEach((item) => {
+		this.navItems.forEach((item) => {
 			let label = "";
 			if (item === "Input") label = t("NAV_INPUT");
 			else if (item === "Output") label = t("NAV_OUTPUT");
 			else if (item === "Outcome") label = t("NAV_OUTCOME");
+			else if (item === "Tasks") label = t("NAV_TASKS");
 
 			const li = list.createEl("li", {
 				text: this.leftPanelCollapsed ? label.charAt(0) : label,

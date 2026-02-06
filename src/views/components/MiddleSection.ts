@@ -53,6 +53,7 @@ export class MiddleSection extends Component {
 		private onSearch: (val: string) => void,
 		private onCloseSearch: () => void,
 		private pagination: PaginationInfo,
+		private hideTabs: boolean = false,
 	) {
 		super();
 		this.sortOption = sortOption;
@@ -152,24 +153,33 @@ export class MiddleSection extends Component {
 
 		// Tabs
 		const tabs = this.container.createDiv({ cls: "content-tabs" });
-		const notesTab = tabs.createDiv({
-			cls: "content-tab",
-			text: t("TAB_NOTES"),
-		});
-		const tasksTab = tabs.createDiv({
-			cls: "content-tab",
-			text: t("TAB_TASKS"),
-		});
 
-		if (this.activeTab === "Notes") notesTab.addClass("is-active");
-		else tasksTab.addClass("is-active");
+		if (!this.hideTabs) {
+			const notesTab = tabs.createDiv({
+				cls: "content-tab",
+				text: t("TAB_NOTES"),
+			});
+			const tasksTab = tabs.createDiv({
+				cls: "content-tab",
+				text: t("TAB_TASKS"),
+			});
 
-		notesTab.onclick = () => {
-			this.onTabChange("Notes");
-		};
-		tasksTab.onclick = () => {
-			this.onTabChange("Tasks");
-		};
+			if (this.activeTab === "Notes") notesTab.addClass("is-active");
+			else tasksTab.addClass("is-active");
+
+			notesTab.onclick = () => {
+				this.onTabChange("Notes");
+			};
+			tasksTab.onclick = () => {
+				this.onTabChange("Tasks");
+			};
+		} else {
+			// If tabs hidden, maybe show a label? Or just nothing.
+			// The requirement says "Middle column default shows all tasks in Task folder".
+			// It doesn't explicitly say hide tabs, but since "only let user view IOTO Task folder tasks",
+			// switching to Notes makes no sense.
+			// So hiding is correct.
+		}
 
 		// Spacer
 		const spacer = tabs.createDiv();
@@ -395,6 +405,9 @@ export class MiddleSection extends Component {
 		addGroupItem(t("GROUP_PROJECT"), "project");
 		addGroupItem(t("GROUP_CREATED"), "created");
 		addGroupItem(t("GROUP_MODIFIED"), "modified");
+		if (this.activeTab === "Tasks") {
+			addGroupItem(t("GROUP_TYPE"), "type");
+		}
 
 		menu.showAtMouseEvent(event);
 	}
@@ -417,6 +430,12 @@ export class MiddleSection extends Component {
 				key = window.moment(file.stat.ctime).format("YYYY-MM-DD");
 			} else if (this.groupOption === "modified") {
 				key = window.moment(file.stat.mtime).format("YYYY-MM-DD");
+			} else if (this.groupOption === "type") {
+				if (type === "task") {
+					key = (item as TaskItem).type || t("GROUP_NONE");
+				} else {
+					key = t("GROUP_NONE");
+				}
 			} else {
 				key = t("GROUP_NONE");
 			}

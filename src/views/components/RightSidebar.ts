@@ -3,6 +3,7 @@ import {
 	TextComponent,
 	debounce,
 	ToggleComponent,
+	Notice,
 } from "obsidian";
 import { t } from "../../lang/helpers";
 import { FilterState } from "../../models/types";
@@ -24,6 +25,7 @@ export class RightSidebar {
 		private onReset: () => void,
 		private onSaveQuery: () => void,
 		private onUpdateQuery: () => void,
+		private showTaskTypeFilter: boolean = false,
 	) {}
 
 	render() {
@@ -31,6 +33,72 @@ export class RightSidebar {
 		this.container.createEl("h3", { text: t("FILTER_TITLE") });
 
 		const form = this.container.createDiv({ cls: "filter-form" });
+
+		// Task Type Filter (New)
+		if (this.showTaskTypeFilter && this.activeTab === "Tasks") {
+			const typeDiv = form.createDiv({ cls: "filter-item" });
+			typeDiv.createEl("label", { text: t("FILTER_TASK_TYPE_LABEL") });
+
+			const types = ["Input", "Output", "Outcome"];
+			const checkboxContainer = typeDiv.createDiv({
+				cls: "filter-checkboxes",
+			});
+			checkboxContainer.style.display = "flex";
+			checkboxContainer.style.flexDirection = "column";
+			checkboxContainer.style.gap = "10px";
+			checkboxContainer.style.marginBottom = "10px";
+
+			types.forEach((type) => {
+				let label = "";
+				if (type === "Input") label = t("NAV_INPUT");
+				else if (type === "Output") label = t("NAV_OUTPUT");
+				else if (type === "Outcome") label = t("NAV_OUTCOME");
+
+				const wrapper = checkboxContainer.createDiv();
+				wrapper.style.display = "flex";
+				wrapper.style.alignItems = "center";
+				wrapper.style.justifyContent = "space-between";
+				wrapper.style.width = "100%";
+
+				wrapper.createEl("span", {
+					text: label,
+				});
+
+				const isChecked =
+					!this.filters.taskType ||
+					this.filters.taskType.length === 0 ||
+					this.filters.taskType.includes(type);
+
+				const toggle = new ToggleComponent(wrapper)
+					.setValue(isChecked)
+					.onChange((checked) => {
+						let currentTypes = this.filters.taskType || [];
+						if (currentTypes.length === 0)
+							currentTypes = ["Input", "Output", "Outcome"];
+
+						if (checked) {
+							if (!currentTypes.includes(type))
+								currentTypes.push(type);
+							this.filters.taskType = currentTypes;
+							this.onFilterChange(this.filters, false);
+						} else {
+							if (
+								currentTypes.length === 1 &&
+								currentTypes.includes(type)
+							) {
+								new Notice(t("FILTER_TASK_TYPE_REQUIRED"));
+								toggle.setValue(true);
+								return;
+							}
+							currentTypes = currentTypes.filter(
+								(t) => t !== type,
+							);
+							this.filters.taskType = currentTypes;
+							this.onFilterChange(this.filters, false);
+						}
+					});
+			});
+		}
 
 		// Name Filter
 		const nameDiv = form.createDiv({ cls: "filter-item" });
