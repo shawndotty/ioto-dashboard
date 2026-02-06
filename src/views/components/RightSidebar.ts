@@ -270,6 +270,10 @@ export class RightSidebar {
 			});
 
 			this.customFilters.forEach((filter) => {
+				const target = filter.target || "all";
+				if (this.activeTab === "Notes" && target === "task") return;
+				if (this.activeTab === "Tasks" && target === "note") return;
+
 				const div = form.createDiv({ cls: "filter-item" });
 				div.createEl("label", { text: filter.name });
 

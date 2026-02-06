@@ -2,6 +2,7 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import IotoDashboardPlugin from "./main";
 import { t } from "./lang/helpers";
 import { FolderPickerModal } from "./ui/pickers/folder-picker";
+import { PropertyPickerModal } from "./ui/pickers/property-picker";
 import { TabbedSettings } from "ui/tabbed-settings";
 export interface SavedQuery {
 	id: string;
@@ -30,6 +31,7 @@ export interface SavedQuery {
 export interface CustomFilter {
 	name: string;
 	type: "text" | "number" | "boolean" | "date" | "list";
+	target?: "all" | "note" | "task";
 }
 
 export interface IotoDashboardSettings {
@@ -215,14 +217,27 @@ export class DashboardSettingTab extends PluginSettingTab {
 		// Add new filter
 		let newFilterName = "";
 		let newFilterType: CustomFilter["type"] = "text";
+		let newFilterTarget: CustomFilter["target"] = "all";
+		let filterNameInput: any;
 
 		new Setting(containerEl)
 			.setName(t("SETTINGS_ADD_FILTER_BTN"))
-			.addText((text) =>
-				text
-					.setPlaceholder(t("SETTINGS_FILTER_NAME_PLACEHOLDER"))
-					.onChange((val) => (newFilterName = val)),
-			)
+			.addText((text) => {
+				filterNameInput = text;
+				text.setPlaceholder(
+					t("SETTINGS_FILTER_NAME_PLACEHOLDER"),
+				).onChange((val) => (newFilterName = val));
+			})
+			.addExtraButton((btn) => {
+				btn.setIcon("list")
+					.setTooltip(t("SETTINGS_FILTER_NAME_PLACEHOLDER"))
+					.onClick(() => {
+						new PropertyPickerModal(this.app, (name) => {
+							newFilterName = name;
+							filterNameInput.setValue(name);
+						}).open();
+					});
+			})
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("text", t("SETTINGS_FILTER_TYPE_TEXT"))
@@ -232,6 +247,14 @@ export class DashboardSettingTab extends PluginSettingTab {
 					.addOption("list", t("SETTINGS_FILTER_TYPE_LIST"))
 					.setValue("text")
 					.onChange((val) => (newFilterType = val as any)),
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("all", t("SETTINGS_FILTER_TARGET_ALL"))
+					.addOption("note", t("SETTINGS_FILTER_TARGET_NOTE"))
+					.addOption("task", t("SETTINGS_FILTER_TARGET_TASK"))
+					.setValue("all")
+					.onChange((val) => (newFilterTarget = val as any)),
 			)
 			.addButton((btn) =>
 				btn
@@ -251,6 +274,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 							this.plugin.settings.customFilters.push({
 								name: newFilterName,
 								type: newFilterType,
+								target: newFilterTarget,
 							});
 							await this.plugin.saveSettings();
 							this.currentTabIndex = 1;
@@ -260,18 +284,28 @@ export class DashboardSettingTab extends PluginSettingTab {
 			);
 		// List existing filters
 		this.plugin.settings.customFilters.forEach((filter, index) => {
+			const typeLabel =
+				filter.type === "text"
+					? t("SETTINGS_FILTER_TYPE_TEXT")
+					: filter.type === "number"
+						? t("SETTINGS_FILTER_TYPE_NUMBER")
+						: filter.type === "boolean"
+							? t("SETTINGS_FILTER_TYPE_BOOLEAN")
+							: filter.type === "date"
+								? t("SETTINGS_FILTER_TYPE_DATE")
+								: t("SETTINGS_FILTER_TYPE_LIST");
+
+			const targetLabel =
+				filter.target === "note"
+					? t("SETTINGS_FILTER_TARGET_NOTE")
+					: filter.target === "task"
+						? t("SETTINGS_FILTER_TARGET_TASK")
+						: t("SETTINGS_FILTER_TARGET_ALL");
+
 			new Setting(containerEl)
 				.setName(filter.name)
 				.setDesc(
-					filter.type === "text"
-						? t("SETTINGS_FILTER_TYPE_TEXT")
-						: filter.type === "number"
-							? t("SETTINGS_FILTER_TYPE_NUMBER")
-							: filter.type === "boolean"
-								? t("SETTINGS_FILTER_TYPE_BOOLEAN")
-								: filter.type === "date"
-									? t("SETTINGS_FILTER_TYPE_DATE")
-									: t("SETTINGS_FILTER_TYPE_LIST"),
+					`${typeLabel} | ${t("SETTINGS_FILTER_TARGET_LABEL")}: ${targetLabel}`,
 				)
 				.addButton((btn) =>
 					btn
