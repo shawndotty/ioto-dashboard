@@ -4,6 +4,7 @@ export default {
 	NAV_INPUT: "輸入 Input",
 	NAV_OUTPUT: "輸出 Output",
 	NAV_OUTCOME: "成果 Outcome",
+	NAV_TASKS: "IOTO 任務",
 	NAV_TITLE: "導航",
 	TAB_NOTES: "筆記",
 	TAB_TASKS: "任務",
@@ -36,6 +37,8 @@ export default {
 	FILTER_NAME_PLACEHOLDER: "搜尋...",
 	FILTER_PROJECT_LABEL: "專案",
 	FILTER_PROJECT_PLACEHOLDER: "專案名稱...",
+	FILTER_TASK_TYPE_LABEL: "任務類型",
+	FILTER_TASK_TYPE_REQUIRED: "必須選擇至少一種任務類型。",
 	FILTER_DATE_TYPE_LABEL: "日期類型",
 	FILTER_DATE_TYPE_CREATED: "建立時間",
 	FILTER_DATE_TYPE_MODIFIED: "修改時間",
@@ -71,10 +74,14 @@ export default {
 		"成果 (Outcome) 資料夾的路徑 (例如: 4-Outcome)",
 	SETTINGS_TASK_FOLDER_NAME: "任務資料夾",
 	SETTINGS_TASK_FOLDER_DESC: "任務 (Task) 資料夾的路徑 (例如: 3-Task)",
+	SETTINGS_PAGE_SIZE_NAME: "每頁數量",
+	SETTINGS_PAGE_SIZE_DESC: "每頁顯示的項目數量 (20-300)。",
 
 	// Commands & Ribbon
 	RIBBON_ICON_TITLE: "開啟 IOTO 儀表板",
+	RIBBON_TASK_VIEW_TITLE: "開啟 IOTO 任務儀表板",
 	COMMAND_OPEN_DASHBOARD: "開啟儀表板",
+	COMMAND_OPEN_TASK_VIEW: "開啟 IOTO 任務視圖",
 	COMMAND_TOGGLE_QUICK_SEARCH: "在儀表板中切換快速搜尋",
 	PICKER_NO_FOLDERS_FOUND: `沒有找到符合條件的資料夾`,
 
@@ -92,6 +99,8 @@ export default {
 	SORT_CREATED_ASC: "建立時間 (從舊到新)",
 	SORT_NAME_ASC: "檔名 (A 到 Z)",
 	SORT_NAME_DESC: "檔名 (Z 到 A)",
+	SORT_SIZE_DESC: "筆記長度 (從多到少)",
+	SORT_SIZE_ASC: "筆記長度 (從少到多)",
 
 	// Group
 	GROUP_LABEL: "分組",
@@ -99,6 +108,7 @@ export default {
 	GROUP_PROJECT: "專案",
 	GROUP_CREATED: "建立日期",
 	GROUP_MODIFIED: "修改日期",
+	GROUP_TYPE: "任務類型",
 
 	// Pagination
 	PAGINATION_PREV: "上一頁",
