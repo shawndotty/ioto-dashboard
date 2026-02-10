@@ -121,7 +121,6 @@ export class TaskView extends ItemView {
 	}
 
 	async onOpen() {
-		this.isZenMode = this.plugin.settings.enableZenMode;
 		const container = this.contentEl;
 		container.empty();
 		container.addClass("ioto-dashboard-view"); // Reuse style
@@ -649,23 +648,8 @@ export class TaskView extends ItemView {
 		this.middleSection.render();
 	}
 
-	async toggleZenMode() {
-		const newMode = !this.isZenMode;
-		this.plugin.settings.enableZenMode = newMode;
-		await this.plugin.saveSettings();
-
-		this.app.workspace.iterateAllLeaves((leaf) => {
-			if (
-				leaf.view.getViewType() === DASHBOARD_VIEW_TYPE ||
-				leaf.view.getViewType() === TASK_VIEW_TYPE
-			) {
-				(leaf.view as any).setZenMode(newMode);
-			}
-		});
-	}
-
-	setZenMode(enabled: boolean) {
-		this.isZenMode = enabled;
+	toggleZenMode() {
+		this.isZenMode = !this.isZenMode;
 		const grid = this.contentEl.querySelector(".dashboard-grid");
 		if (grid) {
 			if (this.isZenMode) {
@@ -675,6 +659,28 @@ export class TaskView extends ItemView {
 			}
 		}
 		this.renderMiddleColumn();
+		this.app.workspace.requestSaveLayout();
+	}
+
+	getState() {
+		return {
+			isZenMode: this.isZenMode,
+		};
+	}
+
+	async setState(state: any, result: any) {
+		if (state && typeof state.isZenMode === "boolean") {
+			this.isZenMode = state.isZenMode;
+			const grid = this.contentEl.querySelector(".dashboard-grid");
+			if (grid) {
+				if (this.isZenMode) {
+					grid.addClass("zen-mode");
+				} else {
+					grid.removeClass("zen-mode");
+				}
+			}
+		}
+		await super.setState(state, result);
 	}
 
 	async deleteTask(task: TaskItem) {
