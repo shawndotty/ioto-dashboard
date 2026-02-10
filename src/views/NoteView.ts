@@ -87,6 +87,10 @@ export class NoteView extends ItemView {
 	requestRefresh = debounce(
 		async (file: TFile) => {
 			if (this.isFileInIOO(file)) {
+				// Invalidate caches
+				this.projectCache = null;
+				this.statusCache = null;
+
 				await this.refreshFiles();
 				this.renderMiddleColumn();
 			}
@@ -98,6 +102,10 @@ export class NoteView extends ItemView {
 	// Debounced refresh for file deletion
 	debouncedDeleteRefresh = debounce(
 		() => {
+			// Invalidate caches
+			this.projectCache = null;
+			this.statusCache = null;
+
 			this.refreshFiles().then(() => {
 				this.renderMiddleColumn();
 			});
@@ -219,9 +227,34 @@ export class NoteView extends ItemView {
 
 	getAllProjects(): string[] {
 		if (this.projectCache) return this.projectCache;
-		// Simple project extraction logic or return empty if not needed
-		// For now, let's keep it simple as implementation of getAllProjects wasn't requested
-		return [];
+
+		const projects = new Set<string>();
+		const files = this.app.vault.getMarkdownFiles();
+		for (const file of files) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const project = cache?.frontmatter?.["Project"];
+			if (project) {
+				projects.add(String(project));
+			}
+		}
+		this.projectCache = Array.from(projects).sort();
+		return this.projectCache;
+	}
+
+	getAllStatuses(): string[] {
+		if (this.statusCache) return this.statusCache;
+
+		const statuses = new Set<string>();
+		const files = this.app.vault.getMarkdownFiles();
+		for (const file of files) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const status = cache?.frontmatter?.["Status"];
+			if (status) {
+				statuses.add(String(status));
+			}
+		}
+		this.statusCache = Array.from(statuses).sort();
+		return this.statusCache;
 	}
 
 	applyFilters(render = true) {
@@ -425,7 +458,7 @@ export class NoteView extends ItemView {
 			this.activeTab,
 			this.activeQueryId,
 			this.getAllProjects(), // allProjects
-			[], // allStatuses (for tasks)
+			this.getAllStatuses(), // allStatuses
 			[], // customFilters - assume none for now or implement logic to get them
 			(filters) => {
 				this.filters = filters;
