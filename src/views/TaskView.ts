@@ -527,6 +527,7 @@ export class TaskView extends ItemView {
 		);
 		this.renderMiddleColumn();
 		this.renderRightColumn();
+		this.app.workspace.requestSaveLayout();
 	}
 
 	renderMiddleColumn() {
@@ -665,22 +666,47 @@ export class TaskView extends ItemView {
 	getState() {
 		return {
 			isZenMode: this.isZenMode,
+			activeQueryId: this.activeQueryId,
 		};
 	}
 
 	async setState(state: any, result: any) {
-		if (state && typeof state.isZenMode === "boolean") {
-			this.isZenMode = state.isZenMode;
-			const grid = this.contentEl.querySelector(".dashboard-grid");
-			if (grid) {
-				if (this.isZenMode) {
-					grid.addClass("zen-mode");
-				} else {
-					grid.removeClass("zen-mode");
+		if (state) {
+			if (typeof state.isZenMode === "boolean") {
+				this.isZenMode = state.isZenMode;
+				const grid = this.contentEl.querySelector(".dashboard-grid");
+				if (grid) {
+					if (this.isZenMode) {
+						grid.addClass("zen-mode");
+					} else {
+						grid.removeClass("zen-mode");
+					}
 				}
+			}
+			if (state.activeQueryId !== undefined) {
+				this.activeQueryId = state.activeQueryId;
 			}
 		}
 		await super.setState(state, result);
+
+		// Restore filters from saved query if active
+		if (this.activeQueryId) {
+			const query = this.plugin.settings.savedQueries.find(
+				(q) => q.id === this.activeQueryId,
+			);
+			if (query) {
+				this.filters = JSON.parse(JSON.stringify(query.filters));
+			}
+		}
+
+		// If the view is already rendered, refresh to reflect restored state
+		const leftCol = this.contentEl.querySelector(".dashboard-left");
+		if (leftCol) {
+			await this.refreshFiles();
+			this.renderLeftColumn(leftCol as HTMLElement);
+			this.renderMiddleColumn();
+			this.renderRightColumn();
+		}
 	}
 
 	async deleteTask(task: TaskItem) {
@@ -773,9 +799,16 @@ export class TaskView extends ItemView {
 					taskType: [],
 					custom: {},
 				};
+				this.activeQueryId = null; // Also reset ID
 				this.applyFilters(true);
 				this.renderMiddleColumn();
 				this.renderRightColumn();
+				this.renderLeftColumn(
+					this.contentEl.querySelector(
+						".dashboard-left",
+					) as HTMLElement,
+				);
+				this.app.workspace.requestSaveLayout();
 			},
 			() => {
 				new SaveQueryModal(
@@ -813,6 +846,7 @@ export class TaskView extends ItemView {
 		);
 		this.renderMiddleColumn();
 		this.renderRightColumn();
+		this.app.workspace.requestSaveLayout();
 	}
 
 	async updateQuery(id: string) {
@@ -870,6 +904,7 @@ export class TaskView extends ItemView {
 		);
 		this.renderMiddleColumn();
 		this.renderRightColumn();
+		this.app.workspace.requestSaveLayout();
 	}
 
 	onFileChange(file: TFile) {
