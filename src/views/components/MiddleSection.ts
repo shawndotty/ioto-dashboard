@@ -54,6 +54,11 @@ export class MiddleSection extends Component {
 		private onCloseSearch: () => void,
 		private pagination: PaginationInfo,
 		private hideTabs: boolean = false,
+		private folderPaths?: {
+			input: string;
+			output: string;
+			outcome: string;
+		},
 	) {
 		super();
 		this.sortOption = sortOption;
@@ -405,7 +410,7 @@ export class MiddleSection extends Component {
 		addGroupItem(t("GROUP_PROJECT"), "project");
 		addGroupItem(t("GROUP_CREATED"), "created");
 		addGroupItem(t("GROUP_MODIFIED"), "modified");
-		if (this.activeTab === "Tasks") {
+		if (this.activeTab === "Tasks" || this.folderPaths) {
 			addGroupItem(t("GROUP_TYPE"), "type");
 		}
 
@@ -433,6 +438,14 @@ export class MiddleSection extends Component {
 			} else if (this.groupOption === "type") {
 				if (type === "task") {
 					key = (item as TaskItem).type || t("GROUP_NONE");
+				} else if (this.folderPaths) {
+					const path = (item as TFile).path;
+					if (path.startsWith(this.folderPaths.input)) key = "Input";
+					else if (path.startsWith(this.folderPaths.output))
+						key = "Output";
+					else if (path.startsWith(this.folderPaths.outcome))
+						key = "Outcome";
+					else key = t("GROUP_NONE");
 				} else {
 					key = t("GROUP_NONE");
 				}

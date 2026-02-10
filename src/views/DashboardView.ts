@@ -708,6 +708,12 @@ export class DashboardView extends ItemView {
 					this.renderMiddleColumn();
 				},
 			},
+			false, // hideTabs
+			{
+				input: this.plugin.settings.inputFolder,
+				output: this.plugin.settings.outputFolder,
+				outcome: this.plugin.settings.outcomeFolder,
+			},
 		);
 		this.addChild(this.middleSection);
 		this.middleSection.render();

@@ -33,7 +33,7 @@ export class NoteView extends ItemView {
 	activeQueryName: string | null = null;
 	sortOption: SortOption = "modified";
 	sortOrder: SortOrder = "desc";
-	groupOption: GroupOption = "none";
+	groupOption: GroupOption = "type";
 	leftPanelCollapsed = false;
 	rightPanelCollapsed = false;
 	isZenMode = false;
@@ -408,6 +408,11 @@ export class NoteView extends ItemView {
 			},
 			this.pagination,
 			true, // hideTabs
+			{
+				input: this.plugin.settings.inputFolder,
+				output: this.plugin.settings.outputFolder,
+				outcome: this.plugin.settings.outcomeFolder,
+			},
 		);
 		this.middleSection.render();
 	}

@@ -644,6 +644,11 @@ export class TaskView extends ItemView {
 				},
 			},
 			true, // Hide Tabs
+			{
+				input: this.plugin.settings.inputFolder,
+				output: this.plugin.settings.outputFolder,
+				outcome: this.plugin.settings.outcomeFolder,
+			},
 		);
 		this.addChild(this.middleSection);
 		this.middleSection.render();
@@ -836,6 +841,9 @@ export class TaskView extends ItemView {
 			category: this.activeCategory,
 			tab: "Tasks",
 			filters: JSON.parse(JSON.stringify(this.filters)),
+			sortOption: this.sortOption,
+			sortOrder: this.sortOrder,
+			groupOption: this.groupOption,
 		};
 		this.plugin.settings.savedQueries.push(newQuery);
 		await this.plugin.saveSettings();
@@ -857,11 +865,16 @@ export class TaskView extends ItemView {
 			queryIndex !== -1 &&
 			this.plugin.settings.savedQueries[queryIndex]
 		) {
-			this.plugin.settings.savedQueries[queryIndex].filters = JSON.parse(
-				JSON.stringify(this.filters),
-			);
+			const existing = this.plugin.settings.savedQueries[queryIndex];
+			this.plugin.settings.savedQueries[queryIndex] = {
+				...existing,
+				filters: JSON.parse(JSON.stringify(this.filters)),
+				sortOption: this.sortOption,
+				sortOrder: this.sortOrder,
+				groupOption: this.groupOption,
+			};
 			await this.plugin.saveSettings();
-			new Notice("Query updated");
+			new Notice(t("NOTICE_QUERY_UPDATED"));
 		}
 	}
 
