@@ -652,10 +652,12 @@ export class DashboardView extends ItemView {
 				this.sortOrder = order;
 				this.applyFilters();
 				this.renderMiddleColumn();
+				this.app.workspace.requestSaveLayout();
 			},
 			(option: GroupOption) => {
 				this.groupOption = option;
 				this.renderMiddleColumn();
+				this.app.workspace.requestSaveLayout();
 			},
 			(id: string) => {
 				this.renameSavedQuery(id);
@@ -731,6 +733,9 @@ export class DashboardView extends ItemView {
 			activeCategory: this.activeCategory,
 			activeTab: this.activeTab,
 			activeQueryId: this.activeQueryId,
+			sortOption: this.sortOption,
+			sortOrder: this.sortOrder,
+			groupOption: this.groupOption,
 		};
 	}
 
@@ -755,6 +760,15 @@ export class DashboardView extends ItemView {
 			}
 			if (state.activeQueryId !== undefined) {
 				this.activeQueryId = state.activeQueryId;
+			}
+			if (state.sortOption) {
+				this.sortOption = state.sortOption;
+			}
+			if (state.sortOrder) {
+				this.sortOrder = state.sortOrder;
+			}
+			if (state.groupOption) {
+				this.groupOption = state.groupOption;
 			}
 		}
 		await super.setState(state, result);

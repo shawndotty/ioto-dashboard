@@ -104,6 +104,10 @@
     flex-direction: column;
 }
 
+.ioto-dashboard-view .dashboard-grid.zen-mode .dashboard-middle {
+    padding: 0px;
+}
+
 .ioto-dashboard-view .file-list {
     flex: 1;
     overflow-y: auto;
