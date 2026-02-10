@@ -178,6 +178,59 @@ export class NoteView extends ItemView {
 		}
 	}
 
+	getState() {
+		return {
+			isZenMode: this.isZenMode,
+			activeCategory: this.activeCategory,
+			activeTab: this.activeTab,
+			activeQueryId: this.activeQueryId,
+			sortOption: this.sortOption,
+			sortOrder: this.sortOrder,
+			groupOption: this.groupOption,
+		};
+	}
+
+	async setState(state: any, result: any) {
+		if (state) {
+			if (typeof state.isZenMode === "boolean") {
+				this.isZenMode = state.isZenMode;
+				const grid = this.contentEl.querySelector(".dashboard-grid");
+				if (grid) {
+					if (this.isZenMode) grid.addClass("zen-mode");
+					else grid.removeClass("zen-mode");
+				}
+			}
+			if (state.activeCategory) this.activeCategory = state.activeCategory;
+			if (state.activeTab) this.activeTab = state.activeTab;
+			if (state.activeQueryId !== undefined)
+				this.activeQueryId = state.activeQueryId;
+			if (state.sortOption) this.sortOption = state.sortOption;
+			if (state.sortOrder) this.sortOrder = state.sortOrder;
+			if (state.groupOption) this.groupOption = state.groupOption;
+		}
+		await super.setState(state, result);
+
+		// Restore filters from saved query if active
+		if (this.activeQueryId) {
+			const query = this.plugin.settings.savedQueries.find(
+				(q) => q.id === this.activeQueryId,
+			);
+			if (query) {
+				this.filters = { ...this.filters, ...query.filters };
+				this.activeQueryName = query.name;
+			}
+		}
+
+		// Refresh UI
+		const leftCol = this.contentEl.querySelector(".dashboard-left");
+		if (leftCol) {
+			await this.refreshFiles();
+			this.renderLeftColumn(leftCol as HTMLElement);
+			this.renderMiddleColumn();
+			this.renderRightColumn();
+		}
+	}
+
 	toggleQuickSearch() {
 		this.isQuickSearchVisible = !this.isQuickSearchVisible;
 		this.renderMiddleColumn();
@@ -346,6 +399,7 @@ export class NoteView extends ItemView {
 					this.applyFilters();
 					this.renderLeftColumn(container);
 					this.renderRightColumn();
+					this.app.workspace.requestSaveLayout();
 				}
 			},
 			(query) => {
@@ -377,15 +431,18 @@ export class NoteView extends ItemView {
 			(tab) => {
 				this.activeTab = tab;
 				this.renderMiddleColumn();
+				this.app.workspace.requestSaveLayout();
 			},
 			(option, order) => {
 				this.sortOption = option;
 				this.sortOrder = order;
 				this.renderMiddleColumn();
+				this.app.workspace.requestSaveLayout();
 			},
 			(option) => {
 				this.groupOption = option;
 				this.renderMiddleColumn();
+				this.app.workspace.requestSaveLayout();
 			},
 			(id) => {
 				// On Edit Query
@@ -427,6 +484,7 @@ export class NoteView extends ItemView {
 					else grid.removeClass("zen-mode");
 				}
 				this.renderMiddleColumn();
+				this.app.workspace.requestSaveLayout();
 			},
 			this.isQuickSearchVisible,
 			this.filters.name,
@@ -576,6 +634,7 @@ export class NoteView extends ItemView {
 			this.renderLeftColumn(leftCol);
 		}
 		this.renderRightColumn();
+		this.app.workspace.requestSaveLayout();
 	}
 
 	async deleteSavedQuery(id: string) {
@@ -616,6 +675,7 @@ export class NoteView extends ItemView {
 					this.renderLeftColumn(leftCol);
 				}
 				new Notice(t("NOTICE_QUERY_DELETED"));
+				this.app.workspace.requestSaveLayout();
 			},
 		).open();
 	}
