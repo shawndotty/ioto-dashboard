@@ -29,7 +29,10 @@ export default class IotoDashboardPlugin extends Plugin {
 			"columns-3",
 			t("RIBBON_ICON_TITLE"),
 			(evt: MouseEvent) => {
-				this.activateView(evt.shiftKey);
+				this.activateView({
+					newWindow: evt.shiftKey,
+					newTab: evt.altKey,
+				});
 			},
 		);
 
@@ -37,7 +40,10 @@ export default class IotoDashboardPlugin extends Plugin {
 			"check-square",
 			t("RIBBON_TASK_VIEW_TITLE"),
 			(evt: MouseEvent) => {
-				this.activateTaskView(evt.shiftKey);
+				this.activateTaskView({
+					newWindow: evt.shiftKey,
+					newTab: evt.altKey,
+				});
 			},
 		);
 
@@ -95,13 +101,21 @@ export default class IotoDashboardPlugin extends Plugin {
 		// View automatically unloads
 	}
 
-	async activateView(newWindow = false) {
+	async activateView(
+		options: { newWindow?: boolean; newTab?: boolean } = {},
+	) {
 		const { workspace } = this.app;
 
 		let leaf: WorkspaceLeaf | null = null;
 
-		if (newWindow) {
+		if (options.newWindow) {
 			leaf = workspace.getLeaf("window");
+			await leaf.setViewState({
+				type: DASHBOARD_VIEW_TYPE,
+				active: true,
+			});
+		} else if (options.newTab) {
+			leaf = workspace.getLeaf("tab");
 			await leaf.setViewState({
 				type: DASHBOARD_VIEW_TYPE,
 				active: true,
@@ -125,13 +139,21 @@ export default class IotoDashboardPlugin extends Plugin {
 		}
 	}
 
-	async activateTaskView(newWindow = false) {
+	async activateTaskView(
+		options: { newWindow?: boolean; newTab?: boolean } = {},
+	) {
 		const { workspace } = this.app;
 
 		let leaf: WorkspaceLeaf | null = null;
 
-		if (newWindow) {
+		if (options.newWindow) {
 			leaf = workspace.getLeaf("window");
+			await leaf.setViewState({
+				type: TASK_VIEW_TYPE,
+				active: true,
+			});
+		} else if (options.newTab) {
+			leaf = workspace.getLeaf("tab");
 			await leaf.setViewState({
 				type: TASK_VIEW_TYPE,
 				active: true,
