@@ -1,6 +1,6 @@
 import { TFile } from "obsidian";
 
-export type Category = "Input" | "Output" | "Outcome" | "Tasks";
+export type Category = "Input" | "Output" | "Outcome" | "Tasks" | "Notes";
 
 declare module "obsidian" {
 	interface App {
@@ -35,6 +35,7 @@ export interface FilterState {
 	status: "all" | "completed" | "incomplete";
 	fileStatus: string;
 	taskType?: string[]; // "Input" | "Output" | "Outcome"
+	noteType?: string[]; // "Input" | "Output" | "Outcome"
 	custom?: Record<string, any>;
 }
 

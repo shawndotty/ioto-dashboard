@@ -7,7 +7,7 @@ import {
 	debounce,
 	TAbstractFile,
 } from "obsidian";
-import { DASHBOARD_VIEW_TYPE, TASK_VIEW_TYPE } from "../models/constants";
+import { DASHBOARD_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { SaveQueryModal } from "../ui/SaveQueryModal";
@@ -923,10 +923,13 @@ export class DashboardView extends ItemView {
 			category: this.activeCategory,
 			tab: this.activeTab,
 			filters: JSON.parse(JSON.stringify(this.filters)),
+			sortOption: this.sortOption,
+			sortOrder: this.sortOrder,
+			groupOption: this.groupOption,
 		};
 		this.plugin.settings.savedQueries.push(newQuery);
 		await this.plugin.saveSettings();
-		new Notice(`Query "${name}" saved.`);
+		new Notice(t("NOTICE_QUERY_SAVED"));
 		this.activeQueryId = newQuery.id;
 		this.renderLeftColumn(
 			this.contentEl.querySelector(".dashboard-left") as HTMLElement,
@@ -946,9 +949,12 @@ export class DashboardView extends ItemView {
 		query.category = this.activeCategory;
 		query.tab = this.activeTab;
 		query.filters = JSON.parse(JSON.stringify(this.filters));
+		query.sortOption = this.sortOption;
+		query.sortOrder = this.sortOrder;
+		query.groupOption = this.groupOption;
 
 		await this.plugin.saveSettings();
-		new Notice(`Query "${query.name}" updated.`);
+		new Notice(t("NOTICE_QUERY_UPDATED"));
 	}
 
 	async renameSavedQuery(id: string) {
@@ -977,7 +983,7 @@ export class DashboardView extends ItemView {
 		this.plugin.settings.savedQueries =
 			this.plugin.settings.savedQueries.filter((q) => q.id !== id);
 		await this.plugin.saveSettings();
-		new Notice("Query deleted.");
+		new Notice(t("NOTICE_QUERY_DELETED"));
 		if (this.activeQueryId === id) {
 			this.activeQueryId = null;
 		}

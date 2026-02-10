@@ -34,10 +34,15 @@ export class RightSidebar {
 
 		const form = this.container.createDiv({ cls: "filter-form" });
 
-		// Task Type Filter (New)
-		if (this.showTaskTypeFilter && this.activeTab === "Tasks") {
+		// Task/Note Type Filter
+		if (this.showTaskTypeFilter) {
+			const isTask = this.activeTab === "Tasks";
+			const labelKey = isTask
+				? "FILTER_TASK_TYPE_LABEL"
+				: "FILTER_NOTE_TYPE_LABEL";
+
 			const typeDiv = form.createDiv({ cls: "filter-item" });
-			typeDiv.createEl("label", { text: t("FILTER_TASK_TYPE_LABEL") });
+			typeDiv.createEl("label", { text: t(labelKey as any) });
 
 			const types = ["Input", "Output", "Outcome"];
 			const checkboxContainer = typeDiv.createDiv({
@@ -64,38 +69,46 @@ export class RightSidebar {
 					text: label,
 				});
 
+				const currentTypes = isTask
+					? this.filters.taskType || []
+					: this.filters.noteType || [];
+
 				const isChecked =
-					!this.filters.taskType ||
-					this.filters.taskType.length === 0 ||
-					this.filters.taskType.includes(type);
+					currentTypes.length === 0 || currentTypes.includes(type);
 
 				const toggle = new ToggleComponent(wrapper)
 					.setValue(isChecked)
 					.onChange((checked) => {
-						let currentTypes = this.filters.taskType || [];
-						if (currentTypes.length === 0)
-							currentTypes = ["Input", "Output", "Outcome"];
+						let newTypes = isTask
+							? this.filters.taskType || []
+							: this.filters.noteType || [];
+
+						if (newTypes.length === 0)
+							newTypes = ["Input", "Output", "Outcome"];
 
 						if (checked) {
-							if (!currentTypes.includes(type))
-								currentTypes.push(type);
-							this.filters.taskType = currentTypes;
-							this.onFilterChange(this.filters, false);
+							if (!newTypes.includes(type)) newTypes.push(type);
 						} else {
 							if (
-								currentTypes.length === 1 &&
-								currentTypes.includes(type)
+								newTypes.length === 1 &&
+								newTypes.includes(type)
 							) {
-								new Notice(t("FILTER_TASK_TYPE_REQUIRED"));
+								const requiredKey = isTask
+									? "FILTER_TASK_TYPE_REQUIRED"
+									: "FILTER_NOTE_TYPE_REQUIRED";
+								new Notice(t(requiredKey as any));
 								toggle.setValue(true);
 								return;
 							}
-							currentTypes = currentTypes.filter(
-								(t) => t !== type,
-							);
-							this.filters.taskType = currentTypes;
-							this.onFilterChange(this.filters, false);
+							newTypes = newTypes.filter((t) => t !== type);
 						}
+
+						if (isTask) {
+							this.filters.taskType = newTypes;
+						} else {
+							this.filters.noteType = newTypes;
+						}
+						this.onFilterChange(this.filters, false);
 					});
 			});
 		}
@@ -264,11 +277,6 @@ export class RightSidebar {
 
 		// Custom Filters
 		if (this.customFilters && this.customFilters.length > 0) {
-			form.createEl("h4", {
-				text: t("SETTINGS_CUSTOM_FILTERS_NAME"),
-				cls: "filter-section-title",
-			});
-
 			this.customFilters.forEach((filter) => {
 				const target = filter.target || "all";
 				if (this.activeTab === "Notes" && target === "task") return;

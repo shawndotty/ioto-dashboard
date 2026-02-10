@@ -32,6 +32,7 @@ export class LeftSidebar {
 			else if (item === "Output") label = t("NAV_OUTPUT");
 			else if (item === "Outcome") label = t("NAV_OUTCOME");
 			else if (item === "Tasks") label = t("NAV_TASKS");
+			else if (item === "Notes") label = t("NAV_NOTES");
 
 			const li = list.createEl("li", {
 				text: this.leftPanelCollapsed ? label.charAt(0) : label,

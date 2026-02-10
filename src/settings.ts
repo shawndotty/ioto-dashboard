@@ -4,11 +4,17 @@ import { t } from "./lang/helpers";
 import { FolderPickerModal } from "./ui/pickers/folder-picker";
 import { PropertyPickerModal } from "./ui/pickers/property-picker";
 import { TabbedSettings } from "ui/tabbed-settings";
+import { SortOption, SortOrder, GroupOption } from "./models/types";
+
 export interface SavedQuery {
 	id: string;
 	name: string;
-	category: "Input" | "Output" | "Outcome" | "Tasks";
+	category: "Input" | "Output" | "Outcome" | "Tasks" | "Notes";
 	tab: "Notes" | "Tasks";
+	type?: string;
+	sortOption: SortOption;
+	sortOrder: SortOrder;
+	groupOption: GroupOption;
 	filters: {
 		name: string;
 		project: string;
@@ -24,6 +30,9 @@ export interface SavedQuery {
 			| "last30days"
 			| "custom";
 		status: "all" | "completed" | "incomplete";
+		fileStatus?: string;
+		taskType?: string[];
+		noteType?: string[];
 		custom?: Record<string, any>;
 	};
 }
