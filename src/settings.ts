@@ -40,6 +40,7 @@ export interface IotoDashboardSettings {
 	taskFolder: string;
 	outcomeFolder: string;
 	pageSize: number;
+	enableZenMode: boolean;
 	savedQueries: SavedQuery[];
 	customFilters: CustomFilter[];
 }
@@ -50,6 +51,7 @@ export const DEFAULT_SETTINGS: IotoDashboardSettings = {
 	taskFolder: t("TASK_FOLDER"),
 	outcomeFolder: t("OUTCOME_FOLDER"),
 	pageSize: 100,
+	enableZenMode: false,
 	savedQueries: [],
 	customFilters: [],
 };

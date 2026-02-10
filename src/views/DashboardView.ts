@@ -7,7 +7,7 @@ import {
 	debounce,
 	TAbstractFile,
 } from "obsidian";
-import { DASHBOARD_VIEW_TYPE } from "../models/constants";
+import { DASHBOARD_VIEW_TYPE, TASK_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { SaveQueryModal } from "../ui/SaveQueryModal";
@@ -120,6 +120,7 @@ export class DashboardView extends ItemView {
 	}
 
 	async onOpen() {
+		this.isZenMode = this.plugin.settings.enableZenMode;
 		const container = this.contentEl;
 		container.empty();
 		container.addClass("ioto-dashboard-view");
@@ -708,8 +709,23 @@ export class DashboardView extends ItemView {
 		this.middleSection.render();
 	}
 
-	toggleZenMode() {
-		this.isZenMode = !this.isZenMode;
+	async toggleZenMode() {
+		const newMode = !this.isZenMode;
+		this.plugin.settings.enableZenMode = newMode;
+		await this.plugin.saveSettings();
+
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			if (
+				leaf.view.getViewType() === DASHBOARD_VIEW_TYPE ||
+				leaf.view.getViewType() === TASK_VIEW_TYPE
+			) {
+				(leaf.view as any).setZenMode(newMode);
+			}
+		});
+	}
+
+	setZenMode(enabled: boolean) {
+		this.isZenMode = enabled;
 		const grid = this.contentEl.querySelector(".dashboard-grid");
 		if (grid) {
 			if (this.isZenMode) {
