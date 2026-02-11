@@ -89,8 +89,8 @@ export default {
 	RIBBON_TASK_VIEW_TITLE: "Open IOTO Task Dashboard",
 	RIBBON_NOTE_VIEW_TITLE: "Open IOTO Note Dashboard",
 	COMMAND_OPEN_DASHBOARD: "Open IOTO Dashboard",
-	COMMAND_OPEN_TASK_VIEW: "Open IOTO Task View",
-	COMMAND_OPEN_NOTE_VIEW: "Open IOTO Note View",
+	COMMAND_OPEN_TASK_VIEW: "Open IOTO Task Dashboard",
+	COMMAND_OPEN_NOTE_VIEW: "Open IOTO Note Dashboard",
 	COMMAND_TOGGLE_QUICK_SEARCH: "Toggle Quick Search",
 	PICKER_NO_FOLDERS_FOUND: `No folders found`,
 

@@ -91,8 +91,8 @@ export default {
 	RIBBON_TASK_VIEW_TITLE: "開啟 IOTO 任務儀表板",
 	RIBBON_NOTE_VIEW_TITLE: "開啟 IOTO 筆記儀表板",
 	COMMAND_OPEN_DASHBOARD: "開啟儀表板",
-	COMMAND_OPEN_TASK_VIEW: "開啟 IOTO 任務視圖",
-	COMMAND_OPEN_NOTE_VIEW: "開啟 IOTO 筆記視圖",
+	COMMAND_OPEN_TASK_VIEW: "開啟 IOTO 任務儀表板",
+	COMMAND_OPEN_NOTE_VIEW: "開啟 IOTO 筆記儀表板",
 	COMMAND_TOGGLE_QUICK_SEARCH: "在儀表板中切換快速搜尋",
 	PICKER_NO_FOLDERS_FOUND: `沒有找到符合條件的資料夾`,
 
