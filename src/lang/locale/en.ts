@@ -5,7 +5,7 @@ export default {
 	NAV_OUTPUT: "Output",
 	NAV_OUTCOME: "Outcome",
 	NAV_TASKS: "IOTO Tasks",
-	NAV_NOTES: "Notes",
+	NAV_NOTES: "IOTO Notes",
 	NAV_TITLE: "Navigation",
 	TAB_NOTES: "Notes",
 	TAB_TASKS: "Tasks",

@@ -200,7 +200,8 @@ export class NoteView extends ItemView {
 					else grid.removeClass("zen-mode");
 				}
 			}
-			if (state.activeCategory) this.activeCategory = state.activeCategory;
+			if (state.activeCategory)
+				this.activeCategory = state.activeCategory;
 			if (state.activeTab) this.activeTab = state.activeTab;
 			if (state.activeQueryId !== undefined)
 				this.activeQueryId = state.activeQueryId;
@@ -355,6 +356,9 @@ export class NoteView extends ItemView {
 			return true;
 		});
 
+		// Sort
+		this.sortFiles(this.filteredFiles);
+
 		// Pagination
 		this.pagination.totalItems = this.filteredFiles.length;
 		this.pagination.totalPages = Math.ceil(
@@ -367,6 +371,22 @@ export class NoteView extends ItemView {
 		}
 
 		if (render) this.renderMiddleColumn();
+	}
+
+	sortFiles(files: TFile[]) {
+		files.sort((a, b) => {
+			let result = 0;
+			if (this.sortOption === "modified") {
+				result = a.stat.mtime - b.stat.mtime;
+			} else if (this.sortOption === "created") {
+				result = a.stat.ctime - b.stat.ctime;
+			} else if (this.sortOption === "name") {
+				result = a.basename.localeCompare(b.basename);
+			} else if (this.sortOption === "size") {
+				result = a.stat.size - b.stat.size;
+			}
+			return this.sortOrder === "asc" ? result : -result;
+		});
 	}
 
 	renderLeftColumn(container: HTMLElement) {
@@ -412,8 +432,20 @@ export class NoteView extends ItemView {
 
 	renderMiddleColumn() {
 		if (this.middleSection) {
-			this.middleSection.unload();
+			this.removeChild(this.middleSection);
 		}
+
+		// Pagination Logic
+		const pageSize = this.plugin.settings.pageSize;
+		const totalNotes = this.filteredFiles.length;
+		const maxNotePage = Math.max(1, Math.ceil(totalNotes / pageSize));
+
+		if (this.pagination.currentPage > maxNotePage)
+			this.pagination.currentPage = maxNotePage;
+
+		const noteStart = (this.pagination.currentPage - 1) * pageSize;
+		const noteEnd = noteStart + pageSize;
+		const paginatedFiles = this.filteredFiles.slice(noteStart, noteEnd);
 
 		this.middleSection = new MiddleSection(
 			this.app,
@@ -422,7 +454,7 @@ export class NoteView extends ItemView {
 			this.activeTab,
 			this.activeQueryId,
 			this.activeQueryName,
-			this.filteredFiles,
+			paginatedFiles,
 			this.filteredTasks,
 			this.isZenMode,
 			this.sortOption,
@@ -436,7 +468,7 @@ export class NoteView extends ItemView {
 			(option, order) => {
 				this.sortOption = option;
 				this.sortOrder = order;
-				this.renderMiddleColumn();
+				this.applyFilters();
 				this.app.workspace.requestSaveLayout();
 			},
 			(option) => {
@@ -505,6 +537,7 @@ export class NoteView extends ItemView {
 				outcome: this.plugin.settings.outcomeFolder,
 			},
 		);
+		this.addChild(this.middleSection);
 		this.middleSection.render();
 	}
 
@@ -517,7 +550,7 @@ export class NoteView extends ItemView {
 			this.activeQueryId,
 			this.getAllProjects(), // allProjects
 			this.getAllStatuses(), // allStatuses
-			[], // customFilters - assume none for now or implement logic to get them
+			this.plugin.settings.customFilters,
 			(filters) => {
 				this.filters = filters;
 				this.applyFilters();

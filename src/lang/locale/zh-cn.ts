@@ -5,7 +5,7 @@ export default {
 	NAV_OUTPUT: "输出 Output",
 	NAV_OUTCOME: "成果 Outcome",
 	NAV_TASKS: "IOTO 任务",
-	NAV_NOTES: "笔记",
+	NAV_NOTES: "IOTO 笔记",
 	NAV_TITLE: "导航",
 	TAB_NOTES: "笔记",
 	TAB_TASKS: "任务",
