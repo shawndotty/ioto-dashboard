@@ -53,12 +53,16 @@ export default class IotoDashboardPlugin extends Plugin {
 			},
 		);
 
-		this.addRibbonIcon("sticky-note", t("NAV_NOTES"), (evt: MouseEvent) => {
-			this.activateNoteView({
-				newWindow: evt.shiftKey,
-				newTab: evt.altKey,
-			});
-		});
+		this.addRibbonIcon(
+			"sticky-note",
+			t("RIBBON_NOTE_VIEW_TITLE"),
+			(evt: MouseEvent) => {
+				this.activateNoteView({
+					newWindow: evt.shiftKey,
+					newTab: evt.altKey,
+				});
+			},
+		);
 
 		// Command
 		this.addCommand({
@@ -79,7 +83,7 @@ export default class IotoDashboardPlugin extends Plugin {
 
 		this.addCommand({
 			id: "open-ioto-note-view",
-			name: t("NAV_NOTES"),
+			name: t("COMMAND_OPEN_NOTE_VIEW"),
 			callback: () => {
 				this.activateNoteView();
 			},
