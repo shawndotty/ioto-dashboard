@@ -335,21 +335,114 @@ export class NoteView extends ItemView {
 					return false;
 			}
 
-			// 3. Custom Filters (Frontmatter)
+			// 3. Project Filter
+			if (this.filters.project) {
+				const cache = this.app.metadataCache.getFileCache(file);
+				const project = cache?.frontmatter?.["Project"];
+				if (
+					!project ||
+					!String(project)
+						.toLowerCase()
+						.includes(this.filters.project.toLowerCase())
+				) {
+					return false;
+				}
+			}
+
+			// 4. Date Filter
+			const dateValue =
+				this.filters.dateType === "created"
+					? file.stat.ctime
+					: file.stat.mtime;
+			const date = new Date(dateValue);
+
 			if (
-				this.filters.custom &&
-				Object.keys(this.filters.custom).length > 0
+				this.filters.datePreset !== "all" &&
+				this.filters.datePreset !== "custom"
+			) {
+				const now = new Date();
+				let days = 0;
+				if (this.filters.datePreset === "last3days") days = 3;
+				else if (this.filters.datePreset === "last1day") days = 1;
+				else if (this.filters.datePreset === "last7days") days = 7;
+				else if (this.filters.datePreset === "last14days") days = 14;
+				else if (this.filters.datePreset === "last30days") days = 30;
+
+				const startDate = new Date();
+				startDate.setDate(now.getDate() - days);
+				startDate.setHours(0, 0, 0, 0);
+
+				if (date < startDate) return false;
+			} else if (this.filters.datePreset === "custom") {
+				if (this.filters.dateStart) {
+					const startDate = new Date(this.filters.dateStart);
+					if (date < startDate) return false;
+				}
+
+				if (this.filters.dateEnd) {
+					const endDate = new Date(this.filters.dateEnd);
+					endDate.setHours(23, 59, 59, 999);
+					if (date > endDate) return false;
+				}
+			}
+
+			// 5. File Status Filter
+			if (this.filters.fileStatus) {
+				const cache = this.app.metadataCache.getFileCache(file);
+				const status = cache?.frontmatter?.["Status"];
+				if (
+					!status ||
+					!String(status)
+						.toLowerCase()
+						.includes(this.filters.fileStatus.toLowerCase())
+				) {
+					return false;
+				}
+			}
+
+			// 6. Custom Filters (Frontmatter)
+			if (
+				this.plugin.settings.customFilters &&
+				this.plugin.settings.customFilters.length > 0 &&
+				this.filters.custom
 			) {
 				const cache = this.app.metadataCache.getFileCache(file);
 				const frontmatter = cache?.frontmatter;
 
-				for (const [key, value] of Object.entries(
-					this.filters.custom,
-				)) {
-					if (!value) continue;
-					if (!frontmatter || !frontmatter[key]) return false;
-					const valStr = String(frontmatter[key]).toLowerCase();
-					if (!valStr.includes(value.toLowerCase())) return false;
+				for (const filter of this.plugin.settings.customFilters) {
+					const filterValue = this.filters.custom[filter.name];
+					if (
+						filterValue === undefined ||
+						filterValue === "" ||
+						filterValue === "all"
+					)
+						continue;
+
+					const fileValue = frontmatter
+						? frontmatter[filter.name]
+						: undefined;
+
+					if (filter.type === "text" || filter.type === "list") {
+						if (!fileValue) return false;
+						const fileValStr = String(fileValue).toLowerCase();
+						const filterValStr = String(filterValue).toLowerCase();
+						if (!fileValStr.includes(filterValStr)) return false;
+					} else if (filter.type === "number") {
+						if (fileValue === undefined) return false;
+						if (Number(fileValue) !== Number(filterValue))
+							return false;
+					} else if (filter.type === "boolean") {
+						const boolFilter = filterValue === "true";
+						const boolFileValue =
+							fileValue === true ||
+							fileValue === "true" ||
+							fileValue === "True";
+						if (boolFileValue !== boolFilter) return false;
+					} else if (filter.type === "date") {
+						if (!fileValue) return false;
+						if (String(fileValue) !== String(filterValue))
+							return false;
+					}
 				}
 			}
 
