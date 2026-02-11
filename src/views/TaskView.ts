@@ -498,7 +498,7 @@ export class TaskView extends ItemView {
 			this.activeCategory,
 			this.activeQueryId,
 			this.leftPanelCollapsed,
-			this.plugin.settings.savedQueries,
+			this.plugin.settings.savedQueries.filter((q) => q.type === "Task"),
 			async (category) => {
 				// Should not happen as we only have "Tasks"
 				this.activeCategory = category;
@@ -840,6 +840,7 @@ export class TaskView extends ItemView {
 			name: name,
 			category: this.activeCategory,
 			tab: "Tasks",
+			type: "Task",
 			filters: JSON.parse(JSON.stringify(this.filters)),
 			sortOption: this.sortOption,
 			sortOrder: this.sortOrder,

@@ -488,9 +488,7 @@ export class NoteView extends ItemView {
 			this.activeCategory,
 			this.activeQueryId,
 			this.leftPanelCollapsed,
-			this.plugin.settings.savedQueries.filter(
-				(q) => q.category === "Notes" || q.type === "NoteView",
-			),
+			this.plugin.settings.savedQueries.filter((q) => q.type === "Note"),
 			(category) => {
 				if (category === "Notes") {
 					this.activeCategory = category;
@@ -686,13 +684,12 @@ export class NoteView extends ItemView {
 							name,
 							category: "Notes",
 							tab: "Notes",
-							type: "NoteView",
+							type: "Note",
 							sortOption: this.sortOption,
 							sortOrder: this.sortOrder,
 							groupOption: this.groupOption,
 							filters: { ...this.filters },
 						};
-
 						this.plugin.settings.savedQueries.push(newQuery);
 						await this.plugin.saveSettings();
 

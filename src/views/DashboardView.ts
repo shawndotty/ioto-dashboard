@@ -556,7 +556,7 @@ export class DashboardView extends ItemView {
 			this.activeCategory,
 			this.activeQueryId,
 			this.leftPanelCollapsed,
-			this.plugin.settings.savedQueries,
+			this.plugin.settings.savedQueries.filter((q) => q.type === "all"),
 			async (category) => {
 				this.activeCategory = category;
 				this.activeQueryId = null; // Reset active query when switching main category
@@ -928,6 +928,7 @@ export class DashboardView extends ItemView {
 			name,
 			category: this.activeCategory,
 			tab: this.activeTab,
+			type: "all",
 			filters: JSON.parse(JSON.stringify(this.filters)),
 			sortOption: this.sortOption,
 			sortOrder: this.sortOrder,
