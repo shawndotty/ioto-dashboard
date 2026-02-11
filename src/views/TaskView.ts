@@ -633,6 +633,9 @@ export class TaskView extends ItemView {
 			() => {
 				this.toggleQuickSearch();
 			},
+			() => {
+				this.toggleQuickSearch();
+			},
 			{
 				currentPage: this.taskCurrentPage,
 				totalPages: maxTaskPage,

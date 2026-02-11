@@ -692,6 +692,9 @@ export class DashboardView extends ItemView {
 			() => {
 				this.toggleQuickSearch();
 			},
+			() => {
+				this.toggleQuickSearch();
+			},
 			{
 				currentPage:
 					this.activeTab === "Notes"

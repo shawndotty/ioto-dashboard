@@ -620,6 +620,9 @@ export class NoteView extends ItemView {
 				this.filters.name = "";
 				this.applyFilters(true);
 			},
+			() => {
+				this.toggleQuickSearch();
+			},
 			this.pagination,
 			true, // hideTabs
 			{

@@ -52,6 +52,7 @@ export class MiddleSection extends Component {
 		private searchText: string,
 		private onSearch: (val: string) => void,
 		private onCloseSearch: () => void,
+		private onToggleSearch: () => void,
 		private pagination: PaginationInfo,
 		private hideTabs: boolean = false,
 		private folderPaths?: {
@@ -210,6 +211,19 @@ export class MiddleSection extends Component {
 		groupBtn.onclick = (e) => {
 			this.showGroupMenu(e as MouseEvent);
 		};
+
+		// Search Button (Zen Mode Only)
+		if (this.isZenMode) {
+			const searchBtn = tabs.createEl("button", {
+				cls: "clickable-icon",
+			});
+			searchBtn.setAttribute("aria-label", t("COMMAND_TOGGLE_QUICK_SEARCH"));
+			setIcon(searchBtn, "search");
+			searchBtn.style.marginLeft = "8px";
+			searchBtn.onclick = () => {
+				this.onToggleSearch();
+			};
+		}
 
 		// Quick Search
 		if (this.isQuickSearchVisible) {
