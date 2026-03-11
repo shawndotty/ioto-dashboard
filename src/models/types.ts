@@ -21,6 +21,7 @@ declare module "obsidian" {
 export interface FilterState {
 	name: string;
 	project: string;
+	subject: string;
 	dateType: "created" | "modified";
 	dateStart: string;
 	dateEnd: string;

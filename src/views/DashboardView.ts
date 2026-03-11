@@ -53,6 +53,7 @@ export class DashboardView extends ItemView {
 	filters: FilterState = {
 		name: "",
 		project: "",
+		subject: "",
 		dateType: "created",
 		dateStart: "",
 		dateEnd: "",
@@ -70,6 +71,7 @@ export class DashboardView extends ItemView {
 	// Caches
 	projectCache: string[] | null = null;
 	statusCache: string[] | null = null;
+	subjectCache: string[] | null = null;
 
 	// Debounced refresh for file changes
 	requestRefresh = debounce(
@@ -77,6 +79,7 @@ export class DashboardView extends ItemView {
 			// Invalidate caches
 			this.projectCache = null;
 			this.statusCache = null;
+			this.subjectCache = null;
 
 			if (isTaskFile) {
 				await this.updateTasksForFile(file);
@@ -94,6 +97,7 @@ export class DashboardView extends ItemView {
 			// Invalidate caches
 			this.projectCache = null;
 			this.statusCache = null;
+			this.subjectCache = null;
 
 			this.applyFilters(false);
 			this.renderMiddleColumn();
@@ -239,6 +243,29 @@ export class DashboardView extends ItemView {
 		}
 		this.statusCache = Array.from(statuses).sort();
 		return this.statusCache;
+	}
+
+	getAllSubjects(): string[] {
+		if (this.subjectCache) return this.subjectCache;
+
+		const subjects = new Set<string>();
+		const files = this.app.vault.getMarkdownFiles();
+		for (const file of files) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const subject = cache?.frontmatter?.["Subject"];
+			if (Array.isArray(subject)) {
+				subject.forEach((s) => {
+					if (s !== null && s !== undefined && String(s).trim()) {
+						subjects.add(String(s));
+					}
+				});
+			} else if (subject !== null && subject !== undefined) {
+				const value = String(subject);
+				if (value.trim()) subjects.add(value);
+			}
+		}
+		this.subjectCache = Array.from(subjects).sort();
+		return this.subjectCache;
 	}
 
 	async fetchTasks() {
@@ -448,7 +475,28 @@ export class DashboardView extends ItemView {
 			}
 		}
 
-		// 3. Date Filter
+		// 3. Subject Filter (Notes only)
+		if (includeFileStatus && this.filters.subject) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const subject = cache?.frontmatter?.["Subject"];
+			const filterVal = this.filters.subject.toLowerCase();
+			if (Array.isArray(subject)) {
+				const match = subject.some((s) =>
+					String(s).toLowerCase().includes(filterVal),
+				);
+				if (!match) return false;
+			} else {
+				if (
+					subject === null ||
+					subject === undefined ||
+					!String(subject).toLowerCase().includes(filterVal)
+				) {
+					return false;
+				}
+			}
+		}
+
+		// 4. Date Filter
 		const dateValue =
 			this.filters.dateType === "created"
 				? file.stat.ctime
@@ -485,7 +533,7 @@ export class DashboardView extends ItemView {
 			}
 		}
 
-		// 4. File Status Filter (new)
+		// 5. File Status Filter (new)
 		if (includeFileStatus && this.filters.fileStatus) {
 			const cache = this.app.metadataCache.getFileCache(file);
 			const status = cache?.frontmatter?.["Status"];
@@ -499,7 +547,7 @@ export class DashboardView extends ItemView {
 			}
 		}
 
-		// 5. Custom Filters
+		// 6. Custom Filters
 		if (
 			this.plugin.settings.customFilters &&
 			this.plugin.settings.customFilters.length > 0 &&
@@ -579,8 +627,24 @@ export class DashboardView extends ItemView {
 		this.activeQueryId = query.id;
 		this.activeCategory = query.category;
 		this.activeTab = query.tab;
-		// Clone filters to avoid reference issues
-		this.filters = JSON.parse(JSON.stringify(query.filters));
+		const defaultFilters: FilterState = {
+			name: "",
+			project: "",
+			subject: "",
+			dateType: "created",
+			dateStart: "",
+			dateEnd: "",
+			datePreset: "all",
+			status: "all",
+			fileStatus: "",
+			custom: {},
+		};
+		this.filters = {
+			...defaultFilters,
+			...(JSON.parse(
+				JSON.stringify(query.filters),
+			) as Partial<FilterState>),
+		};
 
 		await this.refreshFiles();
 		this.renderLeftColumn(
@@ -873,6 +937,7 @@ export class DashboardView extends ItemView {
 			this.activeQueryId,
 			this.getAllProjects(),
 			this.getAllStatuses(),
+			this.getAllSubjects(),
 			this.plugin.settings.customFilters,
 			(newFilters, shouldReRender) => {
 				this.filters = newFilters;
@@ -888,6 +953,7 @@ export class DashboardView extends ItemView {
 				this.filters = {
 					name: "",
 					project: "",
+					subject: "",
 					dateType: "created",
 					dateStart: "",
 					dateEnd: "",

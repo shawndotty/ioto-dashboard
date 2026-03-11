@@ -17,6 +17,7 @@ export class RightSidebar {
 		private activeQueryId: string | null,
 		private allProjects: string[],
 		private allStatuses: string[],
+		private allSubjects: string[],
 		private customFilters: CustomFilter[],
 		private onFilterChange: (
 			newFilters: FilterState,
@@ -176,6 +177,35 @@ export class RightSidebar {
 				),
 			);
 		projectInput.inputEl.setAttribute("list", dataListId);
+
+		// Subject Filter (For Notes only)
+		if (this.activeTab === "Notes") {
+			const subjectDiv = form.createDiv({ cls: "filter-item" });
+			subjectDiv.createEl("label", { text: t("FILTER_SUBJECT_LABEL") });
+
+			const subjectDataListId = "subject-list-" + Date.now();
+			const subjectDataList = subjectDiv.createEl("datalist", {
+				attr: { id: subjectDataListId },
+			});
+			this.allSubjects.forEach((s) => {
+				subjectDataList.createEl("option", { attr: { value: s } });
+			});
+
+			const subjectInput = new TextComponent(subjectDiv)
+				.setValue(this.filters.subject || "")
+				.setPlaceholder(t("FILTER_SUBJECT_PLACEHOLDER"))
+				.onChange(
+					debounce(
+						(val) => {
+							this.filters.subject = val;
+							this.onFilterChange(this.filters, false);
+						},
+						300,
+						true,
+					),
+				);
+			subjectInput.inputEl.setAttribute("list", subjectDataListId);
+		}
 
 		// File Status Filter (For Notes only)
 		if (this.activeTab === "Notes") {

@@ -43,6 +43,8 @@ export default {
 	FILTER_NAME_PLACEHOLDER: "Search...",
 	FILTER_PROJECT_LABEL: "Project",
 	FILTER_PROJECT_PLACEHOLDER: "Project name...",
+	FILTER_SUBJECT_LABEL: "Subject",
+	FILTER_SUBJECT_PLACEHOLDER: "Subject...",
 	FILTER_TASK_TYPE_LABEL: "Task Type",
 	FILTER_NOTE_TYPE_LABEL: "Note Type",
 	FILTER_TASK_TYPE_REQUIRED: "At least one task type must be selected.",

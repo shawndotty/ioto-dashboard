@@ -53,6 +53,7 @@ export class TaskView extends ItemView {
 	filters: FilterState = {
 		name: "",
 		project: "",
+		subject: "",
 		dateType: "created",
 		dateStart: "",
 		dateEnd: "",
@@ -519,7 +520,23 @@ export class TaskView extends ItemView {
 		this.activeQueryId = query.id;
 		this.activeCategory = query.category; // Should be Tasks
 		this.activeTab = "Tasks"; // Force Tasks
-		this.filters = JSON.parse(JSON.stringify(query.filters));
+		const defaultFilters: FilterState = {
+			name: "",
+			project: "",
+			subject: "",
+			dateType: "created",
+			dateStart: "",
+			dateEnd: "",
+			datePreset: "all",
+			status: "all",
+			fileStatus: "",
+			taskType: [],
+			custom: {},
+		};
+		this.filters = {
+			...defaultFilters,
+			...(JSON.parse(JSON.stringify(query.filters)) as Partial<FilterState>),
+		};
 
 		await this.refreshFiles();
 		this.renderLeftColumn(
@@ -782,6 +799,7 @@ export class TaskView extends ItemView {
 			this.activeQueryId,
 			this.getAllProjects(),
 			this.getAllStatuses(),
+			[],
 			this.plugin.settings.customFilters,
 			(newFilters, shouldReRender) => {
 				this.filters = newFilters;
@@ -798,6 +816,7 @@ export class TaskView extends ItemView {
 				this.filters = {
 					name: "",
 					project: "",
+					subject: "",
 					dateType: "created",
 					dateStart: "",
 					dateEnd: "",

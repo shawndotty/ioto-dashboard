@@ -61,6 +61,7 @@ export class NoteView extends ItemView {
 	filters: FilterState = {
 		name: "",
 		project: "",
+		subject: "",
 		dateType: "created",
 		dateStart: "",
 		dateEnd: "",
@@ -82,6 +83,7 @@ export class NoteView extends ItemView {
 	// Caches
 	projectCache: string[] | null = null;
 	statusCache: string[] | null = null;
+	subjectCache: string[] | null = null;
 
 	// Debounced refresh for file changes
 	requestRefresh = debounce(
@@ -90,6 +92,7 @@ export class NoteView extends ItemView {
 				// Invalidate caches
 				this.projectCache = null;
 				this.statusCache = null;
+				this.subjectCache = null;
 
 				await this.refreshFiles();
 				this.renderMiddleColumn();
@@ -105,6 +108,7 @@ export class NoteView extends ItemView {
 			// Invalidate caches
 			this.projectCache = null;
 			this.statusCache = null;
+			this.subjectCache = null;
 
 			this.refreshFiles().then(() => {
 				this.renderMiddleColumn();
@@ -311,6 +315,29 @@ export class NoteView extends ItemView {
 		return this.statusCache;
 	}
 
+	getAllSubjects(): string[] {
+		if (this.subjectCache) return this.subjectCache;
+
+		const subjects = new Set<string>();
+		const files = this.app.vault.getMarkdownFiles();
+		for (const file of files) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const subject = cache?.frontmatter?.["Subject"];
+			if (Array.isArray(subject)) {
+				subject.forEach((s) => {
+					if (s !== null && s !== undefined && String(s).trim()) {
+						subjects.add(String(s));
+					}
+				});
+			} else if (subject !== null && subject !== undefined) {
+				const value = String(subject);
+				if (value.trim()) subjects.add(value);
+			}
+		}
+		this.subjectCache = Array.from(subjects).sort();
+		return this.subjectCache;
+	}
+
 	applyFilters(render = true) {
 		this.filteredFiles = this.files.filter((file) => {
 			// 1. Note Type Filter
@@ -349,7 +376,28 @@ export class NoteView extends ItemView {
 				}
 			}
 
-			// 4. Date Filter
+			// 4. Subject Filter
+			if (this.filters.subject) {
+				const cache = this.app.metadataCache.getFileCache(file);
+				const subject = cache?.frontmatter?.["Subject"];
+				const filterVal = this.filters.subject.toLowerCase();
+				if (Array.isArray(subject)) {
+					const match = subject.some((s) =>
+						String(s).toLowerCase().includes(filterVal),
+					);
+					if (!match) return false;
+				} else {
+					if (
+						subject === null ||
+						subject === undefined ||
+						!String(subject).toLowerCase().includes(filterVal)
+					) {
+						return false;
+					}
+				}
+			}
+
+			// 5. Date Filter
 			const dateValue =
 				this.filters.dateType === "created"
 					? file.stat.ctime
@@ -386,7 +434,7 @@ export class NoteView extends ItemView {
 				}
 			}
 
-			// 5. File Status Filter
+			// 6. File Status Filter
 			if (this.filters.fileStatus) {
 				const cache = this.app.metadataCache.getFileCache(file);
 				const status = cache?.frontmatter?.["Status"];
@@ -400,7 +448,7 @@ export class NoteView extends ItemView {
 				}
 			}
 
-			// 6. Custom Filters (Frontmatter)
+			// 7. Custom Filters (Frontmatter)
 			if (
 				this.plugin.settings.customFilters &&
 				this.plugin.settings.customFilters.length > 0 &&
@@ -497,6 +545,7 @@ export class NoteView extends ItemView {
 					this.filters = {
 						name: "",
 						project: "",
+						subject: "",
 						dateType: "created",
 						dateStart: "",
 						dateEnd: "",
@@ -644,6 +693,7 @@ export class NoteView extends ItemView {
 			this.activeQueryId,
 			this.getAllProjects(), // allProjects
 			this.getAllStatuses(), // allStatuses
+			this.getAllSubjects(), // allSubjects
 			this.plugin.settings.customFilters,
 			(filters) => {
 				this.filters = filters;
@@ -654,6 +704,7 @@ export class NoteView extends ItemView {
 				this.filters = {
 					name: "",
 					project: "",
+					subject: "",
 					dateType: "created",
 					dateStart: "",
 					dateEnd: "",
@@ -734,6 +785,7 @@ export class NoteView extends ItemView {
 		const defaultFilters: FilterState = {
 			name: "",
 			project: "",
+			subject: "",
 			dateType: "created",
 			dateStart: "",
 			dateEnd: "",
@@ -782,6 +834,7 @@ export class NoteView extends ItemView {
 					this.filters = {
 						name: "",
 						project: "",
+						subject: "",
 						dateType: "created",
 						dateStart: "",
 						dateEnd: "",
