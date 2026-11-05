@@ -2,17 +2,19 @@
 
 ## Project overview
 
-- Target: Obsidian Community Plugin (TypeScript → bundled JavaScript).
+- Obsidian Community Plugin (TypeScript → bundled JavaScript), plugin id `ioto-dashboard`.
 - Entry point: `src/main.ts` bundled to `main.js` (plugin root) and loaded by Obsidian.
 - Release artifacts: `main.js`, `manifest.json`, and optional `styles.css`.
+- UI languages: English, Simplified Chinese, Traditional Chinese (follows Obsidian's locale).
 
 ## Environment & tooling
 
-- Node.js: use current LTS (CI uses Node 20/22).
+- Node.js: use current LTS (CI matrix runs 20.x and 22.x).
 - Package manager: npm (see `package.json` scripts).
-- Bundler: esbuild (`esbuild.config.mjs`).
-- Type checking: TypeScript (`tsc -noEmit`).
-- Linting: ESLint flat config (`eslint.config.mts`) via `npm run lint`.
+- Bundler: esbuild 0.25 (`esbuild.config.mjs`): CJS output, `target: es2018`, `obsidian` / `electron` / `@codemirror/*` / `@lezer/*` / Node builtins externalized, inline sourcemap in dev, minified in production.
+- Type checking: TypeScript 5.8 via `tsc -noEmit -skipLibCheck` (part of `npm run build`). `tsconfig.json` enables `strictNullChecks`, `noImplicitAny`, `noImplicitReturns`, `noUncheckedIndexedAccess`, `useUnknownInCatchVariables`, `isolatedModules`.
+- Linting: ESLint 9 flat config (`eslint.config.mts`) with `eslint-plugin-obsidianmd` recommended rules.
+- Unit tests: Node built-in test runner + `jiti` (loads `.ts` sources directly, no build step).
 
 ## Common commands
 
@@ -44,58 +46,123 @@ npm run build
 npm run lint
 ```
 
+### Test
+
+```bash
+npm test                                  # node --test tests/**/*.test.mjs
+node --test tests/lang-helpers.test.mjs    # single file
+```
+
+### One-shot release (GitHub + Gitee)
+
+```bash
+npm run build:deploy -- --dry-run         # preview only, no side effects
+npm run build:deploy                      # build + zip + tag + release on both hosts
+npm run build:deploy -- --github-only     # skip Gitee
+npm run build:deploy -- --notes "..."     # custom release note
+npm run build:deploy -- --force           # overwrite existing tag/release
+```
+
 ## Repository layout
 
-- `src/main.ts`: plugin lifecycle, view registration, ribbon icons, commands.
-- `src/settings.ts`: settings types/defaults + settings tab UI.
-- `src/views/*`: `DashboardView`, `TaskView`, `NoteView` and their UI components.
-- `src/ui/*`: reusable UI pieces (modals, pickers, tabbed settings).
-- `src/lang/*`: i18n strings (`src/lang/locale/*`) and `t()` helper.
-- `src/models/*`: shared constants/types for view IDs and data models.
-- `src/services/*`: optional integrations (e.g., reads settings from the `ioto-settings` plugin on first run).
+- `src/main.ts`: plugin lifecycle, view registration, ribbon icons, commands, settings load/save.
+- `src/settings.ts`: settings types/defaults, `SavedQuery` / `CustomFilter` models, `DashboardSettingTab` (tabbed UI).
+- `src/views/DashboardView.ts`: three-column dashboard (Input / Output / Outcome).
+- `src/views/TaskView.ts`: task-centric view (aggregates tasks from the task folder).
+- `src/views/NoteView.ts`: note-centric view (Input / Output / Outcome notes only).
+- `src/views/components/`: `LeftSidebar` (category nav / saved queries), `MiddleSection` (list, sort, group, pagination, quick search), `RightSidebar` (filters).
+- `src/ui/`: reusable UI (modals, `pickers/` folder & property pickers, `tabbed-settings`).
+- `src/lang/`: `helpers.ts` (`t()`) and `locale/` dictionaries (`en`, `zh-cn`, `zh-tw`).
+- `src/models/`: `constants.ts` (view types) and `types.ts` (shared models + Obsidian module augmentation).
+- `src/services/`: `ioto-settings-services.ts` (read-only bridge to the `ioto-settings` plugin).
+- `tests/`: unit tests + `tests/stubs/obsidian.mjs` runtime stub.
+- `scripts/deploy-release.mjs`: cross-plugin GitHub + Gitee release script.
+- `.github/workflows/lint.yml`: CI (npm ci → build → lint on Node 20/22).
+- `styles.css`: all plugin styling, scoped under `.ioto-dashboard-view`.
+- `notes.md`: plain release-note text, passed explicitly via `npm run build:deploy -- --notes-file ./notes.md` (the script does not read it automatically; without a note it derives one from `git log`).
 
 Notes:
 
-- `tsconfig.json` sets `"baseUrl": "src"`, so imports like `ui/tabbed-settings` resolve from `src/`.
-- `main.js` is generated and ignored by git; do not commit build outputs.
+- `tsconfig.json` sets `"baseUrl": "src"`, so bare imports like `ui/tabbed-settings` resolve from `src/` (esbuild honors the same `baseUrl`). The test setup must replicate this with a `'ui/'` alias because `jiti` ignores `tsconfig`.
+- `main.js` and `data.json` are generated/ignored by git; do not commit build outputs or local settings.
+
+## Architecture conventions
+
+- View types are constants in `src/models/constants.ts` (`ioto-dashboard-view`, `ioto-task-view`, `ioto-note-view`) and must be used in `registerView` / `setViewState` — never hard-code the strings.
+- The three views share the `LeftSidebar` / `MiddleSection` / `RightSidebar` components; pass callbacks in, do not let components reach back into the view.
+- Data refresh: views react to `metadataCache.on("changed")` and `vault.on("delete")` through 500 ms debounced handlers that invalidate the project/status/subject caches before re-filtering.
+- Task aggregation: tasks are collected from list items nested under the headings returned by `getTargetHeader()`. Heading text comes from the `ioto-settings` plugin (`LTDList{Input,Output,Outcome}SectionHeading`) and falls back to the localized `TDL_*_HEADING` strings.
+- Task write-back is line-index based (`task.line`): toggle rewrites the `- [ ]` checkbox in place, delete splices the line. After toggling, update local state and re-filter — do **not** call `refreshFiles()`, because `metadataCache` updates asynchronously and would revert the UI.
+- View state is persisted through `getState()` / `setState()`: `DashboardView` and `NoteView` keep category, tab, sort/group, active saved query and zen mode; `TaskView` keeps only zen mode and the active query. Call `workspace.requestSaveLayout()` after state-changing actions so the layout survives reload.
+- Quick search is toggled from a single command across all three views through `checkCallback`; each view exposes `toggleQuickSearch()`.
+- Zen mode hides both side columns via the `zen-mode` grid class; panel collapse uses `usages-collapsed` / `right-collapsed`.
 
 ## Commands, views, and UX conventions
 
-- View types live in `src/models/constants.ts` and are registered in `src/main.ts`.
 - Keep command IDs stable; current IDs are registered in `src/main.ts`:
     - `open-ioto-dashboard`
     - `open-ioto-task-view`
     - `open-ioto-note-view`
     - `toggle-dashboard-quick-search`
-- All user-facing strings should go through `t()` and be added to locale files.
+- `open-ioto-dashboard` intentionally keeps the plugin id inside its command id (historical); the lint rule is suppressed inline. Do not rename it — saved hotkeys reference command IDs.
+- Ribbon icons: `columns-3` (dashboard), `check-square` (task view), `sticky-note` (note view). `Shift` opens a new window, `Alt` opens a new tab.
+- All user-facing strings must go through `t()` and be added to every locale file.
 
 ## Settings conventions
 
-- Persist settings using `this.loadData()` / `this.saveData()` in `src/main.ts`.
-- Defaults are defined in `DEFAULT_SETTINGS` in `src/settings.ts`.
-- Settings UI lives in `DashboardSettingTab` (`src/settings.ts`) and should call `plugin.saveSettings()` after changes.
-- On a fresh install (no saved data), settings may be initialized from the `ioto-settings` plugin if present (`src/services/ioto-settings-services.ts`).
+- Persist settings with `this.loadData()` / `this.saveData()` (`loadSettings()` / `saveSettings()` in `src/main.ts`).
+- Defaults live in `DEFAULT_SETTINGS` in `src/settings.ts` (7 keys: 4 folder paths, `pageSize`, `savedQueries`, `customFilters`).
+- Folder defaults are produced by `t()` at module load, so they follow the active language.
+- `pageSize` is clamped to 20–300 in the settings UI.
+- The settings tab is built with `TabbedSettings` (`ui/tabbed-settings`): Basic + Custom Filters tabs. Call `plugin.saveSettings()` after each change.
+- `savedQueries` are user-named filter snapshots (`category`, `tab`, `type`, `sortOption`, `sortOrder`, `groupOption`, `filters`); they are created/updated/deleted from the view sidebars, not the settings tab.
+- `customFilters` are frontmatter-driven filters typed as `text | number | boolean | date | list` and targeted at `all | note | task`.
+- On a fresh install **only** (no `data.json`), folder paths are seeded from the `ioto-settings` plugin when it is enabled (`src/services/ioto-settings-services.ts`). Never overwrite existing user settings.
+
+## i18n conventions
+
+- `t(key, args?)` resolves via `moment.locale()`, merges over `en` as fallback, and interpolates `{0}`, `{1}`, … .
+- Locale files are `src/lang/locale/en.ts`, `zh-cn.ts`, `zh-tw.ts`; `en` is the key reference and currently declares 130 keys.
+- Keys are `UPPER_SNAKE_CASE`, values are human-readable (never `key === value`).
+- Keys must be identical across all locales; `tests/locale-key-alignment.test.mjs` enforces parity, non-empty string values, and real translations.
+
+## Testing
+
+- Framework: Node `node:test` + `assert/strict`, run with `node --test tests/**/*.test.mjs`.
+- `.ts` sources are imported through `jiti` with `moduleCache: false`. The aliases required are:
+    - `obsidian` → `tests/stubs/obsidian.mjs`
+    - `ui/` → `src/ui/` (jiti does not honor `tsconfig` `baseUrl`)
+- `tests/stubs/obsidian.mjs` re-exports the real `moment` and provides empty classes (`App`, `ItemView`, `Plugin`, `Modal`, `TFile`, …), `MarkdownRenderer`, `Platform`, `setIcon`, `debounce`, `normalizePath`, plus `window` / `activeDocument` fallbacks. Add stubs there when a new source file imports more of the API.
+- Covered today: default settings shape and language-dependent folder defaults, `IotoSettingsService` availability paths, `t()` lookup/fallback/interpolation, locale key parity, and view-type constants (including asserting `main.ts` registers by constant).
+- DOM/rendering behavior is not unit-tested: verify in a real vault (see below).
+
+## CI
+
+`.github/workflows/lint.yml` runs on every push and pull request, for Node 20.x and 22.x: `npm ci` → `npm run build --if-present` → `npm run lint`. Tests are not wired into CI yet; run them locally before committing.
 
 ## Manifest & release
 
-- `manifest.json` must keep a stable `id` (`ioto-dashboard`) and a valid SemVer `version`.
-- `versions.json` maps plugin version → minimum Obsidian app version; update it when releasing.
-- Release process:
-    - Run `npm run build`.
-    - Update `manifest.json` (and `versions.json`) and ensure the tag matches `manifest.json`’s `version` exactly (no leading `v`).
-    - Optionally run `npm run version` to bump/stage `manifest.json` + `versions.json`.
-    - Attach `main.js`, `manifest.json`, and `styles.css` (if present) to the GitHub release.
+- `manifest.json` must keep a stable `id` (`ioto-dashboard`) and a valid SemVer `version`; `versions.json` maps plugin version → minimum Obsidian app version.
+- Version bump: use `npm version <x.y.z> --no-git-tag-version` (it sets `npm_package_version`, which `version-bump.mjs` reads to rewrite `manifest.json` + `versions.json`, then stages both).
+    - Never run `node version-bump.mjs` directly: without `npm_package_version` it writes `version: undefined` and JSON.stringify drops the key.
+- `npm run build:deploy` (preferred):
+    - Requires `manifest.version === package.json.version`, a clean working tree, `gh` authenticated with repo scope, and `origin` pointing at the GitHub repo (the repo **name** drives the Gitee repo and zip name — not `manifest.id`).
+    - Gitee needs `GITEE_TOKEN` or a local `.gitee-token`; both are gitignored.
+    - Pushes `v<version>` annotated tags (never `--tags`), creates releases on GitHub and Gitee, and uploads `main.js`, `manifest.json`, `styles.css`, plus `<repo>.zip`.
+    - `.npmrc` disables the npm tag prefix, so let the script own tag creation; do not also tag with `npm version`.
+- Manual release (fallback): `npm run build`, ensure `manifest.json` / `versions.json` match the tag (no leading `v` in `manifest.version`), then attach `main.js`, `manifest.json`, `styles.css` to the GitHub release.
 
-## Testing (manual)
+## Testing (manual, real vault)
 
-- Ensure `main.js`, `manifest.json`, and `styles.css` (if any) are present under:
+- Ensure `main.js`, `manifest.json`, and `styles.css` are present under:
     ```
     <Vault>/.obsidian/plugins/ioto-dashboard/
     ```
 - Reload Obsidian, then toggle the plugin in **Settings → Community plugins**.
+- Check the three ribbon icons, all four commands, and that saved queries, filters, sort/group and zen mode survive a workspace reload.
 
 ## Security & privacy
 
-- Default to local/offline operation. Avoid network calls unless essential and clearly disclosed.
+- Default to local/offline operation. Avoid network calls unless essential and clearly disclosed. The only outbound traffic is in the release script (`build:deploy`), never at plugin runtime.
 - Never execute remote code or auto-update plugin code outside normal releases.
 - Avoid logging sensitive vault content; keep logs minimal and user-relevant.
