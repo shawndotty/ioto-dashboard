@@ -6,6 +6,7 @@ import {
 	Notice,
 	debounce,
 	TAbstractFile,
+	ViewStateResult,
 } from "obsidian";
 import { DASHBOARD_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
@@ -20,6 +21,8 @@ import {
 	SortOption,
 	SortOrder,
 	GroupOption,
+	FrontmatterValue,
+	DashboardViewState,
 } from "../models/types";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RightSidebar } from "./components/RightSidebar";
@@ -220,7 +223,7 @@ export class DashboardView extends ItemView {
 		const files = this.app.vault.getMarkdownFiles();
 		for (const file of files) {
 			const cache = this.app.metadataCache.getFileCache(file);
-			const project = cache?.frontmatter?.["Project"];
+			const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
 			if (project) {
 				projects.add(String(project));
 			}
@@ -236,7 +239,7 @@ export class DashboardView extends ItemView {
 		const files = this.app.vault.getMarkdownFiles();
 		for (const file of files) {
 			const cache = this.app.metadataCache.getFileCache(file);
-			const status = cache?.frontmatter?.["Status"];
+			const status = cache?.frontmatter?.["Status"] as FrontmatterValue;
 			if (status) {
 				statuses.add(String(status));
 			}
@@ -252,7 +255,7 @@ export class DashboardView extends ItemView {
 		const files = this.app.vault.getMarkdownFiles();
 		for (const file of files) {
 			const cache = this.app.metadataCache.getFileCache(file);
-			const subject = cache?.frontmatter?.["Subject"];
+			const subject = cache?.frontmatter?.["Subject"] as FrontmatterValue;
 			if (Array.isArray(subject)) {
 				subject.forEach((s) => {
 					if (s !== null && s !== undefined && String(s).trim()) {
@@ -464,7 +467,7 @@ export class DashboardView extends ItemView {
 		// 2. Project Filter
 		if (this.filters.project) {
 			const cache = this.app.metadataCache.getFileCache(file);
-			const project = cache?.frontmatter?.["Project"];
+			const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
 			if (
 				!project ||
 				!String(project)
@@ -478,7 +481,7 @@ export class DashboardView extends ItemView {
 		// 3. Subject Filter (Notes only)
 		if (includeFileStatus && this.filters.subject) {
 			const cache = this.app.metadataCache.getFileCache(file);
-			const subject = cache?.frontmatter?.["Subject"];
+			const subject = cache?.frontmatter?.["Subject"] as FrontmatterValue;
 			const filterVal = this.filters.subject.toLowerCase();
 			if (Array.isArray(subject)) {
 				const match = subject.some((s) =>
@@ -536,7 +539,7 @@ export class DashboardView extends ItemView {
 		// 5. File Status Filter (new)
 		if (includeFileStatus && this.filters.fileStatus) {
 			const cache = this.app.metadataCache.getFileCache(file);
-			const status = cache?.frontmatter?.["Status"];
+			const status = cache?.frontmatter?.["Status"] as FrontmatterValue;
 			if (
 				!status ||
 				!String(status)
@@ -557,7 +560,7 @@ export class DashboardView extends ItemView {
 			const frontmatter = cache?.frontmatter;
 
 			for (const filter of this.plugin.settings.customFilters) {
-				const filterValue = this.filters.custom[filter.name];
+				const filterValue = this.filters.custom[filter.name] as FrontmatterValue;
 				if (
 					filterValue === undefined ||
 					filterValue === "" ||
@@ -566,7 +569,7 @@ export class DashboardView extends ItemView {
 					continue;
 
 				const fileValue = frontmatter
-					? frontmatter[filter.name]
+					? frontmatter[filter.name] as FrontmatterValue
 					: undefined;
 
 				if (filter.type === "text" || filter.type === "list") {
@@ -604,23 +607,24 @@ export class DashboardView extends ItemView {
 			this.activeCategory,
 			this.activeQueryId,
 			this.leftPanelCollapsed,
-			this.plugin.settings.savedQueries.filter((q) => q.type === "all"),
-			async (category) => {
-				this.activeCategory = category;
-				this.activeQueryId = null; // Reset active query when switching main category
-				// Update active class manually or re-render?
-				// renderLeftColumn re-renders the whole list, so it handles active class.
-				this.renderLeftColumn(container);
+		this.plugin.settings.savedQueries.filter((q) => q.type === "all"),
+		(category) => {
+			this.activeCategory = category;
+			this.activeQueryId = null; // Reset active query when switching main category
+			// Update active class manually or re-render?
+			// renderLeftColumn re-renders the whole list, so it handles active class.
+			this.renderLeftColumn(container);
 
-				await this.refreshFiles();
+			void this.refreshFiles().then(() => {
 				this.renderMiddleColumn();
 				this.renderRightColumn();
 				this.app.workspace.requestSaveLayout();
-			},
-			async (query) => {
-				this.loadSavedQuery(query);
-			},
-		).render();
+			});
+		},
+		(query) => {
+			void this.loadSavedQuery(query);
+		},
+	).render();
 	}
 
 	async loadSavedQuery(query: SavedQuery) {
@@ -641,9 +645,7 @@ export class DashboardView extends ItemView {
 		};
 		this.filters = {
 			...defaultFilters,
-			...(JSON.parse(
-				JSON.stringify(query.filters),
-			) as Partial<FilterState>),
+			...structuredClone(query.filters),
 		};
 
 		await this.refreshFiles();
@@ -724,15 +726,15 @@ export class DashboardView extends ItemView {
 				this.app.workspace.requestSaveLayout();
 			},
 			(id: string) => {
-				this.renameSavedQuery(id);
+				void this.renameSavedQuery(id);
 			},
 			(id: string) => {
 				new ConfirmModal(
 					this.app,
 					t("CONFIRM_DELETE_TITLE"),
 					t("CONFIRM_DELETE_MSG"),
-					async () => {
-						await this.deleteSavedQuery(id);
+					() => {
+						void this.deleteSavedQuery(id);
 					},
 				).open();
 			},
@@ -812,37 +814,36 @@ export class DashboardView extends ItemView {
 		};
 	}
 
-	async setState(state: any, result: any) {
-		if (state) {
-			if (typeof state.isZenMode === "boolean") {
-				this.isZenMode = state.isZenMode;
-				const grid = this.contentEl.querySelector(".dashboard-grid");
-				if (grid) {
-					if (this.isZenMode) {
-						grid.addClass("zen-mode");
-					} else {
-						grid.removeClass("zen-mode");
-					}
+	async setState(state: unknown, result: ViewStateResult) {
+		const s = (state ?? {}) as Partial<DashboardViewState>;
+		if (typeof s.isZenMode === "boolean") {
+			this.isZenMode = s.isZenMode;
+			const grid = this.contentEl.querySelector(".dashboard-grid");
+			if (grid) {
+				if (this.isZenMode) {
+					grid.addClass("zen-mode");
+				} else {
+					grid.removeClass("zen-mode");
 				}
 			}
-			if (state.activeCategory) {
-				this.activeCategory = state.activeCategory;
-			}
-			if (state.activeTab) {
-				this.activeTab = state.activeTab;
-			}
-			if (state.activeQueryId !== undefined) {
-				this.activeQueryId = state.activeQueryId;
-			}
-			if (state.sortOption) {
-				this.sortOption = state.sortOption;
-			}
-			if (state.sortOrder) {
-				this.sortOrder = state.sortOrder;
-			}
-			if (state.groupOption) {
-				this.groupOption = state.groupOption;
-			}
+		}
+		if (s.activeCategory) {
+			this.activeCategory = s.activeCategory;
+		}
+		if (s.activeTab) {
+			this.activeTab = s.activeTab;
+		}
+		if (s.activeQueryId !== undefined) {
+			this.activeQueryId = s.activeQueryId;
+		}
+		if (s.sortOption) {
+			this.sortOption = s.sortOption;
+		}
+		if (s.sortOrder) {
+			this.sortOrder = s.sortOrder;
+		}
+		if (s.groupOption) {
+			this.groupOption = s.groupOption;
 		}
 		await super.setState(state, result);
 
@@ -852,7 +853,7 @@ export class DashboardView extends ItemView {
 				(q) => q.id === this.activeQueryId,
 			);
 			if (query) {
-				this.filters = JSON.parse(JSON.stringify(query.filters));
+				this.filters = structuredClone(query.filters) as FilterState;
 				// Ensure category and tab match the query
 				this.activeCategory = query.category;
 				this.activeTab = query.tab;
@@ -874,22 +875,24 @@ export class DashboardView extends ItemView {
 			this.app,
 			t("CONFIRM_DELETE_TASK_TITLE"),
 			t("CONFIRM_DELETE_TASK_MSG"),
-			async () => {
-				const file = task.file;
-				const content = await this.app.vault.read(file);
-				const lines = content.split("\n");
+			() => {
+				void (async () => {
+					const file = task.file;
+					const content = await this.app.vault.read(file);
+					const lines = content.split("\n");
 
-				if (task.line >= lines.length) return;
+					if (task.line >= lines.length) return;
 
-				// Remove the line
-				lines.splice(task.line, 1);
+					// Remove the line
+					lines.splice(task.line, 1);
 
-				await this.app.vault.modify(file, lines.join("\n"));
-				new Notice(t("TASK_DELETED"));
+					await this.app.vault.modify(file, lines.join("\n"));
+					new Notice(t("TASK_DELETED"));
 
-				// Refresh UI
-				await this.refreshFiles();
-				this.renderMiddleColumn();
+					// Refresh UI
+					await this.refreshFiles();
+					this.renderMiddleColumn();
+				})();
 			},
 		).open();
 	}
@@ -979,14 +982,14 @@ export class DashboardView extends ItemView {
 					this.app,
 					t("MODAL_SAVE_TITLE"),
 					"",
-					async (name) => {
-						await this.saveCurrentQuery(name);
+					(name) => {
+						void this.saveCurrentQuery(name);
 					},
 				).open();
 			},
-			async () => {
+			() => {
 				// onUpdateQuery
-				await this.updateSavedQuery(this.activeQueryId!);
+				void this.updateSavedQuery(this.activeQueryId!);
 			},
 		).render();
 	}
@@ -998,7 +1001,7 @@ export class DashboardView extends ItemView {
 			category: this.activeCategory,
 			tab: this.activeTab,
 			type: "all",
-			filters: JSON.parse(JSON.stringify(this.filters)),
+			filters: structuredClone(this.filters),
 			sortOption: this.sortOption,
 			sortOrder: this.sortOrder,
 			groupOption: this.groupOption,
@@ -1024,7 +1027,7 @@ export class DashboardView extends ItemView {
 		// Update query details
 		query.category = this.activeCategory;
 		query.tab = this.activeTab;
-		query.filters = JSON.parse(JSON.stringify(this.filters));
+		query.filters = structuredClone(this.filters);
 		query.sortOption = this.sortOption;
 		query.sortOrder = this.sortOrder;
 		query.groupOption = this.groupOption;
@@ -1043,14 +1046,15 @@ export class DashboardView extends ItemView {
 			this.app,
 			t("MODAL_EDIT_TITLE"),
 			query.name,
-			async (newName) => {
+			(newName) => {
 				query.name = newName;
-				await this.plugin.saveSettings();
-				this.renderLeftColumn(
-					this.contentEl.querySelector(
-						".dashboard-left",
-					) as HTMLElement,
-				);
+				void this.plugin.saveSettings().then(() => {
+					this.renderLeftColumn(
+						this.contentEl.querySelector(
+							".dashboard-left",
+						) as HTMLElement,
+					);
+				});
 			},
 		).open();
 	}

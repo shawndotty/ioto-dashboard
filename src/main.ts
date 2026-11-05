@@ -35,7 +35,7 @@ export default class IotoDashboardPlugin extends Plugin {
 			"columns-3",
 			t("RIBBON_ICON_TITLE"),
 			(evt: MouseEvent) => {
-				this.activateView({
+				void this.activateView({
 					newWindow: evt.shiftKey,
 					newTab: evt.altKey,
 				});
@@ -46,7 +46,7 @@ export default class IotoDashboardPlugin extends Plugin {
 			"check-square",
 			t("RIBBON_TASK_VIEW_TITLE"),
 			(evt: MouseEvent) => {
-				this.activateTaskView({
+				void this.activateTaskView({
 					newWindow: evt.shiftKey,
 					newTab: evt.altKey,
 				});
@@ -57,7 +57,7 @@ export default class IotoDashboardPlugin extends Plugin {
 			"sticky-note",
 			t("RIBBON_NOTE_VIEW_TITLE"),
 			(evt: MouseEvent) => {
-				this.activateNoteView({
+				void this.activateNoteView({
 					newWindow: evt.shiftKey,
 					newTab: evt.altKey,
 				});
@@ -66,10 +66,11 @@ export default class IotoDashboardPlugin extends Plugin {
 
 		// Command
 		this.addCommand({
+			// eslint-disable-next-line obsidianmd/commands/no-plugin-id-in-command-id -- 历史 ID，AGENTS.md 要求保持稳定
 			id: "open-ioto-dashboard",
 			name: t("COMMAND_OPEN_DASHBOARD"),
 			callback: () => {
-				this.activateView();
+				void this.activateView();
 			},
 		});
 
@@ -77,7 +78,7 @@ export default class IotoDashboardPlugin extends Plugin {
 			id: "open-ioto-task-view",
 			name: t("COMMAND_OPEN_TASK_VIEW"),
 			callback: () => {
-				this.activateTaskView();
+				void this.activateTaskView();
 			},
 		});
 
@@ -85,7 +86,7 @@ export default class IotoDashboardPlugin extends Plugin {
 			id: "open-ioto-note-view",
 			name: t("COMMAND_OPEN_NOTE_VIEW"),
 			callback: () => {
-				this.activateNoteView();
+				void this.activateNoteView();
 			},
 		});
 
@@ -166,7 +167,7 @@ export default class IotoDashboardPlugin extends Plugin {
 		}
 
 		if (leaf) {
-			workspace.revealLeaf(leaf);
+			void workspace.revealLeaf(leaf);
 		}
 	}
 
@@ -204,7 +205,7 @@ export default class IotoDashboardPlugin extends Plugin {
 		}
 
 		if (leaf) {
-			workspace.revealLeaf(leaf);
+			void workspace.revealLeaf(leaf);
 		}
 	}
 
@@ -242,12 +243,14 @@ export default class IotoDashboardPlugin extends Plugin {
 		}
 
 		if (leaf) {
-			workspace.revealLeaf(leaf);
+			void workspace.revealLeaf(leaf);
 		}
 	}
 
 	async loadSettings() {
-		const loadedData = await this.loadData();
+		const loadedData = (await this.loadData()) as
+			| Partial<IotoDashboardSettings>
+			| null;
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,

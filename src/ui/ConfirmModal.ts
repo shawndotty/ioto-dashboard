@@ -1,4 +1,4 @@
-import { App, Modal, Setting, ButtonComponent } from "obsidian";
+import { App, Modal, ButtonComponent } from "obsidian";
 import { t } from "../lang/helpers";
 
 export class ConfirmModal extends Modal {
@@ -28,10 +28,7 @@ export class ConfirmModal extends Modal {
 		const btnContainer = contentEl.createDiv({
 			cls: "confirm-modal-buttons",
 		});
-		btnContainer.style.display = "flex";
-		btnContainer.style.justifyContent = "flex-end";
-		btnContainer.style.gap = "10px";
-		btnContainer.style.marginTop = "20px";
+		btnContainer.setCssStyles({ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "20px" });
 
 		new ButtonComponent(btnContainer)
 			.setButtonText(t("BTN_CANCEL"))

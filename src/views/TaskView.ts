@@ -6,8 +6,9 @@ import {
 	Notice,
 	debounce,
 	TAbstractFile,
+	ViewStateResult,
 } from "obsidian";
-import { TASK_VIEW_TYPE, DASHBOARD_VIEW_TYPE } from "../models/constants";
+import { TASK_VIEW_TYPE } from "../models/constants";
 import IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { SaveQueryModal } from "../ui/SaveQueryModal";
@@ -20,6 +21,8 @@ import {
 	SortOption,
 	SortOrder,
 	GroupOption,
+	FrontmatterValue,
+	TaskViewState,
 } from "../models/types";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RightSidebar } from "./components/RightSidebar";
@@ -203,7 +206,7 @@ export class TaskView extends ItemView {
 		const files = this.app.vault.getMarkdownFiles();
 		for (const file of files) {
 			const cache = this.app.metadataCache.getFileCache(file);
-			const project = cache?.frontmatter?.["Project"];
+			const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
 			if (project) {
 				projects.add(String(project));
 			}
@@ -398,7 +401,7 @@ export class TaskView extends ItemView {
 		// 2. Project Filter
 		if (this.filters.project) {
 			const cache = this.app.metadataCache.getFileCache(file);
-			const project = cache?.frontmatter?.["Project"];
+			const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
 			if (
 				!project ||
 				!String(project)
@@ -456,7 +459,7 @@ export class TaskView extends ItemView {
 			const frontmatter = cache?.frontmatter;
 
 			for (const filter of this.plugin.settings.customFilters) {
-				const filterValue = this.filters.custom[filter.name];
+				const filterValue = this.filters.custom[filter.name] as FrontmatterValue;
 				if (
 					filterValue === undefined ||
 					filterValue === "" ||
@@ -465,7 +468,7 @@ export class TaskView extends ItemView {
 					continue;
 
 				const fileValue = frontmatter
-					? frontmatter[filter.name]
+					? frontmatter[filter.name] as FrontmatterValue
 					: undefined;
 
 				if (filter.type === "text" || filter.type === "list") {
@@ -500,17 +503,18 @@ export class TaskView extends ItemView {
 			this.activeQueryId,
 			this.leftPanelCollapsed,
 			this.plugin.settings.savedQueries.filter((q) => q.type === "Task"),
-			async (category) => {
+			(category) => {
 				// Should not happen as we only have "Tasks"
 				this.activeCategory = category;
 				this.activeQueryId = null;
 				this.renderLeftColumn(container);
-				await this.refreshFiles();
-				this.renderMiddleColumn();
-				this.renderRightColumn();
+				void this.refreshFiles().then(() => {
+					this.renderMiddleColumn();
+					this.renderRightColumn();
+				});
 			},
-			async (query) => {
-				this.loadSavedQuery(query);
+			(query) => {
+				void this.loadSavedQuery(query);
 			},
 			["Tasks"], // ONLY Tasks
 		).render();
@@ -535,7 +539,7 @@ export class TaskView extends ItemView {
 		};
 		this.filters = {
 			...defaultFilters,
-			...(JSON.parse(JSON.stringify(query.filters)) as Partial<FilterState>),
+			...structuredClone(query.filters),
 		};
 
 		await this.refreshFiles();
@@ -618,15 +622,15 @@ export class TaskView extends ItemView {
 				this.renderMiddleColumn();
 			},
 			(id: string) => {
-				this.renameSavedQuery(id);
+				void this.renameSavedQuery(id);
 			},
 			(id: string) => {
 				new ConfirmModal(
 					this.app,
 					t("CONFIRM_DELETE_TITLE"),
 					t("CONFIRM_DELETE_MSG"),
-					async () => {
-						await this.deleteSavedQuery(id);
+					() => {
+						void this.deleteSavedQuery(id);
 					},
 				).open();
 			},
@@ -695,22 +699,21 @@ export class TaskView extends ItemView {
 		};
 	}
 
-	async setState(state: any, result: any) {
-		if (state) {
-			if (typeof state.isZenMode === "boolean") {
-				this.isZenMode = state.isZenMode;
-				const grid = this.contentEl.querySelector(".dashboard-grid");
-				if (grid) {
-					if (this.isZenMode) {
-						grid.addClass("zen-mode");
-					} else {
-						grid.removeClass("zen-mode");
-					}
+	async setState(state: unknown, result: ViewStateResult) {
+		const s = (state ?? {}) as Partial<TaskViewState>;
+		if (typeof s.isZenMode === "boolean") {
+			this.isZenMode = s.isZenMode;
+			const grid = this.contentEl.querySelector(".dashboard-grid");
+			if (grid) {
+				if (this.isZenMode) {
+					grid.addClass("zen-mode");
+				} else {
+					grid.removeClass("zen-mode");
 				}
 			}
-			if (state.activeQueryId !== undefined) {
-				this.activeQueryId = state.activeQueryId;
-			}
+		}
+		if (s.activeQueryId !== undefined) {
+			this.activeQueryId = s.activeQueryId;
 		}
 		await super.setState(state, result);
 
@@ -720,7 +723,7 @@ export class TaskView extends ItemView {
 				(q) => q.id === this.activeQueryId,
 			);
 			if (query) {
-				this.filters = JSON.parse(JSON.stringify(query.filters));
+				this.filters = structuredClone(query.filters) as FilterState;
 			}
 		}
 
@@ -739,22 +742,24 @@ export class TaskView extends ItemView {
 			this.app,
 			t("CONFIRM_DELETE_TASK_TITLE"),
 			t("CONFIRM_DELETE_TASK_MSG"),
-			async () => {
-				const file = task.file;
-				const content = await this.app.vault.read(file);
-				const lines = content.split("\n");
+			() => {
+				void (async () => {
+					const file = task.file;
+					const content = await this.app.vault.read(file);
+					const lines = content.split("\n");
 
-				if (task.line >= lines.length) return;
+					if (task.line >= lines.length) return;
 
-				// Remove the line
-				lines.splice(task.line, 1);
+					// Remove the line
+					lines.splice(task.line, 1);
 
-				await this.app.vault.modify(file, lines.join("\n"));
-				new Notice(t("TASK_DELETED"));
+					await this.app.vault.modify(file, lines.join("\n"));
+					new Notice(t("TASK_DELETED"));
 
-				// Refresh UI
-				await this.refreshFiles();
-				this.renderMiddleColumn();
+					// Refresh UI
+					await this.refreshFiles();
+					this.renderMiddleColumn();
+				})();
 			},
 		).open();
 	}
@@ -843,13 +848,13 @@ export class TaskView extends ItemView {
 					t("MODAL_SAVE_TITLE"),
 					"",
 					(name) => {
-						this.saveQuery(name);
+						void this.saveQuery(name);
 					},
 				).open();
 			},
 			() => {
 				if (this.activeQueryId) {
-					this.updateQuery(this.activeQueryId);
+					void this.updateQuery(this.activeQueryId);
 				}
 			},
 			true, // Show Task Type Filter
@@ -863,7 +868,7 @@ export class TaskView extends ItemView {
 			category: this.activeCategory,
 			tab: "Tasks",
 			type: "Task",
-			filters: JSON.parse(JSON.stringify(this.filters)),
+			filters: structuredClone(this.filters),
 			sortOption: this.sortOption,
 			sortOrder: this.sortOrder,
 			groupOption: this.groupOption,
@@ -891,7 +896,7 @@ export class TaskView extends ItemView {
 			const existing = this.plugin.settings.savedQueries[queryIndex];
 			this.plugin.settings.savedQueries[queryIndex] = {
 				...existing,
-				filters: JSON.parse(JSON.stringify(this.filters)),
+				filters: structuredClone(this.filters),
 				sortOption: this.sortOption,
 				sortOrder: this.sortOrder,
 				groupOption: this.groupOption,
@@ -911,15 +916,16 @@ export class TaskView extends ItemView {
 			this.app,
 			t("MODAL_EDIT_TITLE"),
 			query.name,
-			async (newName) => {
+			(newName) => {
 				query.name = newName;
-				await this.plugin.saveSettings();
-				this.renderLeftColumn(
-					this.contentEl.querySelector(
-						".dashboard-left",
-					) as HTMLElement,
-				);
-				this.renderMiddleColumn();
+				void this.plugin.saveSettings().then(() => {
+					this.renderLeftColumn(
+						this.contentEl.querySelector(
+							".dashboard-left",
+						) as HTMLElement,
+					);
+					this.renderMiddleColumn();
+				});
 			},
 		).open();
 	}

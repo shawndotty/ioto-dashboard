@@ -17,6 +17,7 @@ import {
 	SortOrder,
 	GroupOption,
 	PaginationInfo,
+	FrontmatterValue,
 } from "../../models/types";
 import { DASHBOARD_VIEW_TYPE } from "../../models/constants";
 
@@ -100,9 +101,7 @@ export class MiddleSection extends Component {
 		const header = this.container.createDiv({
 			cls: "content-header",
 		});
-		header.style.display = "flex";
-		header.style.justifyContent = "space-between";
-		header.style.alignItems = "center";
+		header.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center" });
 
 		const count = this.pagination.totalItems;
 
@@ -115,13 +114,11 @@ export class MiddleSection extends Component {
 			text: titleText,
 			cls: "view-header-title",
 		});
-		title.style.margin = "0";
+		title.setCssStyles({ margin: "0" });
 
 		// Actions
 		const actionsDiv = header.createDiv({ cls: "header-actions" });
-		actionsDiv.style.display = "flex";
-		actionsDiv.style.alignItems = "center";
-		actionsDiv.style.paddingBottom = "10px";
+		actionsDiv.setCssStyles({ display: "flex", alignItems: "center", paddingBottom: "10px" });
 
 		// Zen Mode Button
 		const zenBtn = actionsDiv.createEl("button", {
@@ -189,7 +186,7 @@ export class MiddleSection extends Component {
 
 		// Spacer
 		const spacer = tabs.createDiv();
-		spacer.style.flex = "1";
+		spacer.setCssStyles({ flex: "1" });
 
 		// Sort Button
 		const sortBtn = tabs.createEl("button", {
@@ -198,7 +195,7 @@ export class MiddleSection extends Component {
 		sortBtn.setAttribute("aria-label", t("SORT_LABEL"));
 		setIcon(sortBtn, "arrow-up-down");
 		sortBtn.onclick = (e) => {
-			this.showSortMenu(e as MouseEvent);
+			this.showSortMenu(e);
 		};
 
 		// Group Button
@@ -207,9 +204,9 @@ export class MiddleSection extends Component {
 		});
 		groupBtn.setAttribute("aria-label", t("GROUP_LABEL"));
 		setIcon(groupBtn, "layers");
-		groupBtn.style.marginLeft = "8px";
+		groupBtn.setCssStyles({ marginLeft: "8px" });
 		groupBtn.onclick = (e) => {
-			this.showGroupMenu(e as MouseEvent);
+			this.showGroupMenu(e);
 		};
 
 		// Search Button (Zen Mode Only)
@@ -219,7 +216,7 @@ export class MiddleSection extends Component {
 			});
 			searchBtn.setAttribute("aria-label", t("COMMAND_TOGGLE_QUICK_SEARCH"));
 			setIcon(searchBtn, "search");
-			searchBtn.style.marginLeft = "8px";
+			searchBtn.setCssStyles({ marginLeft: "8px" });
 			searchBtn.onclick = () => {
 				this.onToggleSearch();
 			};
@@ -230,30 +227,28 @@ export class MiddleSection extends Component {
 			const searchContainer = this.container.createDiv({
 				cls: "dashboard-search-container",
 			});
-			searchContainer.style.padding = "0 1px 8px 1px";
+			searchContainer.setCssStyles({ padding: "0 1px 8px 1px" });
 
 			const wrapper = searchContainer.createDiv({
 				cls: "search-input-wrapper",
 			});
-			wrapper.style.position = "relative";
-			wrapper.style.display = "flex";
-			wrapper.style.alignItems = "center";
+			wrapper.setCssStyles({ position: "relative", display: "flex", alignItems: "center" });
 
 			const searchIcon = wrapper.createSpan({ cls: "search-icon" });
 			setIcon(searchIcon, "search");
-			searchIcon.style.position = "absolute";
-			searchIcon.style.left = "10px";
-			searchIcon.style.color = "var(--text-muted)";
-			searchIcon.style.pointerEvents = "none";
-			searchIcon.style.display = "flex";
+			searchIcon.setCssStyles({
+				position: "absolute",
+				left: "10px",
+				color: "var(--text-muted)",
+				pointerEvents: "none",
+				display: "flex",
+			});
 
 			const searchInput = wrapper.createEl("input", {
 				type: "text",
 				cls: "dashboard-search-input",
 			});
-			searchInput.style.width = "100%";
-			searchInput.style.paddingLeft = "32px";
-			searchInput.style.paddingRight = "32px";
+			searchInput.setCssStyles({ width: "100%", paddingLeft: "32px", paddingRight: "32px" });
 			searchInput.placeholder = t("FILTER_NAME_PLACEHOLDER");
 			searchInput.value = this.searchText;
 
@@ -262,11 +257,13 @@ export class MiddleSection extends Component {
 					cls: "search-clear-icon clickable-icon",
 				});
 				setIcon(clearIcon, "x");
-				clearIcon.style.position = "absolute";
-				clearIcon.style.right = "10px";
-				clearIcon.style.cursor = "pointer";
-				clearIcon.style.color = "var(--text-muted)";
-				clearIcon.style.display = "flex";
+				clearIcon.setCssStyles({
+					position: "absolute",
+					right: "10px",
+					cursor: "pointer",
+					color: "var(--text-muted)",
+					display: "flex",
+				});
 
 				clearIcon.onclick = () => {
 					this.onSearch("");
@@ -328,15 +325,16 @@ export class MiddleSection extends Component {
 		const paginationContainer = this.container.createDiv({
 			cls: "dashboard-pagination",
 		});
-		paginationContainer.style.display = "flex";
-		paginationContainer.style.justifyContent = "center";
-		paginationContainer.style.alignItems = "center";
-		paginationContainer.style.gap = "12px";
-		paginationContainer.style.padding = "10px 0 30px 0";
-		paginationContainer.style.marginTop = "10px";
-		paginationContainer.style.borderTop =
-			"1px solid var(--background-modifier-border)";
-		paginationContainer.style.flexShrink = "0";
+		paginationContainer.setCssStyles({
+			display: "flex",
+			justifyContent: "center",
+			alignItems: "center",
+			gap: "12px",
+			padding: "10px 0 30px 0",
+			marginTop: "10px",
+			borderTop: "1px solid var(--background-modifier-border)",
+			flexShrink: "0",
+		});
 
 		// Prev Button
 		const prevBtn = paginationContainer.createEl("button", {
@@ -439,12 +437,12 @@ export class MiddleSection extends Component {
 
 		items.forEach((item) => {
 			let key = "";
-			const file =
-				type === "file" ? (item as TFile) : (item as TaskItem).file;
+			const file = item instanceof TFile ? item : item.file;
 
 			if (this.groupOption === "project") {
 				const cache = this.app.metadataCache.getFileCache(file);
-				key = cache?.frontmatter?.["Project"] || t("GROUP_NONE");
+				const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
+				key = project ? String(project) : t("GROUP_NONE");
 			} else if (this.groupOption === "created") {
 				key = window.moment(file.stat.ctime).format("YYYY-MM-DD");
 			} else if (this.groupOption === "modified") {
@@ -452,8 +450,8 @@ export class MiddleSection extends Component {
 			} else if (this.groupOption === "type") {
 				if (type === "task") {
 					key = (item as TaskItem).type || t("GROUP_NONE");
-				} else if (this.folderPaths) {
-					const path = (item as TFile).path;
+			} else if (this.folderPaths) {
+				const path = file.path;
 					if (path.startsWith(this.folderPaths.input)) key = "Input";
 					else if (path.startsWith(this.folderPaths.output))
 						key = "Output";
@@ -501,39 +499,40 @@ export class MiddleSection extends Component {
 			const header = groupContainer.createDiv({
 				cls: "group-header",
 			});
-			header.style.padding = "8px 16px 4px 0px";
-			header.style.marginBottom = "8px";
-			header.style.display = "flex";
-			header.style.alignItems = "center";
-			header.style.cursor = "pointer";
+			header.setCssStyles({
+				padding: "8px 16px 4px 0px",
+				marginBottom: "8px",
+				display: "flex",
+				alignItems: "center",
+				cursor: "pointer",
+			});
 
 			const isCollapsed = this.collapsedGroups.has(group.label);
 
 			const iconSpan = header.createSpan({ cls: "group-icon" });
 			setIcon(iconSpan, isCollapsed ? "chevron-right" : "chevron-down");
-			iconSpan.style.marginRight = "8px";
-			iconSpan.style.display = "flex";
+			iconSpan.setCssStyles({ marginRight: "8px", display: "flex" });
 
 			const title = header.createEl("h5", {
 				text: `${group.label} (${group.items.length})`,
 			});
-			title.style.margin = "0";
+			title.setCssStyles({ margin: "0" });
 
 			const itemsContainer = groupContainer.createDiv({
 				cls: "group-items",
 			});
 			if (isCollapsed) {
-				itemsContainer.style.display = "none";
+				itemsContainer.setCssStyles({ display: "none" });
 			}
 
 			header.onclick = () => {
 				if (this.collapsedGroups.has(group.label)) {
 					this.collapsedGroups.delete(group.label);
-					itemsContainer.style.display = "block";
+					itemsContainer.setCssStyles({ display: "block" });
 					setIcon(iconSpan, "chevron-down");
 				} else {
 					this.collapsedGroups.add(group.label);
-					itemsContainer.style.display = "none";
+					itemsContainer.setCssStyles({ display: "none" });
 					setIcon(iconSpan, "chevron-right");
 				}
 			};
@@ -556,39 +555,40 @@ export class MiddleSection extends Component {
 			const header = groupContainer.createDiv({
 				cls: "group-header",
 			});
-			header.style.padding = "8px 16px 4px 0px";
-			header.style.marginBottom = "8px";
-			header.style.display = "flex";
-			header.style.alignItems = "center";
-			header.style.cursor = "pointer";
+			header.setCssStyles({
+				padding: "8px 16px 4px 0px",
+				marginBottom: "8px",
+				display: "flex",
+				alignItems: "center",
+				cursor: "pointer",
+			});
 
 			const isCollapsed = this.collapsedGroups.has(group.label);
 
 			const iconSpan = header.createSpan({ cls: "group-icon" });
 			setIcon(iconSpan, isCollapsed ? "chevron-right" : "chevron-down");
-			iconSpan.style.marginRight = "8px";
-			iconSpan.style.display = "flex";
+			iconSpan.setCssStyles({ marginRight: "8px", display: "flex" });
 
 			const title = header.createEl("h5", {
 				text: `${group.label} (${group.items.length})`,
 			});
-			title.style.margin = "0";
+			title.setCssStyles({ margin: "0" });
 
 			const itemsContainer = groupContainer.createDiv({
 				cls: "group-items",
 			});
 			if (isCollapsed) {
-				itemsContainer.style.display = "none";
+				itemsContainer.setCssStyles({ display: "none" });
 			}
 
 			header.onclick = () => {
 				if (this.collapsedGroups.has(group.label)) {
 					this.collapsedGroups.delete(group.label);
-					itemsContainer.style.display = "block";
+					itemsContainer.setCssStyles({ display: "block" });
 					setIcon(iconSpan, "chevron-down");
 				} else {
 					this.collapsedGroups.add(group.label);
-					itemsContainer.style.display = "none";
+					itemsContainer.setCssStyles({ display: "none" });
 					setIcon(iconSpan, "chevron-right");
 				}
 			};
@@ -623,7 +623,7 @@ export class MiddleSection extends Component {
 
 			const meta = item.createDiv({ cls: "file-meta" });
 			const cache = this.app.metadataCache.getFileCache(file);
-			const project = cache?.frontmatter?.["Project"];
+			const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
 
 			if (project) {
 				const projectSpan = meta.createEl("p", {
@@ -631,8 +631,8 @@ export class MiddleSection extends Component {
 				});
 				// Use Lucide icon 'folder'
 				const iconSpan = projectSpan.createSpan({ cls: "meta-icon" });
-				setIcon(iconSpan, "folder");
-				projectSpan.createSpan({ text: ` ${project}` });
+			setIcon(iconSpan, "folder");
+			projectSpan.createSpan({ text: ` ${String(project)}` });
 			}
 
 			const dateSpan = meta.createEl("p", { cls: "file-date" });
@@ -643,11 +643,11 @@ export class MiddleSection extends Component {
 			dateSpan.createSpan({ text: ` ${date}` });
 
 			const sizeSpan = meta.createEl("p", { cls: "file-size" });
-			const sizeIconSpan = sizeSpan.createSpan({ cls: "meta-icon" });
-			setIcon(sizeIconSpan, "file-text");
-			const sizeText = sizeSpan.createSpan({
-				text: ` ${file.stat.size}`,
-			});
+		const sizeIconSpan = sizeSpan.createSpan({ cls: "meta-icon" });
+		setIcon(sizeIconSpan, "file-text");
+		sizeSpan.createSpan({
+			text: ` ${file.stat.size}`,
+		});
 
 			item.onclick = async (e) => {
 				e.stopPropagation();
@@ -696,22 +696,17 @@ export class MiddleSection extends Component {
 			header.createEl("span", { text: date });
 
 			const content = item.createDiv({ cls: "task-content" });
-			content.style.display = "flex";
-			content.style.justifyContent = "space-between";
-			content.style.alignItems = "center";
+			content.setCssStyles({ display: "flex", justifyContent: "space-between", alignItems: "center" });
 
 			const leftContainer = content.createDiv({ cls: "task-left" });
-			leftContainer.style.display = "flex";
-			leftContainer.style.flex = "1";
-			leftContainer.style.alignItems = "center";
+			leftContainer.setCssStyles({ display: "flex", flex: "1", alignItems: "center" });
 
 			const checkbox = leftContainer.createEl("input", {
 				type: "checkbox",
 				cls: "task-checkbox",
 			});
 			// Explicitly allow pointer events to ensure click is captured
-			checkbox.style.pointerEvents = "auto";
-			checkbox.style.marginTop = "0";
+			checkbox.setCssStyles({ pointerEvents: "auto", marginTop: "0" });
 			checkbox.checked = task.status !== " ";
 			checkbox.onclick = async (e) => {
 				e.stopPropagation();
@@ -721,8 +716,7 @@ export class MiddleSection extends Component {
 			const textSpan = leftContainer.createEl("div", {
 				cls: "task-markdown-content",
 			});
-			textSpan.style.flex = "1";
-			textSpan.style.marginLeft = "8px";
+			textSpan.setCssStyles({ flex: "1", marginLeft: "8px" });
 
 			const deleteBtn = content.createEl("button", {
 				cls: "task-delete-btn clickable-icon",
@@ -732,28 +726,30 @@ export class MiddleSection extends Component {
 				"aria-label",
 				t("CONFIRM_DELETE_TASK_TITLE"),
 			);
-			deleteBtn.style.opacity = "0"; // Initially hidden
-			deleteBtn.style.transition = "opacity 0.2s ease";
-			deleteBtn.style.marginLeft = "8px";
-			deleteBtn.style.border = "none";
-			deleteBtn.style.background = "transparent";
-			deleteBtn.style.cursor = "pointer";
+		deleteBtn.setCssStyles({
+			opacity: "0", // Initially hidden
+			transition: "opacity 0.2s ease",
+			marginLeft: "8px",
+			border: "none",
+			background: "transparent",
+			cursor: "pointer",
+		});
 
 			item.onmouseenter = () => {
-				deleteBtn.style.opacity = "0.7";
+				deleteBtn.setCssStyles({ opacity: "0.7" });
 			};
 			item.onmouseleave = () => {
-				deleteBtn.style.opacity = "0";
+				deleteBtn.setCssStyles({ opacity: "0" });
 			};
 			deleteBtn.onmouseenter = () => {
-				deleteBtn.style.opacity = "1";
+				deleteBtn.setCssStyles({ opacity: "1" });
 			};
 
 			deleteBtn.onclick = async (e) => {
 				e.stopPropagation();
 				await this.onDeleteTask(task);
 			};
-			MarkdownRenderer.render(
+			void MarkdownRenderer.render(
 				this.app,
 				task.content,
 				textSpan,
@@ -763,8 +759,7 @@ export class MiddleSection extends Component {
 				// Remove paragraph margins to keep it inline-like
 				const p = textSpan.querySelector("p");
 				if (p) {
-					p.style.margin = "0";
-					p.style.display = "inline";
+					p.setCssStyles({ margin: "0", display: "inline" });
 				}
 
 				// Handle internal links (preview and navigation)
@@ -783,8 +778,9 @@ export class MiddleSection extends Component {
 						});
 					});
 
-					// Click navigation
-					link.addEventListener("click", async (evt) => {
+				// Click navigation
+				link.addEventListener("click", (evt) => {
+					void (async () => {
 						const e = evt as MouseEvent;
 						e.preventDefault();
 						e.stopPropagation();
@@ -829,14 +825,15 @@ export class MiddleSection extends Component {
 								}
 							} else {
 								// Fallback for non-existent files
-								this.app.workspace.openLinkText(
+								void this.app.workspace.openLinkText(
 									href,
 									task.file.path,
 									e.metaKey || e.ctrlKey,
 								);
 							}
 						}
-					});
+					})();
+				});
 				});
 
 				// Handle external links (stop propagation to avoid opening task file)

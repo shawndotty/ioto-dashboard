@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, TextComponent } from "obsidian";
 import IotoDashboardPlugin from "./main";
 import { t } from "./lang/helpers";
 import { FolderPickerModal } from "./ui/pickers/folder-picker";
@@ -34,7 +34,7 @@ export interface SavedQuery {
 		fileStatus?: string;
 		taskType?: string[];
 		noteType?: string[];
-		custom?: Record<string, any>;
+		custom?: Record<string, unknown>;
 	};
 }
 
@@ -80,7 +80,10 @@ export class DashboardSettingTab extends PluginSettingTab {
 
 		const tabbedSettings = new TabbedSettings(containerEl);
 
-		const tabConfigs = [
+		const tabConfigs: {
+			title: Parameters<typeof t>[0];
+			renderMethod: (container: HTMLElement) => void;
+		}[] = [
 			{
 				title: "SETTINGS_BASIC_NAME",
 				renderMethod: (container: HTMLElement) =>
@@ -94,11 +97,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 		];
 
 		tabConfigs.forEach((config) => {
-			const title =
-				t(config.title as any) === config.title
-					? config.title
-					: t(config.title as any);
-			tabbedSettings.addTab(title, config.renderMethod);
+			tabbedSettings.addTab(t(config.title), config.renderMethod);
 		});
 
 		tabbedSettings.activateTab(this.currentTabIndex);
@@ -110,7 +109,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 			.setDesc(t("SETTINGS_INPUT_FOLDER_DESC"))
 			.addText((text) =>
 				text
-					.setPlaceholder("1-Input")
+					.setPlaceholder(t("SETTINGS_INPUT_FOLDER_PLACEHOLDER"))
 					.setValue(this.plugin.settings.inputFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.inputFolder = value;
@@ -122,10 +121,9 @@ export class DashboardSettingTab extends PluginSettingTab {
 					.setIcon("folder")
 					.setTooltip(t("CHOOSE_A_FOLDER"))
 					.onClick(() => {
-						new FolderPickerModal(this.app, async (folder) => {
+						new FolderPickerModal(this.app, (folder) => {
 							this.plugin.settings.inputFolder = folder.path;
-							await this.plugin.saveSettings();
-							this.display();
+							void this.plugin.saveSettings().then(() => this.display());
 						}).open();
 					}),
 			);
@@ -135,7 +133,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 			.setDesc(t("SETTINGS_OUTPUT_FOLDER_DESC"))
 			.addText((text) =>
 				text
-					.setPlaceholder("2-Output")
+					.setPlaceholder(t("SETTINGS_OUTPUT_FOLDER_PLACEHOLDER"))
 					.setValue(this.plugin.settings.outputFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.outputFolder = value;
@@ -147,10 +145,9 @@ export class DashboardSettingTab extends PluginSettingTab {
 					.setIcon("folder")
 					.setTooltip(t("CHOOSE_A_FOLDER"))
 					.onClick(() => {
-						new FolderPickerModal(this.app, async (folder) => {
+						new FolderPickerModal(this.app, (folder) => {
 							this.plugin.settings.outputFolder = folder.path;
-							await this.plugin.saveSettings();
-							this.display();
+							void this.plugin.saveSettings().then(() => this.display());
 						}).open();
 					}),
 			);
@@ -160,7 +157,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 			.setDesc(t("SETTINGS_TASK_FOLDER_DESC"))
 			.addText((text) =>
 				text
-					.setPlaceholder("3-Task")
+					.setPlaceholder(t("SETTINGS_TASK_FOLDER_PLACEHOLDER"))
 					.setValue(this.plugin.settings.taskFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.taskFolder = value;
@@ -172,10 +169,9 @@ export class DashboardSettingTab extends PluginSettingTab {
 					.setIcon("folder")
 					.setTooltip(t("CHOOSE_A_FOLDER"))
 					.onClick(() => {
-						new FolderPickerModal(this.app, async (folder) => {
+						new FolderPickerModal(this.app, (folder) => {
 							this.plugin.settings.taskFolder = folder.path;
-							await this.plugin.saveSettings();
-							this.display();
+							void this.plugin.saveSettings().then(() => this.display());
 						}).open();
 					}),
 			);
@@ -185,7 +181,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 			.setDesc(t("SETTINGS_OUTCOME_FOLDER_DESC"))
 			.addText((text) =>
 				text
-					.setPlaceholder("4-Outcome")
+					.setPlaceholder(t("SETTINGS_OUTCOME_FOLDER_PLACEHOLDER"))
 					.setValue(this.plugin.settings.outcomeFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.outcomeFolder = value;
@@ -197,10 +193,9 @@ export class DashboardSettingTab extends PluginSettingTab {
 					.setIcon("folder")
 					.setTooltip(t("CHOOSE_A_FOLDER"))
 					.onClick(() => {
-						new FolderPickerModal(this.app, async (folder) => {
+						new FolderPickerModal(this.app, (folder) => {
 							this.plugin.settings.outcomeFolder = folder.path;
-							await this.plugin.saveSettings();
-							this.display();
+							void this.plugin.saveSettings().then(() => this.display());
 						}).open();
 					}),
 			);
@@ -228,7 +223,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 		let newFilterName = "";
 		let newFilterType: CustomFilter["type"] = "text";
 		let newFilterTarget: CustomFilter["target"] = "all";
-		let filterNameInput: any;
+		let filterNameInput: TextComponent | undefined;
 
 		new Setting(containerEl)
 			.setName(t("SETTINGS_ADD_FILTER_BTN"))
@@ -244,7 +239,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 					.onClick(() => {
 						new PropertyPickerModal(this.app, (name) => {
 							newFilterName = name;
-							filterNameInput.setValue(name);
+							filterNameInput?.setValue(name);
 						}).open();
 					});
 			})
@@ -256,7 +251,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 					.addOption("date", t("SETTINGS_FILTER_TYPE_DATE"))
 					.addOption("list", t("SETTINGS_FILTER_TYPE_LIST"))
 					.setValue("text")
-					.onChange((val) => (newFilterType = val as any)),
+					.onChange((val) => (newFilterType = val as CustomFilter["type"])),
 			)
 			.addDropdown((dropdown) =>
 				dropdown
@@ -264,7 +259,9 @@ export class DashboardSettingTab extends PluginSettingTab {
 					.addOption("note", t("SETTINGS_FILTER_TARGET_NOTE"))
 					.addOption("task", t("SETTINGS_FILTER_TARGET_TASK"))
 					.setValue("all")
-					.onChange((val) => (newFilterTarget = val as any)),
+					.onChange(
+						(val) => (newFilterTarget = val as CustomFilter["target"]),
+					),
 			)
 			.addButton((btn) =>
 				btn

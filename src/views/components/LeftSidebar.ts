@@ -49,9 +49,10 @@ export class LeftSidebar {
 		// Saved Queries
 		if (this.savedQueries.length > 0) {
 			const divider = this.container.createDiv({ cls: "nav-divider" });
-			divider.style.borderTop =
-				"1px solid var(--background-modifier-border)";
-			divider.style.margin = "10px 0";
+			divider.setCssStyles({
+				borderTop: "1px solid var(--background-modifier-border)",
+				margin: "10px 0",
+			});
 
 			const queryHeader = this.container.createDiv({ cls: "nav-header" });
 			if (!this.leftPanelCollapsed) {

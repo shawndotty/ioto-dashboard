@@ -24,7 +24,7 @@ const localeFiles = readdirSync(localeDir).filter(
 );
 
 const REFERENCE = 'en';
-const CANONICAL_KEY_COUNT = 126;
+const CANONICAL_KEY_COUNT = 130;
 
 const locales = {};
 for (const file of localeFiles) {

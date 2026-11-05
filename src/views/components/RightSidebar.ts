@@ -43,16 +43,13 @@ export class RightSidebar {
 				: "FILTER_NOTE_TYPE_LABEL";
 
 			const typeDiv = form.createDiv({ cls: "filter-item" });
-			typeDiv.createEl("label", { text: t(labelKey as any) });
+			typeDiv.createEl("label", { text: t(labelKey) });
 
 			const types = ["Input", "Output", "Outcome"];
 			const checkboxContainer = typeDiv.createDiv({
 				cls: "filter-checkboxes",
 			});
-			checkboxContainer.style.display = "flex";
-			checkboxContainer.style.flexDirection = "column";
-			checkboxContainer.style.gap = "10px";
-			checkboxContainer.style.marginBottom = "10px";
+			checkboxContainer.setCssStyles({ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "10px" });
 
 			types.forEach((type) => {
 				let label = "";
@@ -61,10 +58,7 @@ export class RightSidebar {
 				else if (type === "Outcome") label = t("NAV_OUTCOME");
 
 				const wrapper = checkboxContainer.createDiv();
-				wrapper.style.display = "flex";
-				wrapper.style.alignItems = "center";
-				wrapper.style.justifyContent = "space-between";
-				wrapper.style.width = "100%";
+				wrapper.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" });
 
 				wrapper.createEl("span", {
 					text: label,
@@ -97,7 +91,7 @@ export class RightSidebar {
 								const requiredKey = isTask
 									? "FILTER_TASK_TYPE_REQUIRED"
 									: "FILTER_NOTE_TYPE_REQUIRED";
-								new Notice(t(requiredKey as any));
+								new Notice(t(requiredKey));
 								toggle.setValue(true);
 								return;
 							}
@@ -317,7 +311,9 @@ export class RightSidebar {
 
 				if (!this.filters.custom) this.filters.custom = {};
 
-				const currentValue = this.filters.custom[filter.name];
+				const currentValue = this.filters.custom[filter.name] as
+					| string
+					| undefined;
 
 				if (filter.type === "text" || filter.type === "list") {
 					new TextComponent(div)
@@ -336,7 +332,7 @@ export class RightSidebar {
 				} else if (filter.type === "number") {
 					const input = div.createEl("input", { type: "number" });
 					input.value = currentValue || "";
-					input.style.width = "100%";
+					input.setCssStyles({ width: "100%" });
 					input.onchange = (e) => {
 						this.filters.custom![filter.name] = (
 							e.target as HTMLInputElement
@@ -356,7 +352,7 @@ export class RightSidebar {
 				} else if (filter.type === "date") {
 					const input = div.createEl("input", { type: "date" });
 					input.value = currentValue || "";
-					input.style.width = "100%";
+					input.setCssStyles({ width: "100%" });
 					input.onchange = (e) => {
 						this.filters.custom![filter.name] = (
 							e.target as HTMLInputElement
@@ -369,13 +365,12 @@ export class RightSidebar {
 
 		// Reset Button
 		const btnDiv = form.createDiv({ cls: "filter-actions" });
-		btnDiv.style.display = "flex";
-		btnDiv.style.gap = "10px";
+		btnDiv.setCssStyles({ display: "flex", gap: "10px" });
 
 		const resetBtn = btnDiv.createEl("button", {
 			text: t("FILTER_RESET_BTN"),
 		});
-		resetBtn.style.flex = "1";
+		resetBtn.setCssStyles({ flex: "1" });
 		resetBtn.onclick = () => {
 			this.onReset();
 		};
@@ -385,7 +380,7 @@ export class RightSidebar {
 				text: t("BTN_UPDATE_QUERY"),
 				cls: "mod-cta",
 			});
-			updateBtn.style.flex = "1";
+			updateBtn.setCssStyles({ flex: "1" });
 			updateBtn.onclick = () => {
 				this.onUpdateQuery();
 			};
@@ -394,7 +389,7 @@ export class RightSidebar {
 				text: t("BTN_SAVE_QUERY"),
 				cls: "mod-cta",
 			});
-			saveBtn.style.flex = "1";
+			saveBtn.setCssStyles({ flex: "1" });
 			saveBtn.onclick = () => {
 				this.onSaveQuery();
 			};

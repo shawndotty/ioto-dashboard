@@ -14,11 +14,9 @@ export class PropertyPickerModal extends FuzzySuggestModal<string> {
 		const allProperties = new Set<string>();
 		
 		// Try to use the new API if available
-		// @ts-ignore
-		if (this.app.metadataCache.getAllPropertyInfos) {
-			// @ts-ignore
-			const infos = this.app.metadataCache.getAllPropertyInfos();
-			Object.keys(infos).forEach(key => allProperties.add(key));
+		const infos = this.app.metadataCache.getAllPropertyInfos?.();
+		if (infos) {
+			Object.keys(infos).forEach((key) => allProperties.add(key));
 			return Array.from(allProperties).sort((a, b) => a.localeCompare(b));
 		}
 

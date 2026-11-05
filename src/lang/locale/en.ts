@@ -83,6 +83,10 @@ export default {
 	SETTINGS_OUTCOME_FOLDER_DESC: "Path to the Outcome folder (e.g. 4-Outcome)",
 	SETTINGS_TASK_FOLDER_NAME: "Task Folder",
 	SETTINGS_TASK_FOLDER_DESC: "Path to the Task folder (e.g. 3-Task)",
+	SETTINGS_INPUT_FOLDER_PLACEHOLDER: "1-input",
+	SETTINGS_OUTPUT_FOLDER_PLACEHOLDER: "2-output",
+	SETTINGS_TASK_FOLDER_PLACEHOLDER: "3-task",
+	SETTINGS_OUTCOME_FOLDER_PLACEHOLDER: "4-outcome",
 	SETTINGS_PAGE_SIZE_NAME: "Page Size",
 	SETTINGS_PAGE_SIZE_DESC: "Number of items to show per page (20-300).",
 
