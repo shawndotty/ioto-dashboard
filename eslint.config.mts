@@ -25,6 +25,8 @@ export default tseslint.config(
 	globalIgnores([
 		"node_modules",
 		"dist",
+		"tests/**/*.test.mjs",
+		"tests/stubs/**",
 		"esbuild.config.mjs",
 		"scripts/**",
 		"eslint.config.js",
