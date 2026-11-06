@@ -40,6 +40,11 @@ export interface IotoSettings {
 	LTDListOutputSectionHeading: string;
 	LTDListOutcomeSectionHeading: string;
 
+	// AI task execution sections
+	aiTaskSectionHeadings?: string;
+	aiGoalSectionHeadings?: string;
+	aiReviewSectionHeadings?: string;
+
 	// Other dynamic keys
 	[key: string]: unknown;
 }

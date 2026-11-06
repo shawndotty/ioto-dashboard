@@ -1,6 +1,13 @@
-import { TFile } from "obsidian";
-
 export type Category = "Input" | "Output" | "Outcome" | "Tasks" | "Notes";
+
+import type { GroupOption, SortOption, SortOrder } from "../data/types";
+
+export type {
+	FilterState,
+	GroupOption,
+	SortOption,
+	SortOrder,
+} from "../data/types";
 
 declare module "obsidian" {
 	interface App {
@@ -32,40 +39,6 @@ export type FrontmatterValue =
 	| string[]
 	| null
 	| undefined;
-
-export interface FilterState {
-	name: string;
-	project: string;
-	subject: string;
-	dateType: "created" | "modified";
-	dateStart: string;
-	dateEnd: string;
-	datePreset:
-		| "all"
-		| "last1day"
-		| "last3days"
-		| "last7days"
-		| "last14days"
-		| "last30days"
-		| "custom";
-	status: "all" | "completed" | "incomplete";
-	fileStatus: string;
-	taskType?: string[]; // "Input" | "Output" | "Outcome"
-	noteType?: string[]; // "Input" | "Output" | "Outcome"
-	custom?: Record<string, unknown>;
-}
-
-export interface TaskItem {
-	file: TFile;
-	content: string;
-	status: string;
-	line: number;
-	type?: "Input" | "Output" | "Outcome";
-}
-
-export type SortOption = "modified" | "created" | "name" | "size";
-export type SortOrder = "asc" | "desc";
-export type GroupOption = "none" | "project" | "created" | "modified" | "type";
 
 export interface PaginationInfo {
 	currentPage: number;

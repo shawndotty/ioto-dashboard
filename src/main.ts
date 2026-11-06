@@ -15,12 +15,29 @@ import {
 } from "./settings";
 
 import { IotoSettingsService } from "./services/ioto-settings-services";
+import { VaultIndex } from "./data/vault-index";
+import type { IndexConfig, SectionHeadings } from "./data/types";
+
+function splitHeadingList(value: string | undefined, fallback: string): string[] {
+	if (!value) return [fallback];
+	const items = value
+		.split(/[\r\n,，;；]+/)
+		.map((item) => item.trim())
+		.filter((item) => item.length > 0);
+	return items.length > 0 ? items : [fallback];
+}
 
 export default class IotoDashboardPlugin extends Plugin {
 	settings: IotoDashboardSettings;
+	index: VaultIndex;
+	private indexRebuildTimer: number | null = null;
 
 	async onload() {
 		await this.loadSettings();
+
+		this.index = new VaultIndex(this.app, () => this.getIndexConfig());
+		this.index.attach();
+		this.register(() => this.index.detach());
 
 		// Register View
 		this.registerView(
@@ -301,5 +318,61 @@ export default class IotoDashboardPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		this.scheduleIndexRebuild();
+	}
+
+	getSectionHeadings(): SectionHeadings {
+		const iotoSettings = new IotoSettingsService(this.app).getSettings();
+		return {
+			task: splitHeadingList(
+				iotoSettings?.aiTaskSectionHeadings,
+				t("TDL_TASK_HEADING"),
+			),
+			input: splitHeadingList(
+				iotoSettings?.LTDListInputSectionHeading,
+				t("TDL_INPUT_HEADING"),
+			),
+			output: splitHeadingList(
+				iotoSettings?.LTDListOutputSectionHeading,
+				t("TDL_OUTPUT_HEADING"),
+			),
+			outcome: splitHeadingList(
+				iotoSettings?.LTDListOutcomeSectionHeading,
+				t("TDL_OUTCOME_HEADING"),
+			),
+			goal: splitHeadingList(
+				iotoSettings?.aiGoalSectionHeadings,
+				t("TDL_GOAL_HEADING"),
+			),
+			review: [
+				...splitHeadingList(
+					iotoSettings?.aiReviewSectionHeadings,
+					t("TDL_REVIEW_HEADING"),
+				),
+				"复盘",
+				"Review",
+			],
+		};
+	}
+
+	getIndexConfig(): IndexConfig {
+		return {
+			inputFolder: this.settings.inputFolder,
+			outputFolder: this.settings.outputFolder,
+			taskFolder: this.settings.taskFolder,
+			outcomeFolder: this.settings.outcomeFolder,
+			headings: this.getSectionHeadings(),
+		};
+	}
+
+	/** Folder/heading settings changed: rebuild the index after typing settles. */
+	scheduleIndexRebuild() {
+		if (this.indexRebuildTimer !== null) {
+			window.clearTimeout(this.indexRebuildTimer);
+		}
+		this.indexRebuildTimer = window.setTimeout(() => {
+			this.indexRebuildTimer = null;
+			this.index?.rebuild();
+		}, 600);
 	}
 }

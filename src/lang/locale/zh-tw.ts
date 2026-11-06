@@ -138,6 +138,10 @@ export default {
 	TDL_OUTPUT_HEADING: "輸出 THINK",
 	// TDL Outcome Heading
 	TDL_OUTCOME_HEADING: "成果 DO",
+	// Task / Goal / Review section headings
+	TDL_TASK_HEADING: "任務",
+	TDL_GOAL_HEADING: "目標",
+	TDL_REVIEW_HEADING: "復盤",
 
 	// Custom Filters Settings
 	SETTINGS_CUSTOM_FILTERS_NAME: "自訂過濾",

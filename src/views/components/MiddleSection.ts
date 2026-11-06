@@ -12,14 +12,19 @@ import {
 import { t } from "../../lang/helpers";
 import {
 	Category,
-	TaskItem,
 	SortOption,
 	SortOrder,
 	GroupOption,
 	PaginationInfo,
-	FrontmatterValue,
 } from "../../models/types";
+import type { NoteRecord, TaskRecord } from "../../data/types";
 import { DASHBOARD_VIEW_TYPE } from "../../models/constants";
+
+type ListItem = NoteRecord | TaskRecord;
+
+function isTaskRecord(item: ListItem): item is TaskRecord {
+	return "sectionRole" in item;
+}
 
 export class MiddleSection extends Component {
 	sortOption: SortOption;
@@ -35,8 +40,8 @@ export class MiddleSection extends Component {
 		private activeTab: "Notes" | "Tasks",
 		private activeQueryId: string | null,
 		private activeQueryName: string | null,
-		private filteredFiles: TFile[],
-		private filteredTasks: TaskItem[],
+		private filteredFiles: NoteRecord[],
+		private filteredTasks: TaskRecord[],
 		private isZenMode: boolean,
 		sortOption: SortOption,
 		sortOrder: SortOrder,
@@ -46,8 +51,8 @@ export class MiddleSection extends Component {
 		private onGroupChange: (option: GroupOption) => void,
 		private onEditQuery: (id: string) => void,
 		private onDeleteQuery: (id: string) => void,
-		private onTaskToggle: (task: TaskItem) => Promise<void>,
-		private onDeleteTask: (task: TaskItem) => Promise<void>,
+		private onTaskToggle: (task: TaskRecord) => Promise<void>,
+		private onDeleteTask: (task: TaskRecord) => Promise<void>,
 		private onToggleZenMode: () => void,
 		private isQuickSearchVisible: boolean,
 		private searchText: string,
@@ -70,27 +75,33 @@ export class MiddleSection extends Component {
 
 	private listContainer: HTMLElement;
 
-	updateData(filteredFiles: TFile[], filteredTasks: TaskItem[]) {
+	updateData(filteredFiles: NoteRecord[], filteredTasks: TaskRecord[]) {
 		this.filteredFiles = filteredFiles;
 		this.filteredTasks = filteredTasks;
 		this.refreshList();
 	}
 
+	/** Pagination happens here; grouping counts always use the full result set. */
+	private pageSlice<T>(items: T[]): T[] {
+		const pageSize = this.pagination.pageSize;
+		const currentPage = Math.max(1, this.pagination.currentPage);
+		const start = (currentPage - 1) * pageSize;
+		return items.slice(start, start + pageSize);
+	}
+
 	refreshList() {
 		if (!this.listContainer) return;
 		this.listContainer.empty();
-		if (this.groupOption === "none") {
-			if (this.activeTab === "Notes") {
-				this.renderNoteList(this.listContainer);
+		if (this.activeTab === "Notes") {
+			if (this.groupOption === "none") {
+				this.renderNoteList(this.listContainer, this.pageSlice(this.filteredFiles));
 			} else {
-				this.renderTaskList(this.listContainer);
-			}
-		} else {
-			if (this.activeTab === "Notes") {
 				this.renderGroupedNoteList(this.listContainer);
-			} else {
-				this.renderGroupedTaskList(this.listContainer);
 			}
+		} else if (this.groupOption === "none") {
+			this.renderTaskList(this.listContainer, this.pageSlice(this.filteredTasks));
+		} else {
+			this.renderGroupedTaskList(this.listContainer);
 		}
 	}
 
@@ -176,12 +187,6 @@ export class MiddleSection extends Component {
 			tasksTab.onclick = () => {
 				this.onTabChange("Tasks");
 			};
-		} else {
-			// If tabs hidden, maybe show a label? Or just nothing.
-			// The requirement says "Middle column default shows all tasks in Task folder".
-			// It doesn't explicitly say hide tabs, but since "only let user view IOTO Task folder tasks",
-			// switching to Notes makes no sense.
-			// So hiding is correct.
 		}
 
 		// Spacer
@@ -273,8 +278,6 @@ export class MiddleSection extends Component {
 			// Auto-focus logic
 			setTimeout(() => {
 				searchInput.focus();
-				// Optional: select text? Or just cursor at end?
-				// To put cursor at end:
 				const len = searchInput.value.length;
 				searchInput.setSelectionRange(len, len);
 			}, 0);
@@ -429,38 +432,50 @@ export class MiddleSection extends Component {
 		menu.showAtMouseEvent(event);
 	}
 
+	private typeLabelOf(item: ListItem): string {
+		if (isTaskRecord(item)) {
+			switch (item.sectionRole) {
+				case "input":
+					return "Input";
+				case "output":
+					return "Output";
+				case "outcome":
+					return "Outcome";
+				default:
+					return t("GROUP_NONE");
+			}
+		}
+		if (
+			item.ioType === "Input" ||
+			item.ioType === "Output" ||
+			item.ioType === "Outcome"
+		) {
+			return item.ioType;
+		}
+		return t("GROUP_NONE");
+	}
+
 	getGroups(
-		items: (TFile | TaskItem)[],
+		items: ListItem[],
 		type: "file" | "task",
-	): { label: string; items: (TFile | TaskItem)[] }[] {
-		const groups: { [key: string]: (TFile | TaskItem)[] } = {};
+	): { label: string; items: ListItem[] }[] {
+		const groups: { [key: string]: ListItem[] } = {};
 
 		items.forEach((item) => {
 			let key = "";
-			const file = item instanceof TFile ? item : item.file;
 
 			if (this.groupOption === "project") {
-				const cache = this.app.metadataCache.getFileCache(file);
-				const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
-				key = project ? String(project) : t("GROUP_NONE");
+				key = item.project ? String(item.project) : t("GROUP_NONE");
 			} else if (this.groupOption === "created") {
-				key = window.moment(file.stat.ctime).format("YYYY-MM-DD");
+				key = window.moment(
+					isTaskRecord(item) ? item.noteCtime : item.ctime,
+				).format("YYYY-MM-DD");
 			} else if (this.groupOption === "modified") {
-				key = window.moment(file.stat.mtime).format("YYYY-MM-DD");
+				key = window.moment(
+					isTaskRecord(item) ? item.noteMtime : item.mtime,
+				).format("YYYY-MM-DD");
 			} else if (this.groupOption === "type") {
-				if (type === "task") {
-					key = (item as TaskItem).type || t("GROUP_NONE");
-			} else if (this.folderPaths) {
-				const path = file.path;
-					if (path.startsWith(this.folderPaths.input)) key = "Input";
-					else if (path.startsWith(this.folderPaths.output))
-						key = "Output";
-					else if (path.startsWith(this.folderPaths.outcome))
-						key = "Outcome";
-					else key = t("GROUP_NONE");
-				} else {
-					key = t("GROUP_NONE");
-				}
+				key = this.typeLabelOf(item);
 			} else {
 				key = t("GROUP_NONE");
 			}
@@ -486,13 +501,22 @@ export class MiddleSection extends Component {
 	}
 
 	renderGroupedNoteList(container: HTMLElement) {
+		const visible = new Set(
+			this.pageSlice(this.filteredFiles).map((note) => note.path),
+		);
 		const groups = this.getGroups(this.filteredFiles, "file");
 		if (groups.length === 0) {
 			container.createEl("p", { text: t("NO_NOTES_FOUND") });
 			return;
 		}
 
-		groups.forEach((group) => {
+		for (const group of groups) {
+			const visibleItems = group.items.filter(
+				(item): item is NoteRecord =>
+					!isTaskRecord(item) && visible.has(item.path),
+			);
+			if (visibleItems.length === 0) continue;
+
 			const groupContainer = container.createDiv({
 				cls: "group-container",
 			});
@@ -537,18 +561,29 @@ export class MiddleSection extends Component {
 				}
 			};
 
-			this.renderNoteList(itemsContainer, group.items as TFile[]);
-		});
+			this.renderNoteList(itemsContainer, visibleItems);
+		}
 	}
 
 	renderGroupedTaskList(container: HTMLElement) {
+		const visible = new Set(
+			this.pageSlice(this.filteredTasks).map(
+				(task) => `${task.path}:${task.line}`,
+			),
+		);
 		const groups = this.getGroups(this.filteredTasks, "task");
 		if (groups.length === 0) {
 			container.createEl("p", { text: t("NO_TASKS_FOUND") });
 			return;
 		}
 
-		groups.forEach((group) => {
+		for (const group of groups) {
+			const visibleItems = group.items.filter(
+				(item): item is TaskRecord =>
+					isTaskRecord(item) && visible.has(`${item.path}:${item.line}`),
+			);
+			if (visibleItems.length === 0) continue;
+
 			const groupContainer = container.createDiv({
 				cls: "group-container",
 			});
@@ -593,14 +628,41 @@ export class MiddleSection extends Component {
 				}
 			};
 
-			this.renderTaskList(itemsContainer, group.items as TaskItem[]);
-		});
+			this.renderTaskList(itemsContainer, visibleItems);
+		}
 	}
 
-	renderNoteList(
-		container: HTMLElement,
-		files: TFile[] = this.filteredFiles,
-	) {
+	private openFileAt(
+		path: string,
+		line: number | null,
+		event: MouseEvent,
+	): void {
+		void (async () => {
+			const abstractFile = this.app.vault.getAbstractFileByPath(path);
+			if (!(abstractFile instanceof TFile)) return;
+			const isSplit =
+				(event.metaKey && event.altKey) ||
+				(event.ctrlKey && event.altKey);
+			const leaf = isSplit
+				? this.app.workspace.getLeaf("split", "vertical")
+				: this.app.workspace.getLeaf(false);
+			await leaf.openFile(
+				abstractFile,
+				line === null ? undefined : { eState: { line } },
+			);
+			const view = leaf.view;
+			if (view instanceof MarkdownView) {
+				const editor = view.editor;
+				const targetLine =
+					line === null ? editor.lineCount() - 1 : line;
+				const lineContent = editor.getLine(targetLine);
+				editor.setCursor({ line: targetLine, ch: lineContent.length });
+				editor.focus();
+			}
+		})();
+	}
+
+	renderNoteList(container: HTMLElement, files: NoteRecord[]) {
 		if (files.length === 0) {
 			container.createEl("p", { text: t("NO_NOTES_FOUND") });
 			return;
@@ -622,66 +684,36 @@ export class MiddleSection extends Component {
 			});
 
 			const meta = item.createDiv({ cls: "file-meta" });
-			const cache = this.app.metadataCache.getFileCache(file);
-			const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
 
-			if (project) {
+			if (file.project) {
 				const projectSpan = meta.createEl("p", {
 					cls: "file-project",
 				});
-				// Use Lucide icon 'folder'
 				const iconSpan = projectSpan.createSpan({ cls: "meta-icon" });
-			setIcon(iconSpan, "folder");
-			projectSpan.createSpan({ text: ` ${String(project)}` });
+				setIcon(iconSpan, "folder");
+				projectSpan.createSpan({ text: ` ${file.project}` });
 			}
 
 			const dateSpan = meta.createEl("p", { cls: "file-date" });
-			// Use Lucide icon 'calendar'
 			const dateIconSpan = dateSpan.createSpan({ cls: "meta-icon" });
 			setIcon(dateIconSpan, "calendar");
-			const date = new Date(file.stat.ctime).toLocaleDateString();
+			const date = new Date(file.ctime).toLocaleDateString();
 			dateSpan.createSpan({ text: ` ${date}` });
 
 			const sizeSpan = meta.createEl("p", { cls: "file-size" });
-		const sizeIconSpan = sizeSpan.createSpan({ cls: "meta-icon" });
-		setIcon(sizeIconSpan, "file-text");
-		sizeSpan.createSpan({
-			text: ` ${file.stat.size}`,
-		});
+			const sizeIconSpan = sizeSpan.createSpan({ cls: "meta-icon" });
+			setIcon(sizeIconSpan, "file-text");
+			sizeSpan.createSpan({ text: ` ${file.size}` });
 
-			item.onclick = async (e) => {
+			item.onclick = (e) => {
 				e.stopPropagation();
 				e.preventDefault();
-
-				let leaf;
-				// Check for modifier keys to open in new split
-				// Mac: Cmd+Opt, Windows: Ctrl+Alt
-				if ((e.metaKey && e.altKey) || (e.ctrlKey && e.altKey)) {
-					leaf = this.app.workspace.getLeaf("split", "vertical");
-				} else {
-					leaf = this.app.workspace.getLeaf(false);
-				}
-				await leaf.openFile(file);
-
-				const view = leaf.view;
-				if (view instanceof MarkdownView) {
-					const editor = view.editor;
-					const lastLine = editor.lineCount() - 1;
-					const lastLineContent = editor.getLine(lastLine);
-					editor.setCursor({
-						line: lastLine,
-						ch: lastLineContent.length,
-					});
-					editor.focus();
-				}
+				this.openFileAt(file.path, null, e);
 			};
 		});
 	}
 
-	renderTaskList(
-		container: HTMLElement,
-		tasks: TaskItem[] = this.filteredTasks,
-	) {
+	renderTaskList(container: HTMLElement, tasks: TaskRecord[]) {
 		if (tasks.length === 0) {
 			container.createEl("p", { text: t("NO_TASKS_FOUND") });
 			return;
@@ -691,8 +723,8 @@ export class MiddleSection extends Component {
 			const item = container.createDiv({ cls: "task-item" });
 
 			const header = item.createDiv({ cls: "task-item-header" });
-			header.createEl("span", { text: task.file.basename });
-			const date = new Date(task.file.stat.ctime).toLocaleDateString();
+			header.createEl("span", { text: task.noteBasename });
+			const date = new Date(task.noteCtime).toLocaleDateString();
 			header.createEl("span", { text: date });
 
 			const content = item.createDiv({ cls: "task-content" });
@@ -705,9 +737,8 @@ export class MiddleSection extends Component {
 				type: "checkbox",
 				cls: "task-checkbox",
 			});
-			// Explicitly allow pointer events to ensure click is captured
 			checkbox.setCssStyles({ pointerEvents: "auto", marginTop: "0" });
-			checkbox.checked = task.status !== " ";
+			checkbox.checked = task.isCompleted;
 			checkbox.onclick = async (e) => {
 				e.stopPropagation();
 				await this.onTaskToggle(task);
@@ -726,14 +757,14 @@ export class MiddleSection extends Component {
 				"aria-label",
 				t("CONFIRM_DELETE_TASK_TITLE"),
 			);
-		deleteBtn.setCssStyles({
-			opacity: "0", // Initially hidden
-			transition: "opacity 0.2s ease",
-			marginLeft: "8px",
-			border: "none",
-			background: "transparent",
-			cursor: "pointer",
-		});
+			deleteBtn.setCssStyles({
+				opacity: "0",
+				transition: "opacity 0.2s ease",
+				marginLeft: "8px",
+				border: "none",
+				background: "transparent",
+				cursor: "pointer",
+			});
 
 			item.onmouseenter = () => {
 				deleteBtn.setCssStyles({ opacity: "0.7" });
@@ -751,22 +782,19 @@ export class MiddleSection extends Component {
 			};
 			void MarkdownRenderer.render(
 				this.app,
-				task.content,
+				task.text,
 				textSpan,
-				task.file.path,
+				task.path,
 				this,
 			).then(() => {
-				// Remove paragraph margins to keep it inline-like
 				const p = textSpan.querySelector("p");
 				if (p) {
 					p.setCssStyles({ margin: "0", display: "inline" });
 				}
 
-				// Handle internal links (preview and navigation)
 				const internalLinks =
 					textSpan.querySelectorAll("a.internal-link");
 				internalLinks.forEach((link) => {
-					// Hover preview
 					link.addEventListener("mouseenter", (e) => {
 						this.app.workspace.trigger("hover-link", {
 							event: e,
@@ -774,23 +802,22 @@ export class MiddleSection extends Component {
 							hoverParent: textSpan,
 							targetEl: link,
 							linktext: link.getAttribute("data-href"),
-							sourcePath: task.file.path,
+							sourcePath: task.path,
 						});
 					});
 
-				// Click navigation
-				link.addEventListener("click", (evt) => {
-					void (async () => {
-						const e = evt as MouseEvent;
-						e.preventDefault();
-						e.stopPropagation();
-						const href = link.getAttribute("data-href");
-						if (href) {
+					link.addEventListener("click", (evt) => {
+						void (async () => {
+							const e = evt as MouseEvent;
+							e.preventDefault();
+							e.stopPropagation();
+							const href = link.getAttribute("data-href");
+							if (!href) return;
 							const { path } = parseLinktext(href);
 							const file =
 								this.app.metadataCache.getFirstLinkpathDest(
 									path,
-									task.file.path,
+									task.path,
 								);
 
 							if (file) {
@@ -824,19 +851,16 @@ export class MiddleSection extends Component {
 									editor.focus();
 								}
 							} else {
-								// Fallback for non-existent files
 								void this.app.workspace.openLinkText(
 									href,
-									task.file.path,
+									task.path,
 									e.metaKey || e.ctrlKey,
 								);
 							}
-						}
-					})();
-				});
+						})();
+					});
 				});
 
-				// Handle external links (stop propagation to avoid opening task file)
 				const externalLinks =
 					textSpan.querySelectorAll("a.external-link");
 				externalLinks.forEach((link) => {
@@ -846,21 +870,18 @@ export class MiddleSection extends Component {
 				});
 			});
 
-			item.onclick = async (e) => {
+			item.onclick = (e) => {
 				const target = e.target as HTMLElement;
-				// Prevent triggering if clicking checkbox directly
 				if (
 					target instanceof HTMLInputElement &&
 					target.type === "checkbox"
 				) {
 					return;
 				}
-				// Prevent triggering if clicking a link (internal or external)
 				if (target.tagName === "A" || target.closest("a")) {
 					return;
 				}
 
-				// Handle selection state
 				container.querySelectorAll(".task-item").forEach((el) => {
 					el.removeClass("is-selected");
 				});
@@ -868,30 +889,7 @@ export class MiddleSection extends Component {
 
 				e.stopPropagation();
 				e.preventDefault();
-
-				let leaf;
-				// Check for modifier keys to open in new split
-				// Mac: Cmd+Opt, Windows: Ctrl+Alt
-				if ((e.metaKey && e.altKey) || (e.ctrlKey && e.altKey)) {
-					leaf = this.app.workspace.getLeaf("split", "vertical");
-				} else {
-					leaf = this.app.workspace.getLeaf(false);
-				}
-
-				await leaf.openFile(task.file, {
-					eState: { line: task.line },
-				});
-
-				const view = leaf.view;
-				if (view instanceof MarkdownView) {
-					const editor = view.editor;
-					const lineContent = editor.getLine(task.line);
-					editor.setCursor({
-						line: task.line,
-						ch: lineContent.length,
-					});
-					editor.focus();
-				}
+				this.openFileAt(task.path, task.line, e);
 			};
 		});
 	}

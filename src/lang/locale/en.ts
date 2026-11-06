@@ -137,6 +137,10 @@ export default {
 	TDL_OUTPUT_HEADING: "Output (THINK)",
 	// TDL Outcome Heading
 	TDL_OUTCOME_HEADING: "Outcome (DO)",
+	// Task / Goal / Review section headings
+	TDL_TASK_HEADING: "Tasks",
+	TDL_GOAL_HEADING: "Goal",
+	TDL_REVIEW_HEADING: "Review",
 
 	// Custom Filters Settings
 	SETTINGS_CUSTOM_FILTERS_NAME: "Custom Filters",

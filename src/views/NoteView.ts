@@ -1,8 +1,6 @@
 import {
 	ItemView,
 	WorkspaceLeaf,
-	TFile,
-	TFolder,
 	debounce,
 	Notice,
 	ViewStateResult,
@@ -14,19 +12,27 @@ import { SavedQuery } from "../settings";
 import {
 	Category,
 	FilterState,
-	TaskItem,
 	SortOption,
 	SortOrder,
 	GroupOption,
 	PaginationInfo,
-	FrontmatterValue,
 	NoteViewState,
 } from "../models/types";
+import type { NoteFacets, NoteRecord } from "../data/types";
+import { collectFacets } from "../data/note-source";
+import { queryNotes } from "../data/note-query";
+import { sortNotes } from "../data/sort";
+import {
+	createDefaultFilterState,
+	savedQueryToFilterState,
+} from "../data/saved-query-adapter";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RightSidebar } from "./components/RightSidebar";
 import { MiddleSection } from "./components/MiddleSection";
 import { SaveQueryModal } from "../ui/SaveQueryModal";
 import { ConfirmModal } from "../ui/ConfirmModal";
+
+const IOO_TYPES = ["Input", "Output", "Outcome"];
 
 export class NoteView extends ItemView {
 	plugin: IotoDashboardPlugin;
@@ -42,11 +48,10 @@ export class NoteView extends ItemView {
 	isZenMode = false;
 	isQuickSearchVisible = false;
 
-	// Data
-	files: TFile[] = [];
-	filteredFiles: TFile[] = [];
-	tasks: TaskItem[] = []; // Empty
-	filteredTasks: TaskItem[] = []; // Empty
+	// Data (consumed from VaultIndex only)
+	notes: NoteRecord[] = [];
+	filteredFiles: NoteRecord[] = [];
+	facets: NoteFacets = { projects: [], statuses: [], subjects: [] };
 
 	// Pagination
 	pagination: PaginationInfo = {
@@ -61,20 +66,7 @@ export class NoteView extends ItemView {
 	};
 
 	// Filters
-	filters: FilterState = {
-		name: "",
-		project: "",
-		subject: "",
-		dateType: "created",
-		dateStart: "",
-		dateEnd: "",
-		datePreset: "all",
-		status: "all",
-		fileStatus: "",
-		taskType: [],
-		noteType: ["Input", "Output", "Outcome"], // Default to all
-		custom: {},
-	};
+	filters: FilterState = createDefaultFilterState();
 
 	// UI Elements
 	middleContainer: HTMLElement;
@@ -83,39 +75,11 @@ export class NoteView extends ItemView {
 	leftSidebar: LeftSidebar | null = null;
 	rightSidebar: RightSidebar | null = null;
 
-	// Caches
-	projectCache: string[] | null = null;
-	statusCache: string[] | null = null;
-	subjectCache: string[] | null = null;
-
-	// Debounced refresh for file changes
 	requestRefresh = debounce(
-		async (file: TFile) => {
-			if (this.isFileInIOO(file)) {
-				// Invalidate caches
-				this.projectCache = null;
-				this.statusCache = null;
-				this.subjectCache = null;
-
-				await this.refreshFiles();
-				this.renderMiddleColumn();
-			}
-		},
-		500,
-		true,
-	);
-
-	// Debounced refresh for file deletion
-	debouncedDeleteRefresh = debounce(
-		() => {
-			// Invalidate caches
-			this.projectCache = null;
-			this.statusCache = null;
-			this.subjectCache = null;
-
-			void this.refreshFiles().then(() => {
-				this.renderMiddleColumn();
-			});
+		async () => {
+			await this.refreshFiles();
+			this.renderMiddleColumn();
+			this.renderRightColumn();
 		},
 		500,
 		true,
@@ -149,34 +113,17 @@ export class NoteView extends ItemView {
 		if (this.rightPanelCollapsed) grid.addClass("right-collapsed");
 		if (this.isZenMode) grid.addClass("zen-mode");
 
-		// Left Column: Navigation
 		const leftCol = grid.createDiv({ cls: "dashboard-left" });
 		this.renderLeftColumn(leftCol);
 
-		// Middle Column: Content
 		this.middleContainer = grid.createDiv({ cls: "dashboard-middle" });
-
-		// Right Column: Filters
 		this.rightContainer = grid.createDiv({ cls: "dashboard-right" });
 
-		// Initial Load
 		await this.refreshFiles();
 		this.renderMiddleColumn();
 		this.renderRightColumn();
 
-		// Register file change listener
-		this.registerEvent(
-			this.app.metadataCache.on("changed", (file) => {
-				if (file instanceof TFile) this.requestRefresh(file);
-			}),
-		);
-		this.registerEvent(
-			this.app.vault.on("delete", (file) => {
-				if (file instanceof TFile && this.isFileInIOO(file)) {
-					this.debouncedDeleteRefresh();
-				}
-			}),
-		);
+		this.register(this.plugin.index.subscribe(() => this.requestRefresh()));
 	}
 
 	async onClose() {
@@ -216,18 +163,16 @@ export class NoteView extends ItemView {
 		if (s.groupOption) this.groupOption = s.groupOption;
 		await super.setState(state, result);
 
-		// Restore filters from saved query if active
 		if (this.activeQueryId) {
 			const query = this.plugin.settings.savedQueries.find(
 				(q) => q.id === this.activeQueryId,
 			);
 			if (query) {
-				this.filters = { ...this.filters, ...query.filters };
+				this.filters = savedQueryToFilterState(query);
 				this.activeQueryName = query.name;
 			}
 		}
 
-		// Refresh UI
 		const leftCol = this.contentEl.querySelector(".dashboard-left");
 		if (leftCol) {
 			await this.refreshFiles();
@@ -242,266 +187,26 @@ export class NoteView extends ItemView {
 		this.renderMiddleColumn();
 	}
 
-	isFileInIOO(file: TFile): boolean {
-		const path = file.path;
-		const settings = this.plugin.settings;
-		return (
-			path.startsWith(settings.inputFolder) ||
-			path.startsWith(settings.outputFolder) ||
-			path.startsWith(settings.outcomeFolder)
-		);
-	}
-
 	async refreshFiles() {
-		const settings = this.plugin.settings;
-		const inputFiles = this.getFilesInFolder(settings.inputFolder);
-		const outputFiles = this.getFilesInFolder(settings.outputFolder);
-		const outcomeFiles = this.getFilesInFolder(settings.outcomeFolder);
-
-		this.files = [...inputFiles, ...outputFiles, ...outcomeFiles];
-		this.applyFilters();
-	}
-
-	getFilesInFolder(folderPath: string): TFile[] {
-		const folder = this.app.vault.getAbstractFileByPath(folderPath);
-		if (folder && folder instanceof TFolder) {
-			return this.getAllFiles(folder);
-		}
-		return [];
-	}
-
-	getAllFiles(folder: TFolder): TFile[] {
-		let files: TFile[] = [];
-		for (const child of folder.children) {
-			if (child instanceof TFile) {
-				if (child.extension === "md") {
-					files.push(child);
-				}
-			} else if (child instanceof TFolder) {
-				files.push(...this.getAllFiles(child));
-			}
-		}
-		return files;
-	}
-
-	getAllProjects(): string[] {
-		if (this.projectCache) return this.projectCache;
-
-		const projects = new Set<string>();
-		const files = this.app.vault.getMarkdownFiles();
-		for (const file of files) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
-			if (project) {
-				projects.add(String(project));
-			}
-		}
-		this.projectCache = Array.from(projects).sort();
-		return this.projectCache;
-	}
-
-	getAllStatuses(): string[] {
-		if (this.statusCache) return this.statusCache;
-
-		const statuses = new Set<string>();
-		const files = this.app.vault.getMarkdownFiles();
-		for (const file of files) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const status = cache?.frontmatter?.["Status"] as FrontmatterValue;
-			if (status) {
-				statuses.add(String(status));
-			}
-		}
-		this.statusCache = Array.from(statuses).sort();
-		return this.statusCache;
-	}
-
-	getAllSubjects(): string[] {
-		if (this.subjectCache) return this.subjectCache;
-
-		const subjects = new Set<string>();
-		const files = this.app.vault.getMarkdownFiles();
-		for (const file of files) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const subject = cache?.frontmatter?.["Subject"] as FrontmatterValue;
-			if (Array.isArray(subject)) {
-				subject.forEach((s) => {
-					if (s !== null && s !== undefined && String(s).trim()) {
-						subjects.add(String(s));
-					}
-				});
-			} else if (subject !== null && subject !== undefined) {
-				const value = String(subject);
-				if (value.trim()) subjects.add(value);
-			}
-		}
-		this.subjectCache = Array.from(subjects).sort();
-		return this.subjectCache;
+		const snapshot = await this.plugin.index.getSnapshot();
+		this.notes = snapshot.notes.filter((note) =>
+			IOO_TYPES.includes(note.ioType),
+		);
+		this.facets = collectFacets(snapshot.notes);
+		this.applyFilters(false);
 	}
 
 	applyFilters(render = true) {
-		this.filteredFiles = this.files.filter((file) => {
-			// 1. Note Type Filter
-			let typeMatch = false;
-			const settings = this.plugin.settings;
-			if (file.path.startsWith(settings.inputFolder))
-				typeMatch = this.filters.noteType?.includes("Input") ?? false;
-			else if (file.path.startsWith(settings.outputFolder))
-				typeMatch = this.filters.noteType?.includes("Output") ?? false;
-			else if (file.path.startsWith(settings.outcomeFolder))
-				typeMatch = this.filters.noteType?.includes("Outcome") ?? false;
+		this.filteredFiles = sortNotes(
+			queryNotes(
+				this.notes,
+				this.filters,
+				this.plugin.settings.customFilters,
+			),
+			this.sortOption,
+			this.sortOrder,
+		);
 
-			if (!typeMatch) return false;
-
-			// 2. Name Filter
-			if (this.filters.name) {
-				if (
-					!file.basename
-						.toLowerCase()
-						.includes(this.filters.name.toLowerCase())
-				)
-					return false;
-			}
-
-			// 3. Project Filter
-			if (this.filters.project) {
-				const cache = this.app.metadataCache.getFileCache(file);
-				const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
-				if (
-					!project ||
-					!String(project)
-						.toLowerCase()
-						.includes(this.filters.project.toLowerCase())
-				) {
-					return false;
-				}
-			}
-
-			// 4. Subject Filter
-			if (this.filters.subject) {
-				const cache = this.app.metadataCache.getFileCache(file);
-				const subject = cache?.frontmatter?.["Subject"] as FrontmatterValue;
-				const filterVal = this.filters.subject.toLowerCase();
-				if (Array.isArray(subject)) {
-					const match = subject.some((s) =>
-						String(s).toLowerCase().includes(filterVal),
-					);
-					if (!match) return false;
-				} else {
-					if (
-						subject === null ||
-						subject === undefined ||
-						!String(subject).toLowerCase().includes(filterVal)
-					) {
-						return false;
-					}
-				}
-			}
-
-			// 5. Date Filter
-			const dateValue =
-				this.filters.dateType === "created"
-					? file.stat.ctime
-					: file.stat.mtime;
-			const date = new Date(dateValue);
-
-			if (
-				this.filters.datePreset !== "all" &&
-				this.filters.datePreset !== "custom"
-			) {
-				const now = new Date();
-				let days = 0;
-				if (this.filters.datePreset === "last3days") days = 3;
-				else if (this.filters.datePreset === "last1day") days = 1;
-				else if (this.filters.datePreset === "last7days") days = 7;
-				else if (this.filters.datePreset === "last14days") days = 14;
-				else if (this.filters.datePreset === "last30days") days = 30;
-
-				const startDate = new Date();
-				startDate.setDate(now.getDate() - days);
-				startDate.setHours(0, 0, 0, 0);
-
-				if (date < startDate) return false;
-			} else if (this.filters.datePreset === "custom") {
-				if (this.filters.dateStart) {
-					const startDate = new Date(this.filters.dateStart);
-					if (date < startDate) return false;
-				}
-
-				if (this.filters.dateEnd) {
-					const endDate = new Date(this.filters.dateEnd);
-					endDate.setHours(23, 59, 59, 999);
-					if (date > endDate) return false;
-				}
-			}
-
-			// 6. File Status Filter
-			if (this.filters.fileStatus) {
-				const cache = this.app.metadataCache.getFileCache(file);
-				const status = cache?.frontmatter?.["Status"] as FrontmatterValue;
-				if (
-					!status ||
-					!String(status)
-						.toLowerCase()
-						.includes(this.filters.fileStatus.toLowerCase())
-				) {
-					return false;
-				}
-			}
-
-			// 7. Custom Filters (Frontmatter)
-			if (
-				this.plugin.settings.customFilters &&
-				this.plugin.settings.customFilters.length > 0 &&
-				this.filters.custom
-			) {
-				const cache = this.app.metadataCache.getFileCache(file);
-				const frontmatter = cache?.frontmatter;
-
-				for (const filter of this.plugin.settings.customFilters) {
-					const filterValue = this.filters.custom[filter.name] as FrontmatterValue;
-					if (
-						filterValue === undefined ||
-						filterValue === "" ||
-						filterValue === "all"
-					)
-						continue;
-
-					const fileValue = frontmatter
-						? frontmatter[filter.name] as FrontmatterValue
-						: undefined;
-
-					if (filter.type === "text" || filter.type === "list") {
-						if (!fileValue) return false;
-						const fileValStr = String(fileValue).toLowerCase();
-						const filterValStr = String(filterValue).toLowerCase();
-						if (!fileValStr.includes(filterValStr)) return false;
-					} else if (filter.type === "number") {
-						if (fileValue === undefined) return false;
-						if (Number(fileValue) !== Number(filterValue))
-							return false;
-					} else if (filter.type === "boolean") {
-						const boolFilter = filterValue === "true";
-						const boolFileValue =
-							fileValue === true ||
-							fileValue === "true" ||
-							fileValue === "True";
-						if (boolFileValue !== boolFilter) return false;
-					} else if (filter.type === "date") {
-						if (!fileValue) return false;
-						if (String(fileValue) !== String(filterValue))
-							return false;
-					}
-				}
-			}
-
-			return true;
-		});
-
-		// Sort
-		this.sortFiles(this.filteredFiles);
-
-		// Pagination
 		this.pagination.totalItems = this.filteredFiles.length;
 		this.pagination.totalPages = Math.ceil(
 			this.pagination.totalItems / this.pagination.pageSize,
@@ -513,22 +218,6 @@ export class NoteView extends ItemView {
 		}
 
 		if (render) this.renderMiddleColumn();
-	}
-
-	sortFiles(files: TFile[]) {
-		files.sort((a, b) => {
-			let result = 0;
-			if (this.sortOption === "modified") {
-				result = a.stat.mtime - b.stat.mtime;
-			} else if (this.sortOption === "created") {
-				result = a.stat.ctime - b.stat.ctime;
-			} else if (this.sortOption === "name") {
-				result = a.basename.localeCompare(b.basename);
-			} else if (this.sortOption === "size") {
-				result = a.stat.size - b.stat.size;
-			}
-			return this.sortOrder === "asc" ? result : -result;
-		});
 	}
 
 	renderLeftColumn(container: HTMLElement) {
@@ -543,20 +232,7 @@ export class NoteView extends ItemView {
 					this.activeCategory = category;
 					this.activeQueryId = null;
 					this.activeQueryName = null;
-					this.filters = {
-						name: "",
-						project: "",
-						subject: "",
-						dateType: "created",
-						dateStart: "",
-						dateEnd: "",
-						datePreset: "all",
-						status: "all",
-						fileStatus: "",
-						taskType: [],
-						noteType: ["Input", "Output", "Outcome"],
-						custom: {},
-					};
+					this.filters = createDefaultFilterState();
 					this.applyFilters();
 					this.renderLeftColumn(container);
 					this.renderRightColumn();
@@ -564,7 +240,7 @@ export class NoteView extends ItemView {
 				}
 			},
 			(query) => {
-				this.loadSavedQuery(query);
+				void this.loadSavedQuery(query);
 			},
 			["Notes"],
 		);
@@ -576,7 +252,6 @@ export class NoteView extends ItemView {
 			this.removeChild(this.middleSection);
 		}
 
-		// Pagination Logic
 		const pageSize = this.plugin.settings.pageSize;
 		const totalNotes = this.filteredFiles.length;
 		const maxNotePage = Math.max(1, Math.ceil(totalNotes / pageSize));
@@ -584,9 +259,9 @@ export class NoteView extends ItemView {
 		if (this.pagination.currentPage > maxNotePage)
 			this.pagination.currentPage = maxNotePage;
 
-		const noteStart = (this.pagination.currentPage - 1) * pageSize;
-		const noteEnd = noteStart + pageSize;
-		const paginatedFiles = this.filteredFiles.slice(noteStart, noteEnd);
+		this.pagination.pageSize = pageSize;
+		this.pagination.totalItems = totalNotes;
+		this.pagination.totalPages = maxNotePage;
 
 		this.middleSection = new MiddleSection(
 			this.app,
@@ -595,8 +270,8 @@ export class NoteView extends ItemView {
 			this.activeTab,
 			this.activeQueryId,
 			this.activeQueryName,
-			paginatedFiles,
-			this.filteredTasks,
+			this.filteredFiles,
+			[],
 			this.isZenMode,
 			this.sortOption,
 			this.sortOrder,
@@ -618,18 +293,13 @@ export class NoteView extends ItemView {
 				this.app.workspace.requestSaveLayout();
 			},
 			(id) => {
-				// On Edit Query
-				// For now, we can just open the save modal again to rename?
-				// Or implementing edit name logic if needed.
-				// But typically edit means changing filters and clicking update.
-				// This callback seems to be for renaming.
 				const query = this.plugin.settings.savedQueries.find(
 					(q) => q.id === id,
 				);
-				if (query) {
-					new SaveQueryModal(
-						this.app,
-						t("MODAL_SAVE_TITLE"),
+				if (!query) return;
+				new SaveQueryModal(
+					this.app,
+					t("MODAL_SAVE_TITLE"),
 					query.name,
 					(newName) => {
 						query.name = newName;
@@ -643,7 +313,6 @@ export class NoteView extends ItemView {
 						});
 					},
 				).open();
-				}
 			},
 			(id) => {
 				void this.deleteSavedQuery(id);
@@ -675,7 +344,7 @@ export class NoteView extends ItemView {
 				this.toggleQuickSearch();
 			},
 			this.pagination,
-			true, // hideTabs
+			true, // hide tabs
 			{
 				input: this.plugin.settings.inputFolder,
 				output: this.plugin.settings.outputFolder,
@@ -693,90 +362,74 @@ export class NoteView extends ItemView {
 			this.filters,
 			this.activeTab,
 			this.activeQueryId,
-			this.getAllProjects(), // allProjects
-			this.getAllStatuses(), // allStatuses
-			this.getAllSubjects(), // allSubjects
+			this.facets.projects,
+			this.facets.statuses,
+			this.facets.subjects,
 			this.plugin.settings.customFilters,
 			(filters) => {
 				this.filters = filters;
 				this.applyFilters();
 			},
 			() => {
-				// Reset
-				this.filters = {
-					name: "",
-					project: "",
-					subject: "",
-					dateType: "created",
-					dateStart: "",
-					dateEnd: "",
-					datePreset: "all",
-					status: "all",
-					fileStatus: "",
-					taskType: [],
-					noteType: ["Input", "Output", "Outcome"],
-					custom: {},
-				};
+				this.filters = createDefaultFilterState();
 				this.applyFilters();
 				this.renderRightColumn();
 			},
-		() => {
-			// On Save Query
-			new SaveQueryModal(
-				this.app,
-				t("MODAL_SAVE_TITLE"),
-				"",
-				(name) => {
-					const existing = this.plugin.settings.savedQueries.find(
-						(q) => q.name === name,
-					);
-					if (existing) {
-						new Notice(t("NOTICE_QUERY_EXISTS"));
-						return;
-					}
+			() => {
+				new SaveQueryModal(
+					this.app,
+					t("MODAL_SAVE_TITLE"),
+					"",
+					(name) => {
+						const existing = this.plugin.settings.savedQueries.find(
+							(q) => q.name === name,
+						);
+						if (existing) {
+							new Notice(t("NOTICE_QUERY_EXISTS"));
+							return;
+						}
 
-					const newQuery: SavedQuery = {
-						id: Date.now().toString(),
-						name,
-						category: "Notes",
-						tab: "Notes",
-						type: "Note",
+						const newQuery: SavedQuery = {
+							id: Date.now().toString(),
+							name,
+							category: "Notes",
+							tab: "Notes",
+							type: "Note",
+							sortOption: this.sortOption,
+							sortOrder: this.sortOrder,
+							groupOption: this.groupOption,
+							filters: { ...this.filters },
+						};
+						this.plugin.settings.savedQueries.push(newQuery);
+						void this.plugin.saveSettings().then(() => {
+							this.loadSavedQuery(newQuery);
+							new Notice(t("NOTICE_QUERY_SAVED"));
+						});
+					},
+				).open();
+			},
+			() => {
+				if (!this.activeQueryId) return;
+				const queryIndex = this.plugin.settings.savedQueries.findIndex(
+					(q) => q.id === this.activeQueryId,
+				);
+				if (queryIndex !== -1) {
+					const existing =
+						this.plugin.settings.savedQueries[queryIndex];
+					if (!existing) return;
+					this.plugin.settings.savedQueries[queryIndex] = {
+						...existing,
 						sortOption: this.sortOption,
 						sortOrder: this.sortOrder,
 						groupOption: this.groupOption,
 						filters: { ...this.filters },
 					};
-					this.plugin.settings.savedQueries.push(newQuery);
 					void this.plugin.saveSettings().then(() => {
-						this.loadSavedQuery(newQuery);
-						new Notice(t("NOTICE_QUERY_SAVED"));
+						new Notice(t("NOTICE_QUERY_UPDATED"));
 					});
-				},
-			).open();
-		},
-		() => {
-			// On Update Query
-			if (!this.activeQueryId) return;
-			const queryIndex = this.plugin.settings.savedQueries.findIndex(
-				(q) => q.id === this.activeQueryId,
-			);
-			if (queryIndex !== -1) {
-				const existing =
-					this.plugin.settings.savedQueries[queryIndex];
-				if (!existing) return;
-				this.plugin.settings.savedQueries[queryIndex] = {
-					...existing,
-					sortOption: this.sortOption,
-					sortOrder: this.sortOrder,
-					groupOption: this.groupOption,
-					filters: { ...this.filters },
-				};
-				void this.plugin.saveSettings().then(() => {
-					new Notice(t("NOTICE_QUERY_UPDATED"));
-				});
-			}
-		},
-			true, // showTaskTypeFilter (which actually controls note type filter here)
+				}
+			},
+			true, // note type filter
 		);
 		this.rightSidebar.render();
 	}
@@ -784,26 +437,7 @@ export class NoteView extends ItemView {
 	loadSavedQuery(query: SavedQuery) {
 		this.activeQueryId = query.id;
 		this.activeQueryName = query.name;
-
-		const defaultFilters: FilterState = {
-			name: "",
-			project: "",
-			subject: "",
-			dateType: "created",
-			dateStart: "",
-			dateEnd: "",
-			datePreset: "all",
-			status: "all",
-			fileStatus: "",
-			taskType: [],
-			noteType: ["Input", "Output", "Outcome"],
-			custom: {},
-		};
-
-		this.filters = {
-			...defaultFilters,
-			...query.filters,
-		};
+		this.filters = savedQueryToFilterState(query);
 
 		this.sortOption = query.sortOption;
 		this.sortOrder = query.sortOrder;
@@ -834,21 +468,7 @@ export class NoteView extends ItemView {
 					if (this.activeQueryId === id) {
 						this.activeQueryId = null;
 						this.activeQueryName = null;
-						// Reset filters to default when deleting active query
-						this.filters = {
-							name: "",
-							project: "",
-							subject: "",
-							dateType: "created",
-							dateStart: "",
-							dateEnd: "",
-							datePreset: "all",
-							status: "all",
-							fileStatus: "",
-							taskType: [],
-							noteType: ["Input", "Output", "Outcome"],
-							custom: {},
-						};
+						this.filters = createDefaultFilterState();
 						this.applyFilters();
 						this.renderRightColumn();
 					}

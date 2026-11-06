@@ -2,10 +2,8 @@ import {
 	ItemView,
 	WorkspaceLeaf,
 	TFile,
-	TFolder,
 	Notice,
 	debounce,
-	TAbstractFile,
 	ViewStateResult,
 } from "obsidian";
 import { DASHBOARD_VIEW_TYPE } from "../models/constants";
@@ -17,17 +15,58 @@ import { SavedQuery } from "../settings";
 import {
 	Category,
 	FilterState,
-	TaskItem,
 	SortOption,
 	SortOrder,
 	GroupOption,
-	FrontmatterValue,
 	DashboardViewState,
 } from "../models/types";
+import type {
+	IoType,
+	NoteFacets,
+	NoteRecord,
+	SectionRole,
+	TaskRecord,
+	TaskScope,
+} from "../data/types";
+import { collectFacets } from "../data/note-source";
+import { queryNotes } from "../data/note-query";
+import { queryTasks } from "../data/task-query";
+import { sortNotes, sortTasks } from "../data/sort";
+import {
+	createDefaultFilterState,
+	savedQueryToFilterState,
+} from "../data/saved-query-adapter";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RightSidebar } from "./components/RightSidebar";
 import { MiddleSection } from "./components/MiddleSection";
-import { IotoSettingsService } from "../services/ioto-settings-services";
+
+function categoryToIoType(category: Category): IoType {
+	switch (category) {
+		case "Input":
+			return "Input";
+		case "Output":
+			return "Output";
+		case "Outcome":
+			return "Outcome";
+		case "Tasks":
+			return "Task";
+		default:
+			return "Unknown";
+	}
+}
+
+function categoryToSectionRole(category: Category): SectionRole {
+	switch (category) {
+		case "Input":
+			return "input";
+		case "Output":
+			return "output";
+		case "Outcome":
+			return "outcome";
+		default:
+			return "task";
+	}
+}
 
 export class DashboardView extends ItemView {
 	plugin: IotoDashboardPlugin;
@@ -42,68 +81,31 @@ export class DashboardView extends ItemView {
 	isZenMode = false;
 	isQuickSearchVisible = false;
 
-	// Data
-	files: TFile[] = [];
-	filteredFiles: TFile[] = [];
-	tasks: TaskItem[] = [];
-	filteredTasks: TaskItem[] = [];
+	// Data (consumed from VaultIndex only)
+	files: NoteRecord[] = [];
+	filteredFiles: NoteRecord[] = [];
+	tasks: TaskRecord[] = [];
+	filteredTasks: TaskRecord[] = [];
+	facets: NoteFacets = { projects: [], statuses: [], subjects: [] };
 
 	// Pagination
 	noteCurrentPage = 1;
 	taskCurrentPage = 1;
 
 	// Filters
-	filters: FilterState = {
-		name: "",
-		project: "",
-		subject: "",
-		dateType: "created",
-		dateStart: "",
-		dateEnd: "",
-		datePreset: "all",
-		status: "all",
-		fileStatus: "",
-		custom: {},
-	};
+	filters: FilterState = createDefaultFilterState();
 
 	// UI Elements
 	middleContainer: HTMLElement;
 	rightContainer: HTMLElement;
 	middleSection: MiddleSection | null = null;
 
-	// Caches
-	projectCache: string[] | null = null;
-	statusCache: string[] | null = null;
-	subjectCache: string[] | null = null;
-
-	// Debounced refresh for file changes
+	// Debounced refresh on index change
 	requestRefresh = debounce(
-		async (file: TFile, isTaskFile: boolean) => {
-			// Invalidate caches
-			this.projectCache = null;
-			this.statusCache = null;
-			this.subjectCache = null;
-
-			if (isTaskFile) {
-				await this.updateTasksForFile(file);
-			}
-			this.applyFilters(false);
+		async () => {
+			await this.refreshFiles();
 			this.renderMiddleColumn();
-		},
-		500,
-		true,
-	);
-
-	// Debounced refresh for file deletion
-	debouncedDeleteRefresh = debounce(
-		() => {
-			// Invalidate caches
-			this.projectCache = null;
-			this.statusCache = null;
-			this.subjectCache = null;
-
-			this.applyFilters(false);
-			this.renderMiddleColumn();
+			this.renderRightColumn();
 		},
 		500,
 		true,
@@ -130,7 +132,6 @@ export class DashboardView extends ItemView {
 		const container = this.contentEl;
 		container.empty();
 		container.addClass("ioto-dashboard-view");
-		// Allow container to receive focus for keyboard events
 		container.setAttr("tabindex", "0");
 
 		const grid = container.createDiv({ cls: "dashboard-grid" });
@@ -138,28 +139,17 @@ export class DashboardView extends ItemView {
 		if (this.rightPanelCollapsed) grid.addClass("right-collapsed");
 		if (this.isZenMode) grid.addClass("zen-mode");
 
-		// Left Column: Navigation
 		const leftCol = grid.createDiv({ cls: "dashboard-left" });
 		this.renderLeftColumn(leftCol);
 
-		// Middle Column: Content
 		this.middleContainer = grid.createDiv({ cls: "dashboard-middle" });
-
-		// Right Column: Filters
 		this.rightContainer = grid.createDiv({ cls: "dashboard-right" });
 
-		// Initial Load
 		await this.refreshFiles();
 		this.renderMiddleColumn();
 		this.renderRightColumn();
 
-		// Register file change listener
-		this.registerEvent(
-			this.app.metadataCache.on("changed", this.onFileChange.bind(this)),
-		);
-		this.registerEvent(
-			this.app.vault.on("delete", this.onFileDelete.bind(this)),
-		);
+		this.register(this.plugin.index.subscribe(() => this.requestRefresh()));
 	}
 
 	async onClose() {
@@ -174,217 +164,22 @@ export class DashboardView extends ItemView {
 	}
 
 	async refreshFiles() {
-		// 1. Fetch Notes
-		let folderPath = "";
-		switch (this.activeCategory) {
-			case "Input":
-				folderPath = this.plugin.settings.inputFolder;
-				break;
-			case "Output":
-				folderPath = this.plugin.settings.outputFolder;
-				break;
-			case "Outcome":
-				folderPath = this.plugin.settings.outcomeFolder;
-				break;
-		}
-
-		const folder = this.app.vault.getAbstractFileByPath(folderPath);
-		if (folder && folder instanceof TFolder) {
-			this.files = this.getAllFiles(folder);
-		} else {
-			this.files = [];
-		}
-
-		// 2. Fetch Tasks
-		await this.fetchTasks();
-
-		// 3. Apply Filters
+		const snapshot = await this.plugin.index.getSnapshot();
+		this.facets = collectFacets(snapshot.notes);
+		this.files = snapshot.notes.filter(
+			(note) => note.ioType === categoryToIoType(this.activeCategory),
+		);
+		this.tasks = snapshot.tasks;
 		this.applyFilters();
 	}
 
-	getAllFiles(folder: TFolder): TFile[] {
-		let files: TFile[] = [];
-		for (const child of folder.children) {
-			if (child instanceof TFile) {
-				if (child.extension === "md") {
-					files.push(child);
-				}
-			} else if (child instanceof TFolder) {
-				files.push(...this.getAllFiles(child));
-			}
-		}
-		return files;
-	}
-
-	getAllProjects(): string[] {
-		if (this.projectCache) return this.projectCache;
-
-		const projects = new Set<string>();
-		const files = this.app.vault.getMarkdownFiles();
-		for (const file of files) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
-			if (project) {
-				projects.add(String(project));
-			}
-		}
-		this.projectCache = Array.from(projects).sort();
-		return this.projectCache;
-	}
-
-	getAllStatuses(): string[] {
-		if (this.statusCache) return this.statusCache;
-
-		const statuses = new Set<string>();
-		const files = this.app.vault.getMarkdownFiles();
-		for (const file of files) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const status = cache?.frontmatter?.["Status"] as FrontmatterValue;
-			if (status) {
-				statuses.add(String(status));
-			}
-		}
-		this.statusCache = Array.from(statuses).sort();
-		return this.statusCache;
-	}
-
-	getAllSubjects(): string[] {
-		if (this.subjectCache) return this.subjectCache;
-
-		const subjects = new Set<string>();
-		const files = this.app.vault.getMarkdownFiles();
-		for (const file of files) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const subject = cache?.frontmatter?.["Subject"] as FrontmatterValue;
-			if (Array.isArray(subject)) {
-				subject.forEach((s) => {
-					if (s !== null && s !== undefined && String(s).trim()) {
-						subjects.add(String(s));
-					}
-				});
-			} else if (subject !== null && subject !== undefined) {
-				const value = String(subject);
-				if (value.trim()) subjects.add(value);
-			}
-		}
-		this.subjectCache = Array.from(subjects).sort();
-		return this.subjectCache;
-	}
-
-	async fetchTasks() {
-		this.tasks = [];
-		const taskFolderPath = this.plugin.settings.taskFolder;
-		const taskFolder = this.app.vault.getAbstractFileByPath(taskFolderPath);
-
-		if (!taskFolder || !(taskFolder instanceof TFolder)) {
-			return;
-		}
-
-		const files = this.getAllFiles(taskFolder);
-		const results = await Promise.all(
-			files.map((f) => this.getTasksFromFile(f)),
-		);
-		this.tasks = results.flat();
-	}
-
-	async getTasksFromFile(file: TFile): Promise<TaskItem[]> {
-		const tasks: TaskItem[] = [];
-		const targetHeader = this.getTargetHeader(this.activeCategory);
-
-		const cache = this.app.metadataCache.getFileCache(file);
-		if (!cache || !cache.headings) return tasks;
-
-		const headings = cache.headings;
-
-		// Find the target header
-		const headingIndex = headings.findIndex(
-			(h) => h.heading === targetHeader,
-		);
-		if (headingIndex === -1) return tasks;
-
-		const targetHeading = headings[headingIndex];
-		if (!targetHeading) return tasks;
-
-		const startLine = targetHeading.position.start.line;
-
-		// Find end line
-		let endLine = Infinity;
-		for (let i = headingIndex + 1; i < headings.length; i++) {
-			const h = headings[i];
-			if (!h) continue;
-			if (h.level <= targetHeading.level) {
-				endLine = h.position.start.line;
-				break;
-			}
-		}
-
-		// Get list items in range
-		if (!cache.listItems) return tasks;
-		const relevantItems = cache.listItems.filter(
-			(item) =>
-				item.position.start.line > startLine &&
-				item.position.start.line < endLine &&
-				item.task !== undefined,
-		);
-
-		if (relevantItems.length > 0) {
-			// Read file content
-			const content = await this.app.vault.cachedRead(file);
-			const lines = content.split("\n");
-
-			for (const item of relevantItems) {
-				let text = lines[item.position.start.line];
-				if (text === undefined) continue;
-
-				// Strip checkbox pattern like "- [ ] " or "* [x] "
-				text = text.replace(/^(\s*)[-*+]\s*\[.\]\s*/, "");
-
-				if (!text.trim()) continue;
-
-				tasks.push({
-					file: file,
-					content: text,
-					status: item.task!,
-					line: item.position.start.line,
-				});
-			}
-		}
-		return tasks;
-	}
-
-	async updateTasksForFile(file: TFile) {
-		// Remove existing tasks for this file
-		this.tasks = this.tasks.filter((t) => t.file.path !== file.path);
-
-		// Fetch new tasks
-		const newTasks = await this.getTasksFromFile(file);
-
-		// Add new tasks
-		this.tasks.push(...newTasks);
-	}
-
-	getTargetHeader(category: Category): string {
-		const iotoServices = new IotoSettingsService(this.app);
-		const iotoSettings = iotoServices.getSettings();
-		switch (category) {
-			case "Input":
-				return (
-					iotoSettings?.LTDListInputSectionHeading ||
-					t("TDL_INPUT_HEADING")
-				);
-			case "Output":
-				return (
-					iotoSettings?.LTDListOutputSectionHeading ||
-					t("TDL_OUTPUT_HEADING")
-				);
-			case "Outcome":
-				return (
-					iotoSettings?.LTDListOutcomeSectionHeading ||
-					t("TDL_OUTCOME_HEADING")
-				);
-			default:
-				return "";
-		}
+	private taskScope(): TaskScope {
+		return {
+			folders: "task",
+			sections: [categoryToSectionRole(this.activeCategory)],
+			includeEmptyText: false,
+			includePlaceholders: false,
+		};
 	}
 
 	applyFilters(resetPage = true) {
@@ -393,212 +188,23 @@ export class DashboardView extends ItemView {
 			this.taskCurrentPage = 1;
 		}
 
-		// Filter Files
-		this.filteredFiles = this.files.filter((file) => {
-			return this.matchesFilter(file, file.basename, true);
-		});
-		this.sortFiles(this.filteredFiles);
+		const customFilters = this.plugin.settings.customFilters;
+		this.filteredFiles = sortNotes(
+			queryNotes(this.files, this.filters, customFilters),
+			this.sortOption,
+			this.sortOrder,
+		);
 
-		// Filter Tasks
-		this.filteredTasks = this.tasks.filter((task) => {
-			if (!this.matchesFilter(task.file, task.content, false))
-				return false;
-
-			// Status Filter
-			if (this.filters.status !== "all") {
-				const isCompleted = task.status !== " ";
-				if (this.filters.status === "completed" && !isCompleted)
-					return false;
-				if (this.filters.status === "incomplete" && isCompleted)
-					return false;
-			}
-
-			return true;
-		});
-		this.sortTasks(this.filteredTasks);
-	}
-
-	sortFiles(files: TFile[]) {
-		files.sort((a, b) => {
-			let result = 0;
-			if (this.sortOption === "modified") {
-				result = a.stat.mtime - b.stat.mtime;
-			} else if (this.sortOption === "created") {
-				result = a.stat.ctime - b.stat.ctime;
-			} else if (this.sortOption === "name") {
-				result = a.basename.localeCompare(b.basename);
-			} else if (this.sortOption === "size") {
-				result = a.stat.size - b.stat.size;
-			}
-			return this.sortOrder === "asc" ? result : -result;
-		});
-	}
-
-	sortTasks(tasks: TaskItem[]) {
-		tasks.sort((a, b) => {
-			let result = 0;
-			if (this.sortOption === "modified") {
-				result = a.file.stat.mtime - b.file.stat.mtime;
-			} else if (this.sortOption === "created") {
-				result = a.file.stat.ctime - b.file.stat.ctime;
-			} else if (this.sortOption === "name") {
-				result = a.file.basename.localeCompare(b.file.basename);
-			} else if (this.sortOption === "size") {
-				// Sort by task file size
-				result = a.file.stat.size - b.file.stat.size;
-			}
-			return this.sortOrder === "asc" ? result : -result;
-		});
-	}
-
-	matchesFilter(
-		file: TFile,
-		textContent: string,
-		includeFileStatus: boolean = true,
-	): boolean {
-		// 1. Name Filter (applies to File Name or Task Content)
-		if (
-			this.filters.name &&
-			!textContent.toLowerCase().includes(this.filters.name.toLowerCase())
-		) {
-			return false;
-		}
-
-		// 2. Project Filter
-		if (this.filters.project) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const project = cache?.frontmatter?.["Project"] as FrontmatterValue;
-			if (
-				!project ||
-				!String(project)
-					.toLowerCase()
-					.includes(this.filters.project.toLowerCase())
-			) {
-				return false;
-			}
-		}
-
-		// 3. Subject Filter (Notes only)
-		if (includeFileStatus && this.filters.subject) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const subject = cache?.frontmatter?.["Subject"] as FrontmatterValue;
-			const filterVal = this.filters.subject.toLowerCase();
-			if (Array.isArray(subject)) {
-				const match = subject.some((s) =>
-					String(s).toLowerCase().includes(filterVal),
-				);
-				if (!match) return false;
-			} else {
-				if (
-					subject === null ||
-					subject === undefined ||
-					!String(subject).toLowerCase().includes(filterVal)
-				) {
-					return false;
-				}
-			}
-		}
-
-		// 4. Date Filter
-		const dateValue =
-			this.filters.dateType === "created"
-				? file.stat.ctime
-				: file.stat.mtime;
-		const date = new Date(dateValue);
-
-		if (
-			this.filters.datePreset !== "all" &&
-			this.filters.datePreset !== "custom"
-		) {
-			const now = new Date();
-			let days = 0;
-			if (this.filters.datePreset === "last3days") days = 3;
-			else if (this.filters.datePreset === "last1day") days = 1;
-			else if (this.filters.datePreset === "last7days") days = 7;
-			else if (this.filters.datePreset === "last14days") days = 14;
-			else if (this.filters.datePreset === "last30days") days = 30;
-
-			const startDate = new Date();
-			startDate.setDate(now.getDate() - days);
-			startDate.setHours(0, 0, 0, 0);
-
-			if (date < startDate) return false;
-		} else if (this.filters.datePreset === "custom") {
-			if (this.filters.dateStart) {
-				const startDate = new Date(this.filters.dateStart);
-				if (date < startDate) return false;
-			}
-
-			if (this.filters.dateEnd) {
-				const endDate = new Date(this.filters.dateEnd);
-				endDate.setHours(23, 59, 59, 999);
-				if (date > endDate) return false;
-			}
-		}
-
-		// 5. File Status Filter (new)
-		if (includeFileStatus && this.filters.fileStatus) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const status = cache?.frontmatter?.["Status"] as FrontmatterValue;
-			if (
-				!status ||
-				!String(status)
-					.toLowerCase()
-					.includes(this.filters.fileStatus.toLowerCase())
-			) {
-				return false;
-			}
-		}
-
-		// 6. Custom Filters
-		if (
-			this.plugin.settings.customFilters &&
-			this.plugin.settings.customFilters.length > 0 &&
-			this.filters.custom
-		) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const frontmatter = cache?.frontmatter;
-
-			for (const filter of this.plugin.settings.customFilters) {
-				const filterValue = this.filters.custom[filter.name] as FrontmatterValue;
-				if (
-					filterValue === undefined ||
-					filterValue === "" ||
-					filterValue === "all"
-				)
-					continue;
-
-				const fileValue = frontmatter
-					? frontmatter[filter.name] as FrontmatterValue
-					: undefined;
-
-				if (filter.type === "text" || filter.type === "list") {
-					// For text/list, we do a partial match or inclusion check
-					if (!fileValue) return false;
-
-					const fileValStr = String(fileValue).toLowerCase();
-					const filterValStr = String(filterValue).toLowerCase();
-
-					if (!fileValStr.includes(filterValStr)) return false;
-				} else if (filter.type === "number") {
-					if (fileValue === undefined) return false;
-					if (Number(fileValue) !== Number(filterValue)) return false;
-				} else if (filter.type === "boolean") {
-					const boolFilter = filterValue === "true";
-					// Loose equality for boolean check in frontmatter
-					const boolFileValue =
-						fileValue === true ||
-						fileValue === "true" ||
-						fileValue === "True";
-					if (boolFileValue !== boolFilter) return false;
-				} else if (filter.type === "date") {
-					if (!fileValue) return false;
-					if (String(fileValue) !== String(filterValue)) return false;
-				}
-			}
-		}
-
-		return true;
+		const scopedTasks = this.tasks.filter(
+			(task) =>
+				task.ioType === "Task" &&
+				task.sectionRole === categoryToSectionRole(this.activeCategory),
+		);
+		this.filteredTasks = sortTasks(
+			queryTasks(scopedTasks, this.filters, this.taskScope(), customFilters),
+			this.sortOption,
+			this.sortOrder,
+		);
 	}
 
 	renderLeftColumn(container: HTMLElement) {
@@ -607,46 +213,29 @@ export class DashboardView extends ItemView {
 			this.activeCategory,
 			this.activeQueryId,
 			this.leftPanelCollapsed,
-		this.plugin.settings.savedQueries.filter((q) => q.type === "all"),
-		(category) => {
-			this.activeCategory = category;
-			this.activeQueryId = null; // Reset active query when switching main category
-			// Update active class manually or re-render?
-			// renderLeftColumn re-renders the whole list, so it handles active class.
-			this.renderLeftColumn(container);
+			this.plugin.settings.savedQueries.filter((q) => q.type === "all"),
+			(category) => {
+				this.activeCategory = category;
+				this.activeQueryId = null;
+				this.renderLeftColumn(container);
 
-			void this.refreshFiles().then(() => {
-				this.renderMiddleColumn();
-				this.renderRightColumn();
-				this.app.workspace.requestSaveLayout();
-			});
-		},
-		(query) => {
-			void this.loadSavedQuery(query);
-		},
-	).render();
+				void this.refreshFiles().then(() => {
+					this.renderMiddleColumn();
+					this.renderRightColumn();
+					this.app.workspace.requestSaveLayout();
+				});
+			},
+			(query) => {
+				void this.loadSavedQuery(query);
+			},
+		).render();
 	}
 
 	async loadSavedQuery(query: SavedQuery) {
 		this.activeQueryId = query.id;
 		this.activeCategory = query.category;
 		this.activeTab = query.tab;
-		const defaultFilters: FilterState = {
-			name: "",
-			project: "",
-			subject: "",
-			dateType: "created",
-			dateStart: "",
-			dateEnd: "",
-			datePreset: "all",
-			status: "all",
-			fileStatus: "",
-			custom: {},
-		};
-		this.filters = {
-			...defaultFilters,
-			...structuredClone(query.filters),
-		};
+		this.filters = savedQueryToFilterState(query);
 
 		await this.refreshFiles();
 		this.renderLeftColumn(
@@ -672,12 +261,10 @@ export class DashboardView extends ItemView {
 			this.removeChild(this.middleSection);
 		}
 
-		// Pagination Logic
 		const pageSize = this.plugin.settings.pageSize;
 		const totalNotes = this.filteredFiles.length;
 		const totalTasks = this.filteredTasks.length;
 
-		// Clamp pages
 		const maxNotePage = Math.max(1, Math.ceil(totalNotes / pageSize));
 		const maxTaskPage = Math.max(1, Math.ceil(totalTasks / pageSize));
 
@@ -686,14 +273,6 @@ export class DashboardView extends ItemView {
 		if (this.taskCurrentPage > maxTaskPage)
 			this.taskCurrentPage = maxTaskPage;
 
-		const noteStart = (this.noteCurrentPage - 1) * pageSize;
-		const noteEnd = noteStart + pageSize;
-		const paginatedFiles = this.filteredFiles.slice(noteStart, noteEnd);
-
-		const taskStart = (this.taskCurrentPage - 1) * pageSize;
-		const taskEnd = taskStart + pageSize;
-		const paginatedTasks = this.filteredTasks.slice(taskStart, taskEnd);
-
 		this.middleSection = new MiddleSection(
 			this.app,
 			this.middleContainer,
@@ -701,8 +280,8 @@ export class DashboardView extends ItemView {
 			this.activeTab,
 			this.activeQueryId,
 			activeQueryName,
-			paginatedFiles,
-			paginatedTasks,
+			this.filteredFiles,
+			this.filteredTasks,
 			this.isZenMode,
 			this.sortOption,
 			this.sortOrder,
@@ -738,10 +317,10 @@ export class DashboardView extends ItemView {
 					},
 				).open();
 			},
-			async (task: TaskItem) => {
+			async (task: TaskRecord) => {
 				await this.toggleTaskStatus(task);
 			},
-			async (task: TaskItem) => {
+			async (task: TaskRecord) => {
 				await this.deleteTask(task);
 			},
 			() => {
@@ -847,20 +426,17 @@ export class DashboardView extends ItemView {
 		}
 		await super.setState(state, result);
 
-		// Restore filters from saved query if active
 		if (this.activeQueryId) {
 			const query = this.plugin.settings.savedQueries.find(
 				(q) => q.id === this.activeQueryId,
 			);
 			if (query) {
-				this.filters = structuredClone(query.filters) as FilterState;
-				// Ensure category and tab match the query
+				this.filters = savedQueryToFilterState(query);
 				this.activeCategory = query.category;
 				this.activeTab = query.tab;
 			}
 		}
 
-		// If the view is already rendered, refresh to reflect restored state
 		const leftCol = this.contentEl.querySelector(".dashboard-left");
 		if (leftCol) {
 			await this.refreshFiles();
@@ -870,26 +446,30 @@ export class DashboardView extends ItemView {
 		}
 	}
 
-	async deleteTask(task: TaskItem) {
+	private async resolveFile(task: TaskRecord): Promise<TFile | null> {
+		const abstractFile = this.app.vault.getAbstractFileByPath(task.path);
+		return abstractFile instanceof TFile ? abstractFile : null;
+	}
+
+	async deleteTask(task: TaskRecord) {
 		new ConfirmModal(
 			this.app,
 			t("CONFIRM_DELETE_TASK_TITLE"),
 			t("CONFIRM_DELETE_TASK_MSG"),
 			() => {
 				void (async () => {
-					const file = task.file;
+					const file = await this.resolveFile(task);
+					if (!file) return;
 					const content = await this.app.vault.read(file);
 					const lines = content.split("\n");
 
 					if (task.line >= lines.length) return;
 
-					// Remove the line
 					lines.splice(task.line, 1);
 
 					await this.app.vault.modify(file, lines.join("\n"));
 					new Notice(t("TASK_DELETED"));
 
-					// Refresh UI
 					await this.refreshFiles();
 					this.renderMiddleColumn();
 				})();
@@ -897,8 +477,9 @@ export class DashboardView extends ItemView {
 		).open();
 	}
 
-	async toggleTaskStatus(task: TaskItem) {
-		const file = task.file;
+	async toggleTaskStatus(task: TaskRecord) {
+		const file = await this.resolveFile(task);
+		if (!file) return;
 		const content = await this.app.vault.read(file);
 		const lines = content.split("\n");
 
@@ -907,7 +488,6 @@ export class DashboardView extends ItemView {
 		const lineContent = lines[task.line];
 		if (!lineContent) return;
 
-		// Regex to match task: - [ ] content
 		const taskRegex = /^(\s*[-*]\s*\[)(.)(\]\s*.*)$/;
 		const match = lineContent.match(taskRegex);
 
@@ -921,12 +501,10 @@ export class DashboardView extends ItemView {
 
 			await this.app.vault.modify(file, lines.join("\n"));
 
-			// Update local state and UI
-			task.status = newStatus;
+			// Immediate local update; the index reconciles on the modify event.
+			task.marker = newStatus === "x" ? "done" : "open";
+			task.isCompleted = newStatus === "x";
 
-			// Re-apply filters to update lists (e.g. hide if completed)
-			// Do NOT call refreshFiles() here because metadataCache update is async and might be stale,
-			// which would revert the status in the UI.
 			this.applyFilters();
 			this.renderMiddleColumn();
 		}
@@ -938,33 +516,20 @@ export class DashboardView extends ItemView {
 			this.filters,
 			this.activeTab,
 			this.activeQueryId,
-			this.getAllProjects(),
-			this.getAllStatuses(),
-			this.getAllSubjects(),
+			this.facets.projects,
+			this.facets.statuses,
+			this.facets.subjects,
 			this.plugin.settings.customFilters,
 			(newFilters, shouldReRender) => {
 				this.filters = newFilters;
 				this.applyFilters();
 				this.renderMiddleColumn();
-				// Only re-render right column if structural changes are needed (e.g. Custom date fields)
 				if (shouldReRender) {
 					this.renderRightColumn();
 				}
 			},
 			() => {
-				// onReset
-				this.filters = {
-					name: "",
-					project: "",
-					subject: "",
-					dateType: "created",
-					dateStart: "",
-					dateEnd: "",
-					datePreset: "all",
-					status: "all",
-					fileStatus: "",
-					custom: {},
-				};
+				this.filters = createDefaultFilterState();
 				this.activeQueryId = null;
 				this.applyFilters();
 				this.renderMiddleColumn();
@@ -977,7 +542,6 @@ export class DashboardView extends ItemView {
 				this.app.workspace.requestSaveLayout();
 			},
 			() => {
-				// onSaveQuery
 				new SaveQueryModal(
 					this.app,
 					t("MODAL_SAVE_TITLE"),
@@ -988,7 +552,6 @@ export class DashboardView extends ItemView {
 				).open();
 			},
 			() => {
-				// onUpdateQuery
 				void this.updateSavedQuery(this.activeQueryId!);
 			},
 		).render();
@@ -1024,7 +587,6 @@ export class DashboardView extends ItemView {
 		);
 		if (!query) return;
 
-		// Update query details
 		query.category = this.activeCategory;
 		query.tab = this.activeTab;
 		query.filters = structuredClone(this.filters);
@@ -1072,39 +634,5 @@ export class DashboardView extends ItemView {
 		);
 		this.renderMiddleColumn();
 		this.app.workspace.requestSaveLayout();
-	}
-
-	onFileChange(file: TFile) {
-		const isNoteFile = this.files.includes(file);
-
-		const taskFolderPath = this.plugin.settings.taskFolder;
-		const isInTaskFolder = file.path.startsWith(
-			taskFolderPath === "/" ? "" : taskFolderPath,
-		);
-
-		if (!isNoteFile && !isInTaskFolder) return;
-
-		this.requestRefresh(file, isInTaskFolder);
-	}
-
-	onFileDelete(file: TAbstractFile) {
-		if (!(file instanceof TFile)) return;
-
-		// Check if it's in our lists
-		const isNoteFile = this.files.some((f) => f.path === file.path);
-		const hasTasks = this.tasks.some((t) => t.file.path === file.path);
-
-		if (!isNoteFile && !hasTasks) return;
-
-		// Remove from source lists
-		if (isNoteFile) {
-			this.files = this.files.filter((f) => f.path !== file.path);
-		}
-		if (hasTasks) {
-			this.tasks = this.tasks.filter((t) => t.file.path !== file.path);
-		}
-
-		// Apply filters (which will update filtered lists)
-		this.debouncedDeleteRefresh();
 	}
 }
