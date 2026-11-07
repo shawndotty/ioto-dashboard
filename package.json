@@ -1,6 +1,6 @@
 {
 	"name": "ioto-dashboard",
-	"version": "2.7.1",
+	"version": "2.7.2",
 	"description": "Dashoboard for IOTO framework",
 	"main": "main.js",
 	"type": "module",
