@@ -160,4 +160,73 @@ export default {
 	SETTINGS_DELETE_FILTER_BTN: "Delete",
 
 	SETTINGS_BASIC_NAME: "Basic Settings",
+
+	// Custom Dashboard
+	CUSTOM_DASHBOARD_TITLE: "Custom Dashboard",
+	RIBBON_CUSTOM_DASHBOARD_TITLE: "Open Custom Dashboard",
+	COMMAND_OPEN_CUSTOM_DASHBOARD: "Open Custom Dashboard",
+	DASHBOARD_MANAGE_QUERIES: "Queries",
+	DASHBOARD_ADD_COMPONENT: "Add component",
+	DASHBOARD_EDIT_MODE: "Edit",
+	DASHBOARD_VIEW_MODE: "Done",
+	DASHBOARD_EMPTY_TITLE: "No components yet",
+	DASHBOARD_EMPTY_DESC:
+		"Add a KPI, project progress or unfinished-task component and bind it to a query.",
+	DASHBOARD_LOADING: "Loading…",
+	DASHBOARD_ERROR_CONFIG: "Query missing — pick another query.",
+	DASHBOARD_EMPTY_RESULT: "Nothing to show.",
+	DASHBOARD_STORE_DAMAGED:
+		"Dashboard configuration is damaged. The raw data was kept; the panel fell back to an empty dashboard.",
+	DASHBOARD_CONFIG_REMOVE: "Remove component",
+
+	// Components
+	COMPONENT_PICKER_TITLE: "Add component",
+	COMPONENT_KPI_NAME: "KPI",
+	COMPONENT_KPI_DESC: "A single number from a query (task count).",
+	COMPONENT_PROJECT_PROGRESS_NAME: "Project progress",
+	COMPONENT_PROJECT_PROGRESS_DESC:
+		"Completion per project with open and cancelled counts.",
+	COMPONENT_UNFINISHED_NAME: "Unfinished tasks",
+	COMPONENT_UNFINISHED_DESC:
+		"Open tasks ordered by note modification time.",
+	KPI_BASIS_FILE: "Whole file",
+	KPI_BASIS_SECTION: "Scoped sections",
+	KPI_EDIT_HINT: "Use the header controls to change the query or counting basis.",
+	PROJECT_PROGRESS_EMPTY: "No projects in scope.",
+	PROJECT_PROGRESS_OPEN: "Open",
+	PROJECT_PROGRESS_CANCELLED: "Cancelled",
+	PROJECT_PROGRESS_FILES: "Files",
+	UNFINISHED_EMPTY: "No unfinished tasks.",
+
+	// Queries
+	QUERY_MANAGER_TITLE: "Queries",
+	QUERY_MANAGER_NEW: "New query",
+	QUERY_MANAGER_EDIT: "Edit",
+	QUERY_MANAGER_DUPLICATE: "Duplicate",
+	QUERY_MANAGER_DELETE: "Delete",
+	QUERY_MANAGER_REFERENCES: "referenced by",
+	QUERY_EDITOR_TITLE_NEW: "New query",
+	QUERY_EDITOR_TITLE_EDIT: "Edit query",
+	QUERY_NAME: "Name",
+	QUERY_TARGET: "Target",
+	QUERY_TARGET_TASK: "Tasks",
+	QUERY_TARGET_NOTE: "Notes",
+	QUERY_FOLDERS: "Folders",
+	QUERY_FOLDERS_DESC:
+		"Comma-separated vault paths. Empty = the target's default root.",
+	QUERY_FOLDERS_PLACEHOLDER: "3-Tasks, 1-Inputs",
+	QUERY_INCLUDE_SUBFOLDERS: "Include subfolders",
+	QUERY_BROWSE_FOLDER: "Add folder",
+	QUERY_FILTER_NAME: "Name contains",
+	QUERY_FILTER_PROJECT: "Project contains",
+	QUERY_FILTER_SUBJECT: "Subject contains",
+	QUERY_FILTER_DATE_PRESET: "Date preset",
+	QUERY_SAVE: "Save",
+	QUERY_DELETE_CONFIRM_TITLE: "Delete query",
+	QUERY_DELETE_CONFIRM_MSG:
+		"This query is used by {0} component(s). Delete it anyway?",
+	QUERY_BUILTIN_TASKS_ALL: "All tasks",
+	QUERY_BUILTIN_TASKS_UNFINISHED: "Unfinished tasks",
+	QUERY_BUILTIN_NOTES_ALL: "All notes",
+	QUERY_UNCLASSIFIED: "Unclassified",
 };

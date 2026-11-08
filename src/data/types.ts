@@ -69,6 +69,9 @@ export interface TaskScope {
 	sections: SectionRole[];
 	includeEmptyText: false;
 	includePlaceholders: false;
+	/** Vault-absolute folders; empty keeps the legacy `folders` enum behaviour. */
+	paths?: string[];
+	includeSubfolders?: boolean;
 }
 
 export const DEFAULT_SCOPE_SECTIONS: SectionRole[] = [
@@ -76,6 +79,16 @@ export const DEFAULT_SCOPE_SECTIONS: SectionRole[] = [
 	"input",
 	"output",
 	"outcome",
+];
+
+export const ALL_SECTION_ROLES: SectionRole[] = [
+	"task",
+	"input",
+	"output",
+	"outcome",
+	"goal",
+	"review",
+	"other",
 ];
 
 export const DEFAULT_TASK_SCOPE: TaskScope = {

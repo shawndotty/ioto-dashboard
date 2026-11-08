@@ -145,6 +145,26 @@ DEFAULT_TASK_SCOPE = {
 | TaskView 默认范围 | 1836（其中 open 21） |
 | Dashboard 页签 | 输入 29 / 输出 68 / 成果 815 |
 
+### 9.1 复测（2026-11-08，folder-first 项目归属后）
+
+复测脚本直接调用当前解析器（`parseCheckboxes`）扫描四根目录，分节标题取 IOTO 设置中的实际值。
+
+| 指标 | 数值 |
+| --- | --- |
+| 纳入索引的 Markdown 文件 | 1174（Input 23 / Output 61 / Task 275 / Outcome 815） |
+| 原始勾选框行 | 2844 |
+| 解析后有效任务 | 2717（127 行为占位、注释、空文本或代码围栏） |
+| 任务标记分布 | open 697 / done 2016 / cancelled 0 / other 4 |
+| `3-任务` 文件夹任务 | 1845（其中 open 22） |
+| 分节分布 | task 942 / output 67 / outcome 819 / input 29 / other 860 |
+| TaskView 默认范围 | 1857（其中 open 22） |
+| 任务根内的项目数（folder-first + frontmatter） | 11（IOTO Task Center 1324 / Text Popup 249 / IOTO Templates Generator 82 / IOTO Update 77 / IOTO Dashboard 46 / IOTO Settings 39 / SlidesRup 15 / 其余 13） |
+
+与 2026-11-07 基线的差异来自两方面，均属预期：
+
+- Vault 内容在两次测量之间新增/编辑了笔记（文件 +5，任务 +7）；
+- 项目归属改为 folder-first 后，任务根内没有 `Project` 属性的笔记也会被归入 `3-任务/<首段>/` 项目，因此项目筛选选项变多（见 `docs/custom-dashboard-decisions.md` §3）。
+
 ## 10. 验证
 
 ```bash

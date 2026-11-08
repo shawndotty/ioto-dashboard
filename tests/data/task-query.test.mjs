@@ -139,3 +139,55 @@ test('name, project and custom filters apply to task text/frontmatter', () => {
 		['b'],
 	);
 });
+
+test('paths scope intersects the folders enum', () => {
+	const tasks = [
+		task({ text: 'root task' }),
+		task({ text: 'alpha', path: '3-任务/Alpha/n.md' }),
+		task({ text: 'beta', path: '3-任务/Beta/n.md' }),
+		task({
+			text: 'input note',
+			path: '1-输入/n.md',
+			ioType: 'Input',
+			sectionRole: 'input',
+		}),
+	];
+	assert.deepEqual(
+		queryTasks(tasks, createDefaultFilterState(), {
+			...ALL,
+			paths: ['3-任务/Alpha'],
+		}).map((item) => item.text),
+		['alpha'],
+	);
+	// `folders` still applies: an input note inside the path is excluded by
+	// the default task-folder scope.
+	assert.deepEqual(
+		queryTasks(tasks, createDefaultFilterState(), {
+			...DEFAULT_TASK_SCOPE,
+			paths: ['1-输入'],
+		}).map((item) => item.text),
+		[],
+	);
+});
+
+test('includeSubfolders=false only matches the exact folder', () => {
+	const tasks = [
+		task({ text: 'direct', path: '3-任务/Alpha/n.md' }),
+		task({ text: 'nested', path: '3-任务/Alpha/sub/n.md' }),
+	];
+	const scope = { ...ALL, paths: ['3-任务/Alpha'] };
+	assert.deepEqual(
+		queryTasks(tasks, createDefaultFilterState(), scope).map(
+			(item) => item.text,
+		),
+		['direct', 'nested'],
+	);
+	assert.deepEqual(
+		queryTasks(tasks, createDefaultFilterState(), {
+			...scope,
+			includeSubfolders: false,
+		}).map((item) => item.text),
+		['direct'],
+	);
+});
+

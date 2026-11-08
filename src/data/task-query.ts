@@ -1,4 +1,5 @@
 import { matchesCustomFilters, matchesDate, matchesName } from "./note-query";
+import { folderOf, isInsideFolder, normalizeFolder } from "./note-source";
 import type {
 	CustomFilterDef,
 	FilterState,
@@ -23,15 +24,30 @@ function inScopeFolders(task: TaskRecord, scope: TaskScope): boolean {
 	);
 }
 
+function inScopePaths(task: TaskRecord, scope: TaskScope): boolean {
+	const paths = (scope.paths ?? [])
+		.map((item) => normalizeFolder(item))
+		.filter((item) => item.length > 0);
+	if (paths.length === 0) return true;
+	const includeSubfolders = scope.includeSubfolders ?? true;
+	return paths.some((root) =>
+		includeSubfolders
+			? isInsideFolder(task.path, root)
+			: folderOf(task.path) === root,
+	);
+}
+
 export function queryTasks(
 	tasks: TaskRecord[],
 	filters: FilterState,
 	scope: TaskScope,
 	customFilters: CustomFilterDef[] = [],
+	now: number = Date.now(),
 ): TaskRecord[] {
 	const taskTypes = filters.taskType ?? [];
 	return tasks.filter((task) => {
 		if (!inScopeFolders(task, scope)) return false;
+		if (!inScopePaths(task, scope)) return false;
 		if (!scope.sections.includes(task.sectionRole)) return false;
 		if (!matchesName(task.text, filters.name)) return false;
 
@@ -56,7 +72,7 @@ export function queryTasks(
 			if (mappedType && !taskTypes.includes(mappedType)) return false;
 		}
 
-		if (!matchesDate(task.noteCtime, task.noteMtime, filters)) return false;
+		if (!matchesDate(task.noteCtime, task.noteMtime, filters, now)) return false;
 
 		if (
 			!matchesCustomFilters(

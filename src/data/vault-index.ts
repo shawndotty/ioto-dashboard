@@ -7,6 +7,7 @@ import type {
 } from "obsidian";
 import {
 	buildNoteRecord,
+	folderProjectName,
 	isInsideFolder,
 	normalizeFolder,
 	resolveIoType,
@@ -291,12 +292,16 @@ export class VaultIndex {
 		const ioType = resolveIoType(file.path, config);
 		const projectValue = frontmatter?.["Project"] ?? frontmatter?.["project"];
 		const statusValue = frontmatter?.["Status"] ?? frontmatter?.["status"];
+		// Folder-first attribution for the task root; frontmatter still wins.
+		const attributedProject =
+			toText(projectValue) ??
+			folderProjectName(file.path, config.taskFolder);
 		const tasks = extractTasks({
 			path: file.path,
 			content,
 			ioType,
 			headings: config.headings,
-			project: toText(projectValue),
+			project: attributedProject,
 			noteStatus: toText(statusValue),
 			noteCtime: file.stat.ctime,
 			noteMtime: file.stat.mtime,
@@ -313,6 +318,10 @@ export class VaultIndex {
 				size: file.stat.size,
 				ioType,
 				frontmatter,
+				projectOverride: folderProjectName(
+					file.path,
+					config.taskFolder,
+				),
 			},
 			tasks,
 		);

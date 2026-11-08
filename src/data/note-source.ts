@@ -37,6 +37,24 @@ export function folderOf(path: string): string {
 	return index === -1 ? "" : path.slice(0, index);
 }
 
+/**
+ * Folder-first project attribution: `3-任务/<Project>/...` belongs to
+ * `<Project>` even without a `Project` frontmatter. Files directly under the
+ * task root — and every path outside it — have no folder project.
+ */
+export function folderProjectName(
+	path: string,
+	taskFolder: string,
+): string | undefined {
+	const root = normalizeFolder(taskFolder);
+	if (!root || !isInsideFolder(path, root) || path === root) return undefined;
+	const relative = path.slice(root.length + 1);
+	const segments = relative.split("/").filter((segment) => segment.length > 0);
+	if (segments.length < 2) return undefined;
+	const project = segments[0]?.trim();
+	return project ? project : undefined;
+}
+
 export function readFrontmatterValue(
 	frontmatter: Record<string, unknown> | undefined,
 	...keys: string[]
@@ -92,6 +110,8 @@ export interface NoteMetaInput {
 	size: number;
 	ioType: IoType;
 	frontmatter?: Record<string, unknown>;
+	/** Folder-first project attribution; frontmatter `Project` still wins. */
+	projectOverride?: string;
 }
 
 export function buildNoteRecord(
@@ -100,9 +120,9 @@ export function buildNoteRecord(
 	sectionRoles: string[] = DEFAULT_SCOPE_SECTIONS,
 ): NoteRecord {
 	const frontmatter = meta.frontmatter;
-	const project = toProjectValue(
-		readFrontmatterValue(frontmatter, "Project", "project"),
-	);
+	const project =
+		toProjectValue(readFrontmatterValue(frontmatter, "Project", "project")) ??
+		meta.projectOverride;
 	const subject = toSubjectValue(
 		readFrontmatterValue(frontmatter, "Subject", "subject"),
 	);

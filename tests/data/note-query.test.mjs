@@ -155,3 +155,45 @@ test('date presets and custom ranges read the chosen timestamp', () => {
 		true,
 	);
 });
+
+test('paths scope restricts folders and honours includeSubfolders', () => {
+	const nested = note({
+		path: '1-输入/sub/n.md',
+		basename: 'Nested',
+		folder: '1-输入/sub',
+	});
+	const notes = [...NOTES, nested];
+	const names = (items) => items.map((item) => item.basename);
+
+	assert.deepEqual(
+		names(queryNotes(notes, createDefaultFilterState(), [], { paths: ['1-输入'] })),
+		['Alpha', 'Gamma', 'Nested'],
+	);
+	assert.deepEqual(
+		names(
+			queryNotes(notes, createDefaultFilterState(), [], {
+				paths: ['1-输入'],
+				includeSubfolders: false,
+			}),
+		),
+		['Alpha', 'Gamma'],
+	);
+	assert.equal(
+		queryNotes(notes, createDefaultFilterState(), [], { paths: ['2-输出'] }).length,
+		1,
+	);
+	assert.equal(
+		queryNotes(notes, createDefaultFilterState(), [], { paths: [] }).length,
+		4,
+	);
+});
+
+test('ioTypes scope narrows results before filters apply', () => {
+	assert.deepEqual(
+		queryNotes(NOTES, createDefaultFilterState(), [], {
+			ioTypes: ['Input'],
+		}).map((item) => item.basename),
+		['Alpha', 'Gamma'],
+	);
+});
+

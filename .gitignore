@@ -18,6 +18,10 @@ main.js
 # obsidian
 data.json
 
+# local daily metrics snapshots
+metrics-snapshots.json
+metrics-snapshots.json.tmp
+
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
 

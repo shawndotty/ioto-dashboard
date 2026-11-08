@@ -1,9 +1,16 @@
 import type {
 	CustomFilterDef,
 	FilterState,
+	IoType,
 	NoteRecord,
 } from "./types";
-import { toText } from "./note-source";
+import { folderOf, isInsideFolder, normalizeFolder, toText } from "./note-source";
+
+export interface NoteQueryScope {
+	paths?: string[];
+	includeSubfolders?: boolean;
+	ioTypes?: IoType[];
+}
 
 export function matchesName(text: string, filter: string): boolean {
 	if (!filter) return true;
@@ -14,6 +21,7 @@ export function matchesDate(
 	ctime: number,
 	mtime: number,
 	filters: FilterState,
+	now: number = Date.now(),
 ): boolean {
 	const value = filters.dateType === "created" ? ctime : mtime;
 	const date = new Date(value);
@@ -26,7 +34,7 @@ export function matchesDate(
 		else if (filters.datePreset === "last14days") days = 14;
 		else if (filters.datePreset === "last30days") days = 30;
 
-		const startDate = new Date();
+		const startDate = new Date(now);
 		startDate.setDate(startDate.getDate() - days);
 		startDate.setHours(0, 0, 0, 0);
 		if (date < startDate) return false;
@@ -104,14 +112,32 @@ export function matchesSubject(
 	);
 }
 
+function inScopePaths(path: string, scope: NoteQueryScope): boolean {
+	const paths = (scope.paths ?? [])
+		.map((item) => normalizeFolder(item))
+		.filter((item) => item.length > 0);
+	if (paths.length === 0) return true;
+	const includeSubfolders = scope.includeSubfolders ?? true;
+	return paths.some((root) =>
+		includeSubfolders
+			? isInsideFolder(path, root)
+			: folderOf(path) === root,
+	);
+}
+
 export function queryNotes(
 	notes: NoteRecord[],
 	filters: FilterState,
 	customFilters: CustomFilterDef[] = [],
+	scope: NoteQueryScope = {},
+	now: number = Date.now(),
 ): NoteRecord[] {
 	const noteTypes = filters.noteType ?? [];
 	const typeFilterActive = noteTypes.length > 0;
+	const scopeTypes = scope.ioTypes ?? [];
 	return notes.filter((note) => {
+		if (!inScopePaths(note.path, scope)) return false;
+		if (scopeTypes.length > 0 && !scopeTypes.includes(note.ioType)) return false;
 		if (typeFilterActive && !noteTypes.includes(note.ioType)) return false;
 		if (!matchesName(note.basename, filters.name)) return false;
 		if (filters.project) {
@@ -135,7 +161,7 @@ export function queryNotes(
 				return false;
 			}
 		}
-		if (!matchesDate(note.ctime, note.mtime, filters)) return false;
+		if (!matchesDate(note.ctime, note.mtime, filters, now)) return false;
 		if (
 			!matchesCustomFilters(
 				note.frontmatter,

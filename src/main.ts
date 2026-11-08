@@ -2,7 +2,9 @@ import { Plugin, WorkspaceLeaf } from "obsidian";
 import { DashboardView } from "./views/DashboardView";
 import { TaskView } from "./views/TaskView";
 import { NoteView } from "./views/NoteView";
+import { CustomDashboardView } from "./views/CustomDashboardView";
 import {
+	CUSTOM_DASHBOARD_VIEW_TYPE,
 	DASHBOARD_VIEW_TYPE,
 	TASK_VIEW_TYPE,
 	NOTE_VIEW_TYPE,
@@ -17,6 +19,12 @@ import {
 import { IotoSettingsService } from "./services/ioto-settings-services";
 import { VaultIndex } from "./data/vault-index";
 import type { IndexConfig, SectionHeadings } from "./data/types";
+import { DashboardRepository } from "./dashboard/repository";
+import {
+	SnapshotStore,
+	collectDailySnapshot,
+	localDate,
+} from "./metrics/snapshot-store";
 
 function splitHeadingList(value: string | undefined, fallback: string): string[] {
 	if (!value) return [fallback];
@@ -30,7 +38,13 @@ function splitHeadingList(value: string | undefined, fallback: string): string[]
 export default class IotoDashboardPlugin extends Plugin {
 	settings: IotoDashboardSettings;
 	index: VaultIndex;
+	dashboardRepository: DashboardRepository;
+	snapshotStore: SnapshotStore;
 	private indexRebuildTimer: number | null = null;
+	private snapshotTimer: number | null = null;
+	private lastSnapshotDate = "";
+	private lastSnapshotAt = 0;
+	private dataQueue: Promise<void> = Promise.resolve();
 
 	async onload() {
 		await this.loadSettings();
@@ -38,6 +52,29 @@ export default class IotoDashboardPlugin extends Plugin {
 		this.index = new VaultIndex(this.app, () => this.getIndexConfig());
 		this.index.attach();
 		this.register(() => this.index.detach());
+
+		this.dashboardRepository = new DashboardRepository({
+			readData: () => this.loadData(),
+			updateData: (mutate) => this.updateData(mutate),
+		});
+		this.snapshotStore = new SnapshotStore({
+			adapter: this.app.vault.adapter,
+			dir:
+				this.manifest.dir ??
+				`${this.app.vault.configDir}/plugins/ioto-dashboard`,
+			deviceId: this.getDeviceId(),
+		});
+
+		this.registerView(
+			CUSTOM_DASHBOARD_VIEW_TYPE,
+			(leaf) => new CustomDashboardView(leaf, this),
+		);
+		this.app.workspace.onLayoutReady(() =>
+			this.scheduleSnapshotCollect(2000),
+		);
+		this.register(
+			this.index.subscribe(() => this.scheduleSnapshotCollect()),
+		);
 
 		// Register View
 		this.registerView(
@@ -81,6 +118,17 @@ export default class IotoDashboardPlugin extends Plugin {
 			},
 		);
 
+		this.addRibbonIcon(
+			"layout-dashboard",
+			t("RIBBON_CUSTOM_DASHBOARD_TITLE"),
+			(evt: MouseEvent) => {
+				void this.activateCustomDashboardView({
+					newWindow: evt.shiftKey,
+					newTab: evt.altKey,
+				});
+			},
+		);
+
 		// Command
 		this.addCommand({
 			// eslint-disable-next-line obsidianmd/commands/no-plugin-id-in-command-id -- 历史 ID，AGENTS.md 要求保持稳定
@@ -104,6 +152,14 @@ export default class IotoDashboardPlugin extends Plugin {
 			name: t("COMMAND_OPEN_NOTE_VIEW"),
 			callback: () => {
 				void this.activateNoteView();
+			},
+		});
+
+		this.addCommand({
+			id: "open-ioto-custom-dashboard",
+			name: t("COMMAND_OPEN_CUSTOM_DASHBOARD"),
+			callback: () => {
+				void this.activateCustomDashboardView();
 			},
 		});
 
@@ -229,33 +285,36 @@ export default class IotoDashboardPlugin extends Plugin {
 	async activateNoteView(
 		options: { newWindow?: boolean; newTab?: boolean } = {},
 	) {
+		await this.activateCustomView(NOTE_VIEW_TYPE, options);
+	}
+
+	async activateCustomDashboardView(
+		options: { newWindow?: boolean; newTab?: boolean } = {},
+	) {
+		await this.activateCustomView(CUSTOM_DASHBOARD_VIEW_TYPE, options);
+	}
+
+	private async activateCustomView(
+		viewType: string,
+		options: { newWindow?: boolean; newTab?: boolean } = {},
+	): Promise<void> {
 		const { workspace } = this.app;
 
 		let leaf: WorkspaceLeaf | null = null;
 
 		if (options.newWindow) {
 			leaf = workspace.getLeaf("window");
-			await leaf.setViewState({
-				type: NOTE_VIEW_TYPE,
-				active: true,
-			});
+			await leaf.setViewState({ type: viewType, active: true });
 		} else if (options.newTab) {
 			leaf = workspace.getLeaf("tab");
-			await leaf.setViewState({
-				type: NOTE_VIEW_TYPE,
-				active: true,
-			});
+			await leaf.setViewState({ type: viewType, active: true });
 		} else {
-			const leaves = workspace.getLeavesOfType(NOTE_VIEW_TYPE);
-
+			const leaves = workspace.getLeavesOfType(viewType);
 			if (leaves.length > 0) {
 				leaf = leaves[0]!;
 			} else {
 				leaf = workspace.getLeaf(false);
-				await leaf.setViewState({
-					type: NOTE_VIEW_TYPE,
-					active: true,
-				});
+				await leaf.setViewState({ type: viewType, active: true });
 			}
 		}
 
@@ -265,14 +324,22 @@ export default class IotoDashboardPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		const loadedData = (await this.loadData()) as
-			| Partial<IotoDashboardSettings>
-			| null;
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			loadedData as Partial<IotoDashboardSettings>,
-		);
+		const loadedData = (await this.loadData()) as Record<
+			string,
+			unknown
+		> | null;
+		const settings: IotoDashboardSettings = { ...DEFAULT_SETTINGS };
+		if (loadedData) {
+			for (const key of Object.keys(
+				DEFAULT_SETTINGS,
+			) as Array<keyof IotoDashboardSettings>) {
+				if (loadedData[key] !== undefined) {
+					(settings as unknown as Record<string, unknown>)[key] =
+						loadedData[key];
+				}
+			}
+		}
+		this.settings = settings;
 
 		if (!loadedData) {
 			const iotoSettingsService = new IotoSettingsService(this.app);
@@ -317,8 +384,37 @@ export default class IotoDashboardPlugin extends Plugin {
 	}
 
 	async saveSettings() {
-		await this.saveData(this.settings);
+		await this.updateData((data) => {
+			data.inputFolder = this.settings.inputFolder;
+			data.outputFolder = this.settings.outputFolder;
+			data.taskFolder = this.settings.taskFolder;
+			data.outcomeFolder = this.settings.outcomeFolder;
+			data.pageSize = this.settings.pageSize;
+			data.savedQueries = this.settings.savedQueries;
+			data.customFilters = this.settings.customFilters;
+		});
 		this.scheduleIndexRebuild();
+	}
+
+	/**
+	 * Serialised read-modify-write of `data.json`. Settings, dashboard store and
+	 * any future namespace all go through this queue so none overwrites another.
+	 */
+	async updateData(
+		mutate: (data: Record<string, unknown>) => void,
+	): Promise<void> {
+		const run = this.dataQueue.then(async () => {
+			const data = ((await this.loadData()) ?? {}) as Record<
+				string,
+				unknown
+			>;
+			mutate(data);
+			await this.saveData(data);
+		});
+		this.dataQueue = run.catch((error: unknown) => {
+			console.warn("IOTO Dashboard: failed to update data.json", error);
+		});
+		return run;
 	}
 
 	getSectionHeadings(): SectionHeadings {
@@ -374,5 +470,55 @@ export default class IotoDashboardPlugin extends Plugin {
 			this.indexRebuildTimer = null;
 			this.index?.rebuild();
 		}, 600);
+	}
+
+	private getDeviceId(): string {
+		const key = "ioto-dashboard:device-id";
+		try {
+			const existing = window.localStorage.getItem(key);
+			if (existing) return existing;
+			const id = `dev-${Date.now().toString(36)}-${Math.random()
+				.toString(36)
+				.slice(2, 8)}`;
+			window.localStorage.setItem(key, id);
+			return id;
+		} catch {
+			return "dev-local";
+		}
+	}
+
+	private scheduleSnapshotCollect(delay = 5000): void {
+		if (this.snapshotTimer !== null) {
+			window.clearTimeout(this.snapshotTimer);
+		}
+		this.snapshotTimer = window.setTimeout(() => {
+			this.snapshotTimer = null;
+			void this.collectSnapshot();
+		}, delay);
+	}
+
+	private async collectSnapshot(): Promise<void> {
+		if (!this.snapshotStore) return;
+		const now = Date.now();
+		const today = localDate(now);
+		if (
+			today === this.lastSnapshotDate &&
+			now - this.lastSnapshotAt < 30 * 60 * 1000
+		) {
+			return;
+		}
+		this.lastSnapshotDate = today;
+		this.lastSnapshotAt = now;
+		try {
+			const snapshot = await this.index.getSnapshot();
+			await collectDailySnapshot(
+				snapshot,
+				this.getIndexConfig(),
+				this.snapshotStore,
+				now,
+			);
+		} catch (error) {
+			console.warn("IOTO Dashboard: daily snapshot failed", error);
+		}
 	}
 }

@@ -24,7 +24,6 @@ const localeFiles = readdirSync(localeDir).filter(
 );
 
 const REFERENCE = 'en';
-const CANONICAL_KEY_COUNT = 133;
 
 const locales = {};
 for (const file of localeFiles) {
@@ -45,12 +44,13 @@ test('locale directory is discovered with the reference language', () => {
 	);
 });
 
-test(`each dictionary declares exactly ${CANONICAL_KEY_COUNT} keys`, () => {
+// 键数从 en 派生：新增文案不再需要手工同步常量。
+test('each dictionary declares the same number of keys as en', () => {
 	for (const [name, dict] of Object.entries(locales)) {
 		assert.equal(
 			Object.keys(dict).length,
-			CANONICAL_KEY_COUNT,
-			`"${name}" should declare ${CANONICAL_KEY_COUNT} keys (update this constant when keys are intentionally added/removed)`,
+			referenceKeys.length,
+			`"${name}" should declare ${referenceKeys.length} keys`,
 		);
 	}
 });

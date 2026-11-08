@@ -10,6 +10,15 @@ const files = fs
 	.filter((name) => name.endsWith('.ts'))
 	.map((name) => path.join(dataDir, name));
 
+const BOUNDED_DIRS = ['src/query', 'src/metrics'];
+const boundedFiles = BOUNDED_DIRS.flatMap((dir) => {
+	const absolute = path.join(pluginRoot, dir);
+	return fs
+		.readdirSync(absolute)
+		.filter((name) => name.endsWith('.ts'))
+		.map((name) => path.join(absolute, name));
+});
+
 const FORBIDDEN = [
 	'../views',
 	'../ui',
@@ -17,6 +26,16 @@ const FORBIDDEN = [
 	'../services',
 	'../lang',
 	'../models',
+];
+
+const VAULT_WRITE_APIS = [
+	'vault.create',
+	'vault.createFolder',
+	'vault.modify',
+	'vault.process',
+	'vault.delete',
+	'vault.trash',
+	'vault.rename',
 ];
 
 test('every data module is scanned', () => {
@@ -72,3 +91,55 @@ test('the frozen contract keeps its required fields', () => {
 		assert.ok(contract.includes(scope), `missing contract export: ${scope}`);
 	}
 });
+
+test('every query/metrics module is scanned', () => {
+	assert.ok(
+		boundedFiles.length >= 8,
+		`expected query/metrics modules, found ${boundedFiles.length}`,
+	);
+	for (const dir of BOUNDED_DIRS) {
+		assert.ok(
+			boundedFiles.some((file) =>
+				file.startsWith(path.join(pluginRoot, dir) + path.sep),
+			),
+			`no modules found under ${dir}`,
+		);
+	}
+});
+
+test('src/query and src/metrics never import UI, settings or lang layers', () => {
+	for (const file of boundedFiles) {
+		const source = fs.readFileSync(file, 'utf8');
+		for (const specifier of FORBIDDEN) {
+			assert.ok(
+				!source.includes(`"${specifier}`) &&
+					!source.includes(`'${specifier}`),
+				`${path.basename(file)} imports ${specifier}`,
+			);
+		}
+	}
+});
+
+test('query/metrics modules never write notes through the vault API', () => {
+	for (const file of boundedFiles) {
+		const source = fs.readFileSync(file, 'utf8');
+		for (const api of VAULT_WRITE_APIS) {
+			assert.ok(
+				!source.includes(api),
+				`${path.basename(file)} calls ${api}`,
+			);
+		}
+	}
+});
+
+test('only the snapshot store writes its own file', () => {
+	const writers = boundedFiles.filter((file) => {
+		const source = fs.readFileSync(file, 'utf8');
+		return source.includes('.write(') || source.includes('.rename(');
+	});
+	assert.deepEqual(
+		writers.map((file) => path.basename(file)),
+		['snapshot-store.ts'],
+	);
+});
+
