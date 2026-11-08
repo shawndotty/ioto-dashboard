@@ -340,28 +340,39 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private openComponentPicker(): void {
-		new ComponentPickerModal(this.app, this.registry.list(), (definition) => {
-			void (async () => {
-				const queries = this.queryRepository();
-				const preferred = queries.get(definition.defaultQueryId);
-				const queryId =
-					preferred?.id ??
-					queries.defaultFor("task")?.id ??
-					"builtin:tasks-all";
-				const config: DashboardComponentConfig = {
-					...definition.createConfig(queryId),
-					id: `component:${Date.now()}`,
-					type: definition.type,
-					queryId,
-				};
-				this.store = await this.plugin.dashboardRepository.addComponent(
-					this.dashboardId,
-					config,
-				);
-				this.editMode = true;
-				this.render();
-			})();
-		}).open();
+		new ComponentPickerModal(
+			this.app,
+			this.registry.list(),
+			(definition) => {
+				void (async () => {
+					const queries = this.queryRepository();
+					const preferred = queries.get(definition.defaultQueryId);
+					const queryId =
+						preferred?.id ??
+						queries.defaultFor("task")?.id ??
+						"builtin:tasks-all";
+					const config: DashboardComponentConfig = {
+						...definition.createConfig(queryId),
+						id: `component:${Date.now()}`,
+						type: definition.type,
+						queryId,
+					};
+					this.store = await this.plugin.dashboardRepository.addComponent(
+						this.dashboardId,
+						config,
+					);
+					this.editMode = true;
+					this.render();
+				})();
+			},
+			{
+				layout: this.plugin.settings.modalLayout ?? "card",
+				onLayoutChange: (layout) => {
+					this.plugin.settings.modalLayout = layout;
+					void this.plugin.saveSettings();
+				},
+			},
+		).open();
 	}
 
 	private openQueryManager(): void {
@@ -410,6 +421,13 @@ export class CustomDashboardView extends ItemView {
 							})();
 						},
 					).open();
+				},
+			},
+			{
+				layout: this.plugin.settings.modalLayout ?? "list",
+				onLayoutChange: (layout) => {
+					this.plugin.settings.modalLayout = layout;
+					void this.plugin.saveSettings();
 				},
 			},
 		).open();

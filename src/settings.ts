@@ -44,6 +44,8 @@ export interface CustomFilter {
 	target?: "all" | "note" | "task";
 }
 
+export type ModalLayout = "list" | "card";
+
 export interface IotoDashboardSettings {
 	inputFolder: string;
 	outputFolder: string;
@@ -52,6 +54,7 @@ export interface IotoDashboardSettings {
 	pageSize: number;
 	savedQueries: SavedQuery[];
 	customFilters: CustomFilter[];
+	modalLayout?: ModalLayout;
 }
 
 export const DEFAULT_SETTINGS: IotoDashboardSettings = {
@@ -62,6 +65,7 @@ export const DEFAULT_SETTINGS: IotoDashboardSettings = {
 	pageSize: 100,
 	savedQueries: [],
 	customFilters: [],
+	modalLayout: "list",
 };
 
 export class DashboardSettingTab extends PluginSettingTab {

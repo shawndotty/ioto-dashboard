@@ -598,3 +598,163 @@
     font-size: 0.78em;
     color: var(--text-faint);
 }
+
+/* ---- Modal shell (shared) ---- */
+.modal.ioto-dashboard-modal {
+    width: min(720px, 92vw);
+}
+
+.modal.ioto-dashboard-modal.is-fullscreen {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border: none;
+    border-radius: 0;
+}
+
+.ioto-dashboard-modal .modal-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ioto-dashboard-modal .ioto-dashboard-modal__tools {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-inline-start: auto;
+}
+
+.ioto-dashboard-modal .ioto-dashboard-modal__layout {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.ioto-dashboard-modal .ioto-dashboard-modal__layout .clickable-icon.is-active {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.ioto-dashboard-modal.is-fullscreen .modal-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.ioto-dashboard-modal .ioto-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.ioto-dashboard-modal .ioto-modal-footer {
+    flex: 0 0 auto;
+    padding-top: 8px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.ioto-dashboard-modal .ioto-modal-footer .setting-item {
+    border: none;
+    padding-block: 8px 0;
+}
+
+.ioto-dashboard-modal .ioto-modal-filters {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-bottom: 8px;
+}
+
+.ioto-modal-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.ioto-modal-filter label {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+}
+
+.ioto-modal-filter input {
+    width: 100%;
+}
+
+.ioto-modal-hint {
+    margin: -4px 0 8px;
+    font-size: var(--font-ui-small);
+    color: var(--text-error);
+}
+
+.ioto-modal-hint[hidden] {
+    display: none;
+}
+
+/* ---- Collection views (list / card) ---- */
+.ioto-modal-cards {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.ioto-modal-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    min-width: 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--background-secondary);
+}
+
+.ioto-modal-card__header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.ioto-modal-card__icon {
+    display: flex;
+    color: var(--text-muted);
+}
+
+.ioto-modal-card__meta {
+    margin-inline-start: auto;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-modal-card__desc {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.ioto-modal-card__actions {
+    display: flex;
+    gap: 4px;
+    margin-top: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+    .ioto-dashboard-modal .ioto-modal-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .ioto-dashboard-modal__fullscreen {
+        display: none;
+    }
+}
+
+body.is-mac .ioto-dashboard-modal.is-fullscreen .modal-title {
+    padding-inline-start: 72px;
+}

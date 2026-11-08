@@ -338,6 +338,11 @@ export default class IotoDashboardPlugin extends Plugin {
 						loadedData[key];
 				}
 			}
+			settings.modalLayout =
+				settings.modalLayout === "card" ? "card" : "list";
+		} else {
+			// No data.json yet: let each modal apply its own default layout.
+			delete settings.modalLayout;
 		}
 		this.settings = settings;
 
@@ -392,6 +397,7 @@ export default class IotoDashboardPlugin extends Plugin {
 			data.pageSize = this.settings.pageSize;
 			data.savedQueries = this.settings.savedQueries;
 			data.customFilters = this.settings.customFilters;
+			data.modalLayout = this.settings.modalLayout;
 		});
 		this.scheduleIndexRebuild();
 	}

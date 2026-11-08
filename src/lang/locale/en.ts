@@ -229,4 +229,14 @@ export default {
 	QUERY_BUILTIN_TASKS_UNFINISHED: "Unfinished tasks",
 	QUERY_BUILTIN_NOTES_ALL: "All notes",
 	QUERY_UNCLASSIFIED: "Unclassified",
+	// Modal shell
+	MODAL_FULLSCREEN_ENTER: "Enter fullscreen",
+	MODAL_FULLSCREEN_EXIT: "Exit fullscreen",
+	QUERY_SECTION_BASIC: "Basic information",
+	QUERY_SECTION_SCOPE: "Scope",
+	QUERY_SECTION_FILTERS: "Filter conditions",
+	QUERY_NAME_REQUIRED: "Name is required.",
+	MODAL_LAYOUT_LIST: "List",
+	MODAL_LAYOUT_CARD: "Cards",
+	MODAL_LAYOUT_SWITCH: "Layout",
 };

@@ -1,8 +1,15 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, ButtonComponent, Modal, Setting } from "obsidian";
 import { t } from "../lang/helpers";
 import { createDefaultFilterState } from "../data/saved-query-adapter";
 import type { FilterState } from "../data/types";
 import type { QueryDefinition, QueryTarget } from "../query/types";
+import {
+	type CollectionAction,
+	type CollectionItem,
+	type CollectionLayout,
+	renderCollection,
+} from "./collection-view";
+import { applyModalShell, createLayoutToggle } from "./modal-shell";
 import { FolderPickerModal } from "./pickers/folder-picker";
 
 export interface QueryManagerActions {
@@ -12,6 +19,11 @@ export interface QueryManagerActions {
 	onDelete(query: QueryDefinition): void;
 }
 
+export interface QueryManagerPreferences {
+	layout: CollectionLayout;
+	onLayoutChange(layout: CollectionLayout): void;
+}
+
 function displayName(query: QueryDefinition): string {
 	return query.nameKey
 		? t(query.nameKey as Parameters<typeof t>[0])
@@ -19,18 +31,27 @@ function displayName(query: QueryDefinition): string {
 }
 
 export class QueryManagerModal extends Modal {
+	private layout: CollectionLayout;
+	private collectionEl: HTMLElement | null = null;
+
 	constructor(
 		app: App,
 		private queries: QueryDefinition[],
 		private referenceCount: (queryId: string) => number,
 		private actions: QueryManagerActions,
+		private preferences?: QueryManagerPreferences,
 	) {
 		super(app);
+		this.layout = preferences?.layout ?? "list";
 	}
 
 	onOpen(): void {
 		const { contentEl } = this;
-		contentEl.createEl("h2", { text: t("QUERY_MANAGER_TITLE") });
+		applyModalShell(this, {
+			kind: "query-manager",
+			title: t("QUERY_MANAGER_TITLE"),
+		});
+
 		new Setting(contentEl).addButton((button) =>
 			button
 				.setButtonText(t("QUERY_MANAGER_NEW"))
@@ -41,45 +62,74 @@ export class QueryManagerModal extends Modal {
 				}),
 		);
 
-		for (const query of this.queries) {
+		const body = contentEl.createDiv({ cls: "ioto-modal-body" });
+		this.collectionEl = body.createDiv({ cls: "ioto-modal-collection" });
+		this.renderItems();
+
+		if (this.preferences) {
+			createLayoutToggle(this, this.layout, (layout) => {
+				this.layout = layout;
+				this.preferences?.onLayoutChange(layout);
+				this.renderItems();
+			});
+		}
+	}
+
+	private renderItems(): void {
+		if (!this.collectionEl) return;
+
+		const items: CollectionItem[] = this.queries.map((query) => {
 			const isUser = query.id.startsWith("user:");
 			const references = this.referenceCount(query.id);
-			const setting = new Setting(contentEl)
-				.setName(displayName(query))
-				.setDesc(
-					`${query.target === "task" ? t("QUERY_TARGET_TASK") : t("QUERY_TARGET_NOTE")} · ${t("QUERY_MANAGER_REFERENCES")} ${references}`,
-				)
-				.addExtraButton((button) =>
-					button
-						.setIcon("copy")
-						.setTooltip(t("QUERY_MANAGER_DUPLICATE"))
-						.onClick(() => {
-							this.close();
-							this.actions.onDuplicate(query);
-						}),
-				);
+			const meta = `${
+				query.target === "task"
+					? t("QUERY_TARGET_TASK")
+					: t("QUERY_TARGET_NOTE")
+			} · ${t("QUERY_MANAGER_REFERENCES")} ${references}`;
+
+			const actions: CollectionAction[] = [
+				{
+					icon: "copy",
+					label: t("QUERY_MANAGER_DUPLICATE"),
+					onClick: () => {
+						this.close();
+						this.actions.onDuplicate(query);
+					},
+				},
+			];
+
 			if (isUser) {
-				setting
-					.addExtraButton((button) =>
-						button
-							.setIcon("pencil")
-							.setTooltip(t("QUERY_MANAGER_EDIT"))
-							.onClick(() => {
-								this.close();
-								this.actions.onEdit(query);
-							}),
-					)
-					.addExtraButton((button) =>
-						button
-							.setIcon("trash")
-							.setTooltip(t("QUERY_MANAGER_DELETE"))
-							.onClick(() => {
-								this.close();
-								this.actions.onDelete(query);
-							}),
-					);
+				actions.push(
+					{
+						icon: "pencil",
+						label: t("QUERY_MANAGER_EDIT"),
+						onClick: () => {
+							this.close();
+							this.actions.onEdit(query);
+						},
+					},
+					{
+						icon: "trash",
+						label: t("QUERY_MANAGER_DELETE"),
+						danger: true,
+						onClick: () => {
+							this.close();
+							this.actions.onDelete(query);
+						},
+					},
+				);
 			}
-		}
+
+			return {
+				id: query.id,
+				icon: "filter",
+				title: displayName(query),
+				meta,
+				actions,
+			};
+		});
+
+		renderCollection(this.collectionEl, items, this.layout);
 	}
 
 	onClose(): void {
@@ -110,25 +160,44 @@ export class QueryEditModal extends Modal {
 
 	onOpen(): void {
 		const { contentEl } = this;
-		contentEl.createEl("h2", {
-			text: t(
+		applyModalShell(this, {
+			kind: "query-editor",
+			restore: true,
+			title: t(
 				this.draft.name
 					? "QUERY_EDITOR_TITLE_EDIT"
 					: "QUERY_EDITOR_TITLE_NEW",
 			),
 		});
 
-		new Setting(contentEl)
+		const body = contentEl.createDiv({ cls: "ioto-modal-body" });
+		let saveButton: ButtonComponent | null = null;
+
+		body.createEl("h3", {
+			cls: "setting-item-heading",
+			text: t("QUERY_SECTION_BASIC"),
+		});
+
+		new Setting(body)
 			.setName(t("QUERY_NAME"))
 			.addText((text) =>
 				text
 					.setValue(this.draft.name)
 					.onChange((value) => {
 						this.draft.name = value;
+						const empty = value.trim().length === 0;
+						saveButton?.setDisabled(empty);
+						nameHint.hidden = !empty;
 					}),
 			);
 
-		new Setting(contentEl)
+		const nameHint = body.createDiv({
+			cls: "ioto-modal-hint",
+			text: t("QUERY_NAME_REQUIRED"),
+		});
+		nameHint.hidden = true;
+
+		new Setting(body)
 			.setName(t("QUERY_TARGET"))
 			.addDropdown((dropdown) =>
 				dropdown
@@ -140,7 +209,12 @@ export class QueryEditModal extends Modal {
 					}),
 			);
 
-		const foldersSetting = new Setting(contentEl)
+		body.createEl("h3", {
+			cls: "setting-item-heading",
+			text: t("QUERY_SECTION_SCOPE"),
+		});
+
+		const foldersSetting = new Setting(body)
 			.setName(t("QUERY_FOLDERS"))
 			.setDesc(t("QUERY_FOLDERS_DESC"));
 		foldersSetting.addText((text) =>
@@ -169,7 +243,7 @@ export class QueryEditModal extends Modal {
 				}),
 		);
 
-		new Setting(contentEl)
+		new Setting(body)
 			.setName(t("QUERY_INCLUDE_SUBFOLDERS"))
 			.addToggle((toggle) =>
 				toggle
@@ -179,26 +253,32 @@ export class QueryEditModal extends Modal {
 					}),
 			);
 
+		body.createEl("h3", {
+			cls: "setting-item-heading",
+			text: t("QUERY_SECTION_FILTERS"),
+		});
+
+		const filters = body.createDiv({ cls: "ioto-modal-filters" });
 		this.addFilterInput(
-			contentEl,
+			filters,
 			t("QUERY_FILTER_NAME"),
 			"name",
 			this.draft.filters.name,
 		);
 		this.addFilterInput(
-			contentEl,
+			filters,
 			t("QUERY_FILTER_PROJECT"),
 			"project",
 			this.draft.filters.project,
 		);
 		this.addFilterInput(
-			contentEl,
+			filters,
 			t("QUERY_FILTER_SUBJECT"),
 			"subject",
 			this.draft.filters.subject,
 		);
 
-		new Setting(contentEl)
+		new Setting(body)
 			.setName(t("QUERY_FILTER_DATE_PRESET"))
 			.addDropdown((dropdown) => {
 				const options: Array<[FilterState["datePreset"], string]> = [
@@ -208,7 +288,8 @@ export class QueryEditModal extends Modal {
 					["last30days", t("FILTER_DATE_PRESET_LAST_30_DAYS")],
 					["custom", t("FILTER_DATE_PRESET_CUSTOM")],
 				];
-				for (const [value, label] of options) dropdown.addOption(value, label);
+				for (const [value, label] of options)
+					dropdown.addOption(value, label);
 				dropdown
 					.setValue(this.draft.filters.datePreset)
 					.onChange((value) => {
@@ -217,22 +298,29 @@ export class QueryEditModal extends Modal {
 					});
 			});
 
-		new Setting(contentEl)
+		const footer = contentEl.createDiv({ cls: "ioto-modal-footer" });
+		new Setting(footer)
 			.addButton((button) =>
 				button
 					.setButtonText(t("BTN_CANCEL"))
 					.onClick(() => this.close()),
 			)
-			.addButton((button) =>
+			.addButton((button) => {
+				saveButton = button;
 				button
 					.setButtonText(t("QUERY_SAVE"))
 					.setCta()
+					.setDisabled(this.draft.name.trim().length === 0)
 					.onClick(() => {
-						if (!this.draft.name.trim()) return;
+						if (!this.draft.name.trim()) {
+							nameHint.hidden = false;
+							return;
+						}
 						this.onSave(this.draft);
 						this.close();
-					}),
-			);
+					});
+				return button;
+			});
 	}
 
 	private addFilterInput(
@@ -241,11 +329,13 @@ export class QueryEditModal extends Modal {
 		field: "name" | "project" | "subject",
 		value: string,
 	): void {
-		new Setting(container).setName(label).addText((text) =>
-			text.setValue(value).onChange((next) => {
-				this.draft.filters[field] = next;
-			}),
-		);
+		const fieldEl = container.createDiv({ cls: "ioto-modal-filter" });
+		fieldEl.createEl("label", { text: label });
+		const input = fieldEl.createEl("input", { attr: { type: "text" } });
+		input.value = value;
+		input.addEventListener("input", () => {
+			this.draft.filters[field] = input.value;
+		});
 	}
 
 	onClose(): void {
