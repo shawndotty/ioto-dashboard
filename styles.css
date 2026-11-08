@@ -616,7 +616,8 @@
 .ioto-dashboard-modal .modal-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    min-width: 0;
 }
 
 .ioto-dashboard-modal .ioto-dashboard-modal__tools {
@@ -624,12 +625,27 @@
     align-items: center;
     gap: 4px;
     margin-inline-start: auto;
+    flex: 0 0 auto;
+}
+
+/* 关闭按钮入行后只覆盖核心的 absolute；尺寸/底色/hover 仍吃核心。
+   旧版类名 modal-close-button 一起留着兜底。 */
+.ioto-dashboard-modal .modal-header-button,
+.ioto-dashboard-modal .modal-close-button {
+    position: static;
+    flex: 0 0 auto;
+}
+
+/* 未入行（核心改名等）时的兜底：标题右侧留白，不压角标按钮。 */
+.ioto-dashboard-modal:not(.is-close-in-row) .modal-title {
+    padding-inline-end: var(--size-4-12, 48px);
 }
 
 .ioto-dashboard-modal .ioto-dashboard-modal__layout {
     display: flex;
     align-items: center;
     gap: 2px;
+    flex: 0 0 auto;
 }
 
 .ioto-dashboard-modal .ioto-dashboard-modal__layout .clickable-icon.is-active {
@@ -755,6 +771,11 @@
     }
 }
 
-body.is-mac .ioto-dashboard-modal.is-fullscreen .modal-title {
-    padding-inline-start: 72px;
+/* macOS 隐藏标题栏：左上角是系统红黄绿按钮区（--frame-left-space）。
+   系统全屏没有窗口按钮（:not(.is-fullscreen) 摘掉）；藏成功则不缩进，
+   藏失败（类没挂）才退回变量缩进兜底。 */
+body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
+    .ioto-dashboard-modal.is-fullscreen:not(.is-frame-buttons-hidden)
+    .modal-title {
+    padding-inline-start: var(--frame-left-space);
 }

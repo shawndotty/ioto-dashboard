@@ -1,6 +1,10 @@
 import { Modal, Platform, setIcon } from "obsidian";
 import { t } from "../lang/helpers";
 import type { CollectionLayout } from "./collection-view";
+import {
+	hideMacWindowButtons,
+	restoreMacWindowButtons,
+} from "./macos-window-buttons";
 
 export type ModalKind = "query-manager" | "query-editor" | "component-picker";
 
@@ -17,9 +21,35 @@ let lastFullscreen = false;
 
 const SHELL_FLAG = "iotoShellKind";
 const TOOLS_CLASS = "ioto-dashboard-modal__tools";
+const CLOSE_SELECTOR =
+	":scope > .modal-header-button, :scope > .modal-close-button";
+const CLOSE_IN_ROW_CLASS = "is-close-in-row";
+const FRAME_HIDDEN_CLASS = "is-frame-buttons-hidden";
 
 function isFullscreen(modal: Modal): boolean {
 	return modal.modalEl.classList.contains("is-fullscreen");
+}
+
+function restoreFrameButtons(modal: Modal): void {
+	if (!modal.modalEl.classList.contains(FRAME_HIDDEN_CLASS)) {
+		return;
+	}
+	restoreMacWindowButtons();
+	modal.modalEl.removeClass(FRAME_HIDDEN_CLASS);
+}
+
+function setFullscreen(modal: Modal, on: boolean): void {
+	modal.modalEl.toggleClass("is-fullscreen", on);
+	if (!on) {
+		restoreFrameButtons(modal);
+		return;
+	}
+	// 系统原生全屏（body.is-fullscreen）本就没有窗口按钮，不用我们藏。
+	// 类只在 hide 成功时挂：它是 CSS 让位缩进的豁免开关，宁缩进不遮挡。
+	const hiddenByUs =
+		!modal.modalEl.ownerDocument.body.classList.contains("is-fullscreen") &&
+		hideMacWindowButtons();
+	modal.modalEl.toggleClass(FRAME_HIDDEN_CLASS, hiddenByUs);
 }
 
 function updateFullscreenButton(button: HTMLElement, on: boolean): void {
@@ -46,7 +76,7 @@ export function applyModalShell(
 
 	if (options.restore) {
 		const remembered = sessionState.get(options.kind) ?? lastFullscreen;
-		modal.modalEl.toggleClass("is-fullscreen", remembered);
+		setFullscreen(modal, remembered);
 	}
 
 	modal.modalEl.dataset[SHELL_FLAG] = options.kind;
@@ -61,11 +91,19 @@ export function applyModalShell(
 		updateFullscreenButton(button, isFullscreen(modal));
 		button.addEventListener("click", () => {
 			const next = !isFullscreen(modal);
-			modal.modalEl.toggleClass("is-fullscreen", next);
+			setFullscreen(modal, next);
 			updateFullscreenButton(button, next);
 			sessionState.set(options.kind, next);
 			lastFullscreen = next;
 		});
+	}
+
+	// 核心把关闭按钮 absolute 钉在 .modal 角上，搬进 __tools 才能与工具图标同排。
+	// 找不到（核心改名）不挂类，CSS 兜底为右侧留白，功能不坏。
+	const closeEl = modal.modalEl.querySelector<HTMLElement>(CLOSE_SELECTOR);
+	if (closeEl) {
+		tools.appendChild(closeEl);
+		modal.modalEl.addClass(CLOSE_IN_ROW_CLASS);
 	}
 
 	const previousOnClose = modal.onClose.bind(modal);
@@ -73,6 +111,7 @@ export function applyModalShell(
 		const state = isFullscreen(modal);
 		sessionState.set(options.kind, state);
 		lastFullscreen = state;
+		restoreFrameButtons(modal);
 		previousOnClose();
 	};
 }

@@ -17,6 +17,7 @@ import {
 } from "./settings";
 
 import { IotoSettingsService } from "./services/ioto-settings-services";
+import { restoreMacWindowButtons } from "./ui/macos-window-buttons";
 import { VaultIndex } from "./data/vault-index";
 import type { IndexConfig, SectionHeadings } from "./data/types";
 import { DashboardRepository } from "./dashboard/repository";
@@ -203,7 +204,10 @@ export default class IotoDashboardPlugin extends Plugin {
 	}
 
 	onunload() {
-		// View automatically unloads
+		restoreMacWindowButtons();
+		window.activeDocument
+			.querySelectorAll(".ioto-dashboard-modal.is-frame-buttons-hidden")
+			.forEach((el) => el.classList.remove("is-frame-buttons-hidden"));
 	}
 
 	async activateView(
