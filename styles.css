@@ -500,12 +500,6 @@
     white-space: nowrap;
 }
 
-.ioto-custom-dashboard-view .ioto-card-query,
-.ioto-custom-dashboard-view .ioto-card-basis {
-    max-width: 160px;
-    font-size: 0.8em;
-}
-
 .ioto-custom-dashboard-view .ioto-dashboard-card-body {
     flex: 1 1 auto;
     min-height: 0;
@@ -569,11 +563,6 @@
 .ioto-custom-dashboard-view .ioto-kpi-meta {
     font-size: 0.82em;
     color: var(--text-muted);
-}
-
-.ioto-custom-dashboard-view .ioto-kpi-hint {
-    font-size: 0.78em;
-    color: var(--text-faint);
 }
 
 /* Project progress */
@@ -873,15 +862,6 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
    Custom Dashboard layout editing (drag / resize)
    ========================================================================== */
 
-.ioto-custom-dashboard-view .ioto-dashboard-card-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-bottom: 1px solid var(--background-modifier-border);
-}
-
 .ioto-custom-dashboard-view .ioto-card-drag-handle {
     cursor: grab;
     touch-action: none;
@@ -893,36 +873,6 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 
 .ioto-custom-dashboard-view .ioto-card-drag-handle:active {
     cursor: grabbing;
-}
-
-.ioto-custom-dashboard-view .ioto-card-size-controls,
-.ioto-custom-dashboard-view .ioto-card-order-controls {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-}
-
-.ioto-custom-dashboard-view .ioto-card-control-label {
-    margin-inline-start: 6px;
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-}
-
-.ioto-custom-dashboard-view .ioto-card-control-value {
-    min-width: 3.2em;
-    white-space: nowrap;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    font-size: var(--font-ui-smaller);
-}
-
-.ioto-custom-dashboard-view .ioto-card-step {
-    padding: 0 4px;
-}
-
-.ioto-custom-dashboard-view .ioto-card-step:disabled {
-    opacity: 0.4;
-    cursor: default;
 }
 
 .ioto-custom-dashboard-view .ioto-card-resize-handle {
@@ -1040,4 +990,184 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     pointer-events: none;
     z-index: 1000;
     will-change: transform;
+}
+
+/* ==========================================================================
+   Component inspector
+   ========================================================================== */
+
+.ioto-inspector {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 8px 0 16px;
+}
+
+.ioto-inspector-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--background-primary);
+    padding: 4px 0;
+    margin-top: -4px;
+}
+
+.ioto-inspector-inline .ioto-inspector-header {
+    background: var(--background-secondary);
+}
+
+.ioto-inspector-header .clickable-icon:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.ioto-inspector-breadcrumb {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+    color: var(--text-normal);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-inspector-empty-title {
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.ioto-inspector-hint,
+.ioto-inspector-message,
+.ioto-inspector-empty-desc {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-inspector-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid var(--background-modifier-border);
+    padding-top: 12px;
+}
+
+.ioto-inspector-header + .ioto-inspector-section,
+.ioto-inspector-hint + .ioto-inspector-section {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.ioto-inspector-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.ioto-inspector-section-title {
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-semibold);
+    color: var(--text-muted);
+}
+
+.ioto-inspector-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ioto-inspector-field > label,
+.ioto-inspector-row-label {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.ioto-inspector-field select,
+.ioto-inspector-field input {
+    width: 100%;
+}
+
+.ioto-inspector-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ioto-inspector-row-label {
+    flex: 0 0 3.6em;
+}
+
+.ioto-inspector-stepper {
+    display: inline-flex;
+    align-items: center;
+    margin-left: auto;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.ioto-inspector-stepper .ioto-inspector-step {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0 8px;
+    height: 26px;
+}
+
+.ioto-inspector-value {
+    min-width: 2.6em;
+    text-align: center;
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-inspector-step {
+    padding: 0 8px;
+}
+
+.ioto-inspector-step:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.ioto-inspector-order-buttons {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.ioto-inspector-order-position {
+    margin-left: auto;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-inspector.is-readonly .ioto-inspector-field,
+.ioto-inspector.is-readonly .ioto-inspector-row {
+    opacity: 0.7;
+}
+
+.ioto-inspector-inline {
+    max-height: 40vh;
+    overflow-y: auto;
+    padding: 0 12px;
+    border-top: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+}
+
+.ioto-inspector-inline.is-hidden {
+    display: none;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-card.is-selected {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: -2px;
+}
+
+.ioto-custom-dashboard-view.is-editing .ioto-dashboard-card {
+    cursor: pointer;
 }

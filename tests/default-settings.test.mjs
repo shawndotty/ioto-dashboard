@@ -30,11 +30,12 @@ test("settings.ts imports under the 'ui/' alias", async () => {
 	assert.ok(settings && typeof settings === 'object');
 });
 
-test('DEFAULT_SETTINGS has exactly the 8 expected keys', async () => {
+test('DEFAULT_SETTINGS has exactly the 9 expected keys', async () => {
 	const settings = await loadDefaultSettings('en');
 	assert.deepEqual(Object.keys(settings).sort(), [
 		'customFilters',
 		'inputFolder',
+		'inspectorHost',
 		'modalLayout',
 		'outcomeFolder',
 		'outputFolder',
@@ -43,6 +44,7 @@ test('DEFAULT_SETTINGS has exactly the 8 expected keys', async () => {
 		'taskFolder',
 	]);
 	assert.equal(settings.modalLayout, 'list');
+	assert.equal(settings.inspectorHost, 'auto');
 });
 
 test('pageSize is 100 and the two collections are empty arrays', async () => {

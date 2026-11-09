@@ -18,6 +18,7 @@ const {
 	DASHBOARD_VIEW_TYPE,
 	TASK_VIEW_TYPE,
 	NOTE_VIEW_TYPE,
+	CUSTOM_INSPECTOR_VIEW_TYPE,
 } = await jiti.import('../src/models/constants.ts');
 
 // 视图 type 是 Obsidian registerView / setViewState 使用的稳定 ID，
@@ -26,13 +27,19 @@ test('view type constants keep their registered values', () => {
 	assert.equal(DASHBOARD_VIEW_TYPE, 'ioto-dashboard-view');
 	assert.equal(TASK_VIEW_TYPE, 'ioto-task-view');
 	assert.equal(NOTE_VIEW_TYPE, 'ioto-note-view');
+	assert.equal(CUSTOM_INSPECTOR_VIEW_TYPE, 'ioto-custom-inspector-view');
 });
 
 test('view type constants are distinct and share the ioto-*-view shape', () => {
-	const all = [DASHBOARD_VIEW_TYPE, TASK_VIEW_TYPE, NOTE_VIEW_TYPE];
-	assert.equal(new Set(all).size, 3, 'view types must be distinct');
+	const all = [
+		DASHBOARD_VIEW_TYPE,
+		TASK_VIEW_TYPE,
+		NOTE_VIEW_TYPE,
+		CUSTOM_INSPECTOR_VIEW_TYPE,
+	];
+	assert.equal(new Set(all).size, 4, 'view types must be distinct');
 	for (const value of all) {
-		assert.match(value, /^ioto-[a-z]+-view$/);
+		assert.match(value, /^ioto-[a-z-]+-view$/);
 	}
 });
 
@@ -51,6 +58,7 @@ test('main.ts registers views by these constants', () => {
 		'DASHBOARD_VIEW_TYPE',
 		'TASK_VIEW_TYPE',
 		'NOTE_VIEW_TYPE',
+		'CUSTOM_INSPECTOR_VIEW_TYPE',
 	]) {
 		assert.ok(
 			new RegExp(`registerView\\(\\s*${name}\\b`).test(src),

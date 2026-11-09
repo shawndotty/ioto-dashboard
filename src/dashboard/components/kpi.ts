@@ -8,6 +8,11 @@ export const kpiComponent: ComponentDefinition = {
 	defaultQueryId: "builtin:tasks-all",
 	createConfig: (queryId) => ({ queryId, basis: "file", w: 3, h: 2 }),
 	size: { maxH: 6 },
+	settings: [
+		{ key: "queryId", kind: "query", group: "data" },
+		{ key: "basis", kind: "basis", group: "data", fallback: "file" },
+		{ key: "title", kind: "text", group: "display" },
+	],
 	toMetricRequest: (config) => ({
 		kind: "task-count",
 		queryId: config.queryId,
@@ -34,11 +39,5 @@ export const kpiComponent: ComponentDefinition = {
 			cls: "ioto-kpi-meta",
 			text: `${queryName} · ${t(basisKey)}`,
 		});
-		if (ctx.editMode) {
-			el.createDiv({
-				cls: "ioto-kpi-hint",
-				text: t("KPI_EDIT_HINT"),
-			});
-		}
 	},
 };

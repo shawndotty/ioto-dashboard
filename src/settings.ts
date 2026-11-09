@@ -5,6 +5,7 @@ import { FolderPickerModal } from "./ui/pickers/folder-picker";
 import { PropertyPickerModal } from "./ui/pickers/property-picker";
 import { TabbedSettings } from "ui/tabbed-settings";
 import { SortOption, SortOrder, GroupOption } from "./models/types";
+import type { InspectorHost } from "./dashboard/inspector-service";
 
 export interface SavedQuery {
 	id: string;
@@ -55,6 +56,7 @@ export interface IotoDashboardSettings {
 	savedQueries: SavedQuery[];
 	customFilters: CustomFilter[];
 	modalLayout?: ModalLayout;
+	inspectorHost?: InspectorHost;
 }
 
 export const DEFAULT_SETTINGS: IotoDashboardSettings = {
@@ -66,6 +68,7 @@ export const DEFAULT_SETTINGS: IotoDashboardSettings = {
 	savedQueries: [],
 	customFilters: [],
 	modalLayout: "list",
+	inspectorHost: "auto",
 };
 
 export class DashboardSettingTab extends PluginSettingTab {
@@ -216,6 +219,24 @@ export class DashboardSettingTab extends PluginSettingTab {
 						if (val < 20) val = 20;
 						if (val > 300) val = 300;
 						this.plugin.settings.pageSize = val;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName(t("INSPECTOR_HOST_LABEL"))
+			.setDesc(t("INSPECTOR_HOST_DESC"))
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("auto", t("INSPECTOR_HOST_AUTO"))
+					.addOption("sidebar", t("INSPECTOR_HOST_SIDEBAR"))
+					.addOption("inline", t("INSPECTOR_HOST_INLINE"))
+					.setValue(this.plugin.settings.inspectorHost ?? "auto")
+					.onChange(async (value) => {
+						this.plugin.settings.inspectorHost = value as
+							| "auto"
+							| "sidebar"
+							| "inline";
 						await this.plugin.saveSettings();
 					}),
 			);

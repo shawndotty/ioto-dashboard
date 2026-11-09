@@ -8,6 +8,20 @@ export const unfinishedTasksComponent: ComponentDefinition = {
 	defaultQueryId: "builtin:tasks-unfinished",
 	createConfig: (queryId) => ({ queryId, basis: "section", limit: 20, w: 6, h: 3 }),
 	size: { maxH: 24 },
+	settings: [
+		{ key: "queryId", kind: "query", group: "data" },
+		{ key: "basis", kind: "basis", group: "data", fallback: "section" },
+		{
+			key: "limit",
+			kind: "number",
+			group: "data",
+			min: 1,
+			max: 100,
+			step: 1,
+			fallback: 20,
+		},
+		{ key: "title", kind: "text", group: "display" },
+	],
 	toMetricRequest: (config) => ({
 		kind: "unfinished-tasks",
 		queryId: config.queryId,

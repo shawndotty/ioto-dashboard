@@ -1,6 +1,7 @@
 import {
 	ItemView,
 	Notice,
+	Platform,
 	TFile,
 	ViewStateResult,
 	WorkspaceLeaf,
@@ -10,6 +11,12 @@ import type IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { createComponentRegistry } from "../dashboard/components";
 import { DataHub } from "../dashboard/data-hub";
+import type {
+	InspectorController,
+	InspectorFocus,
+	InspectorTarget,
+} from "../dashboard/inspector-service";
+import { resolveInspectorHost } from "../dashboard/inspector-service";
 import {
 	dropIndex,
 	gridMetrics,
@@ -37,6 +44,7 @@ import { ComponentPickerModal } from "../ui/component-picker";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { PageNameModal } from "../ui/page-name-modal";
 import { QueryEditModal, QueryManagerModal } from "../ui/query-editor";
+import { ComponentInspector } from "./components/ComponentInspector";
 
 export class CustomDashboardView extends ItemView {
 	private store: DashboardStoreData | null = null;
@@ -50,9 +58,16 @@ export class CustomDashboardView extends ItemView {
 	private renderDeferred = false;
 	private isNarrow = false;
 	private resizeObserver: ResizeObserver | null = null;
-	private pendingFocus: { componentId: string; action: string } | null = null;
 	private dataVersion = 0;
 	private queriesVersion = 0;
+	private readonly leafId = `canvas:${Date.now().toString(36)}-${Math.random()
+		.toString(36)
+		.slice(2, 8)}`;
+	private selectedComponentId: string | null = null;
+	private controller: InspectorController | null = null;
+	private inspectorEl: HTMLElement | null = null;
+	private inspector: ComponentInspector | null = null;
+	private inspectorUnsubscribe: (() => void) | null = null;
 	private toolbarEl: HTMLElement | null = null;
 	private bannerEl: HTMLElement | null = null;
 	private pagesEl: HTMLElement | null = null;
@@ -123,11 +138,18 @@ export class CustomDashboardView extends ItemView {
 			this.updateVisibility(),
 		);
 		this.observeContainerWidth();
+		this.controller = this.createInspectorController();
+		this.registerDomEvent(this.contentEl, "keydown", (event) => {
+			if (event.key !== "Escape" || this.interacting) return;
+			if (this.selectedComponentId) this.clearSelection();
+		});
 		this.render();
 		this.updateVisibility();
 	}
 
 	async onClose(): Promise<void> {
+		this.destroyInlineInspector();
+		this.plugin.inspectorService.clear(this.leafId);
 		for (const unsubscribe of this.unsubscribers) unsubscribe();
 		this.unsubscribers = [];
 		this.resizeObserver?.disconnect();
@@ -224,7 +246,7 @@ export class CustomDashboardView extends ItemView {
 		}
 
 		this.contentEl.scrollTop = scrollTop;
-		this.restoreFocus();
+		this.syncInspector();
 	}
 
 	private ensureShell(): void {
@@ -308,6 +330,9 @@ export class CustomDashboardView extends ItemView {
 	private ensureGrid(): HTMLElement {
 		if (!this.gridEl) {
 			this.gridEl = this.contentEl.createDiv({ cls: "ioto-dashboard-grid" });
+			this.gridEl.addEventListener("click", (event) => {
+				if (event.target === this.gridEl) this.clearSelection();
+			});
 		}
 		return this.gridEl;
 	}
@@ -373,6 +398,7 @@ export class CustomDashboardView extends ItemView {
 
 	private switchPage(pageId: string): void {
 		if (pageId === this.activePage?.id) return;
+		this.clearSelection();
 		this.leafPageId = pageId;
 		this.render();
 		this.app.workspace.requestSaveLayout();
@@ -380,6 +406,7 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private async createPage(): Promise<void> {
+		this.clearSelection();
 		const taken = new Set(this.store?.pages.map((page) => page.id) ?? []);
 		let id = `page:${Date.now()}`;
 		let n = 2;
@@ -493,6 +520,7 @@ export class CustomDashboardView extends ItemView {
 				grid.insertBefore(node, current ?? null);
 			}
 		}
+		this.syncSelectionClasses();
 	}
 
 	/** Rebuild triggers: config, edit state, data refresh and query edits. */
@@ -526,6 +554,19 @@ export class CustomDashboardView extends ItemView {
 		const size = clampSize(config.w, config.h, this.boundsFor(config));
 		card.style.gridColumn = `span ${size.w}`;
 		card.style.gridRow = `span ${size.h}`;
+		if (this.editMode) {
+			card.addEventListener("click", (event) => {
+				const target = event.target as HTMLElement | null;
+				if (
+					target?.closest(
+						"button, .ioto-card-drag-handle, .ioto-card-resize-handle",
+					)
+				) {
+					return;
+				}
+				this.selectComponent(config.id);
+			});
+		}
 
 		const header = card.createDiv({ cls: "ioto-dashboard-card-header" });
 		if (this.editMode) {
@@ -542,13 +583,6 @@ export class CustomDashboardView extends ItemView {
 		if (this.editMode) {
 			this.renderRenameButton(header, config);
 			this.renderRemoveButton(header, config);
-		}
-
-		if (this.editMode) {
-			const toolbar = card.createDiv({
-				cls: "ioto-dashboard-card-toolbar",
-			});
-			this.renderCardToolbar(toolbar, config, queries);
 		}
 
 		const body = card.createDiv({ cls: "ioto-dashboard-card-body" });
@@ -615,9 +649,10 @@ export class CustomDashboardView extends ItemView {
 			},
 			text: "⋮⋮",
 		});
-		handle.addEventListener("pointerdown", (event) =>
-			this.armDragSort(grid, card, config.id, event),
-		);
+		handle.addEventListener("pointerdown", (event) => {
+			this.selectComponent(config.id);
+			this.armDragSort(grid, card, config.id, event);
+		});
 	}
 
 	private renderRenameButton(
@@ -634,7 +669,10 @@ export class CustomDashboardView extends ItemView {
 			},
 			text: "✎",
 		});
-		rename.onClickEvent(() => this.openRenameComponent(config));
+		rename.onClickEvent((event) => {
+			event.stopPropagation();
+			this.selectComponent(config.id, "title");
+		});
 	}
 
 	private renderRemoveButton(
@@ -651,58 +689,10 @@ export class CustomDashboardView extends ItemView {
 			},
 			text: "×",
 		});
-		remove.onClickEvent(async () => {
-			const pageId = this.activePage?.id;
-			if (!pageId) return;
-			this.store = await this.plugin.dashboardRepository.removeComponent(
-				pageId,
-				config.id,
-			);
-			this.render();
+		remove.onClickEvent((event) => {
+			event.stopPropagation();
+			this.confirmRemove(config.id);
 		});
-	}
-
-	private renderCardToolbar(
-		toolbar: HTMLElement,
-		config: DashboardComponentConfig,
-		queries: QueryRepository,
-	): void {
-		const select = toolbar.createEl("select", {
-			cls: "dropdown ioto-card-query",
-		});
-		for (const query of queries.list()) {
-			const option = select.createEl("option", {
-				text: query.nameKey
-					? t(query.nameKey as Parameters<typeof t>[0])
-					: query.name,
-				value: query.id,
-			});
-			if (query.id === config.queryId) option.selected = true;
-		}
-		select.addEventListener("change", (event) => {
-			const target = event.target as HTMLSelectElement;
-			void this.updateComponent(config.id, { queryId: target.value });
-		});
-
-		const basis = toolbar.createEl("select", {
-			cls: "dropdown ioto-card-basis",
-		});
-		for (const value of ["file", "section"]) {
-			const option = basis.createEl("option", {
-				text: t(value === "file" ? "KPI_BASIS_FILE" : "KPI_BASIS_SECTION"),
-				value,
-			});
-			if ((config.basis ?? "file") === value) option.selected = true;
-		}
-		basis.addEventListener("change", (event) => {
-			const target = event.target as HTMLSelectElement;
-			void this.updateComponent(config.id, {
-				basis: target.value === "section" ? "section" : "file",
-			});
-		});
-
-		this.renderSizeControls(toolbar, config);
-		this.renderOrderControls(toolbar, config);
 	}
 
 	private boundsFor(config: DashboardComponentConfig): SizeBounds {
@@ -718,145 +708,6 @@ export class CustomDashboardView extends ItemView {
 		return clampSize(defaults?.w, defaults?.h, bounds);
 	}
 
-	private renderSizeControls(
-		toolbar: HTMLElement,
-		config: DashboardComponentConfig,
-	): void {
-		const bounds = this.boundsFor(config);
-		const size = clampSize(config.w, config.h, bounds);
-		const group = toolbar.createDiv({ cls: "ioto-card-size-controls" });
-
-		if (size.h <= bounds.minH) {
-			group.setAttr("title", t("DASHBOARD_SIZE_MIN_HINT", [String(bounds.minH)]));
-		} else if (size.h >= bounds.maxH) {
-			group.setAttr("title", t("DASHBOARD_SIZE_MAX_HINT", [String(bounds.maxH)]));
-		}
-
-		group.createSpan({
-			cls: "ioto-card-control-label",
-			text: t("DASHBOARD_WIDTH"),
-		});
-		this.renderStepButton(
-			group,
-			"width-dec",
-			"−",
-			`${t("DASHBOARD_DECREASE")} ${t("DASHBOARD_WIDTH")} ${size.w}`,
-			size.w <= bounds.minW,
-			config.id,
-			() => void this.stepComponentSize(config.id, "w", -1),
-		);
-		group.createSpan({
-			cls: "ioto-card-control-value",
-			text: String(size.w),
-		});
-		this.renderStepButton(
-			group,
-			"width-inc",
-			"+",
-			`${t("DASHBOARD_INCREASE")} ${t("DASHBOARD_WIDTH")} ${size.w}`,
-			size.w >= bounds.maxW,
-			config.id,
-			() => void this.stepComponentSize(config.id, "w", 1),
-		);
-
-		group.createSpan({
-			cls: "ioto-card-control-label",
-			text: t("DASHBOARD_HEIGHT"),
-		});
-		this.renderStepButton(
-			group,
-			"height-dec",
-			"−",
-			`${t("DASHBOARD_DECREASE")} ${t("DASHBOARD_HEIGHT")} ${size.h}`,
-			size.h <= bounds.minH,
-			config.id,
-			() => void this.stepComponentSize(config.id, "h", -1),
-			t("DASHBOARD_SIZE_MIN_HINT", [String(bounds.minH)]),
-		);
-		group.createSpan({
-			cls: "ioto-card-control-value",
-			text: `${size.h} / ${bounds.maxH}`,
-		});
-		this.renderStepButton(
-			group,
-			"height-inc",
-			"+",
-			`${t("DASHBOARD_INCREASE")} ${t("DASHBOARD_HEIGHT")} ${size.h}`,
-			size.h >= bounds.maxH,
-			config.id,
-			() => void this.stepComponentSize(config.id, "h", 1),
-			t("DASHBOARD_SIZE_MAX_HINT", [String(bounds.maxH)]),
-		);
-
-		const defaults = this.defaultSizeFor(config, bounds);
-		this.renderStepButton(
-			group,
-			"size-reset",
-			"↺",
-			t("DASHBOARD_RESET_SIZE"),
-			size.w === defaults.w && size.h === defaults.h,
-			config.id,
-			() => void this.resetComponentSize(config.id),
-		);
-	}
-
-	private renderOrderControls(
-		toolbar: HTMLElement,
-		config: DashboardComponentConfig,
-	): void {
-		const page = this.activePage;
-		const index =
-			page?.components.findIndex((item) => item.id === config.id) ?? -1;
-		const last = (page?.components.length ?? 0) - 1;
-		const group = toolbar.createDiv({ cls: "ioto-card-order-controls" });
-		this.renderStepButton(
-			group,
-			"move-up",
-			"↑",
-			t("DASHBOARD_MOVE_UP"),
-			index <= 0,
-			config.id,
-			() => void this.nudgeComponent(config.id, -1),
-		);
-		this.renderStepButton(
-			group,
-			"move-down",
-			"↓",
-			t("DASHBOARD_MOVE_DOWN"),
-			index < 0 || index >= last,
-			config.id,
-			() => void this.nudgeComponent(config.id, 1),
-		);
-	}
-
-	private renderStepButton(
-		container: HTMLElement,
-		action: string,
-		label: string,
-		ariaLabel: string,
-		disabled: boolean,
-		componentId: string,
-		onStep: () => void,
-		hint?: string,
-	): void {
-		const labelText = disabled && hint ? hint : ariaLabel;
-		const button = container.createEl("button", {
-			cls: "clickable-icon ioto-card-step",
-			attr: {
-				type: "button",
-				"aria-label": labelText,
-				title: labelText,
-				"data-action": action,
-			},
-			text: label,
-		});
-		button.disabled = disabled;
-		button.onClickEvent(() => {
-			this.pendingFocus = { componentId, action };
-			onStep();
-		});
-	}
-
 	private async stepComponentSize(
 		componentId: string,
 		axis: "w" | "h",
@@ -869,10 +720,6 @@ export class CustomDashboardView extends ItemView {
 		const current = clampSize(config.w, config.h, bounds);
 		const next = stepSize(config.w, config.h, axis, direction, bounds);
 		if (next.w === current.w && next.h === current.h) return;
-		this.pendingFocus = {
-			componentId,
-			action: `${axis === "w" ? "width" : "height"}-${direction < 0 ? "dec" : "inc"}`,
-		};
 		this.store = await this.plugin.dashboardRepository.updateComponent(
 			page.id,
 			componentId,
@@ -889,7 +736,6 @@ export class CustomDashboardView extends ItemView {
 		const current = clampSize(config.w, config.h, bounds);
 		const defaults = this.defaultSizeFor(config, bounds);
 		if (defaults.w === current.w && defaults.h === current.h) return;
-		this.pendingFocus = { componentId, action: "size-reset" };
 		this.store = await this.plugin.dashboardRepository.updateComponent(
 			page.id,
 			componentId,
@@ -907,45 +753,12 @@ export class CustomDashboardView extends ItemView {
 		const from = page.components.findIndex((item) => item.id === componentId);
 		const to = from + offset;
 		if (from < 0 || to < 0 || to >= page.components.length) return;
-		this.pendingFocus = {
-			componentId,
-			action: offset < 0 ? "move-up" : "move-down",
-		};
 		this.store = await this.plugin.dashboardRepository.moveComponent(
 			page.id,
 			componentId,
 			to,
 		);
 		this.render();
-	}
-
-	private openRenameComponent(config: DashboardComponentConfig): void {
-		new PageNameModal(
-			this.app,
-			config.title ?? "",
-			(name) => {
-				void (async () => {
-					const pageId = this.activePage?.id;
-					if (!pageId) return;
-					this.pendingFocus = {
-						componentId: config.id,
-						action: "rename",
-					};
-					this.store =
-						await this.plugin.dashboardRepository.updateComponent(
-							pageId,
-							config.id,
-							{ title: name || undefined },
-						);
-					this.render();
-				})();
-			},
-			{
-				titleKey: "DASHBOARD_RENAME_COMPONENT",
-				placeholderKey: "DASHBOARD_RENAME_PLACEHOLDER",
-				allowEmpty: true,
-			},
-		).open();
 	}
 
 	private renderResizeHandle(
@@ -1005,17 +818,202 @@ export class CustomDashboardView extends ItemView {
 		this.render();
 	}
 
-	private restoreFocus(): void {
-		const target = this.pendingFocus;
-		if (!target) return;
-		this.pendingFocus = null;
-		const card = this.contentEl.querySelector(
-			`.ioto-dashboard-card[data-component-id="${target.componentId}"]`,
+	private selectComponent(id: string, focus?: InspectorFocus): void {
+		const pageId = this.activePage?.id;
+		if (!pageId) return;
+		this.selectedComponentId = id;
+		this.syncSelectionClasses();
+		this.ensureInspectorHost();
+		if (!this.controller) return;
+		this.plugin.inspectorService.select(
+			{ leafId: this.leafId, pageId, componentId: id },
+			this.controller,
+			{ focus },
 		);
-		const button = card?.querySelector<HTMLElement>(
-			`[data-action="${target.action}"]`,
+	}
+
+	private clearSelection(): void {
+		if (!this.selectedComponentId) return;
+		this.selectedComponentId = null;
+		this.syncSelectionClasses();
+		this.inspectorEl?.toggleClass("is-hidden", true);
+		this.plugin.inspectorService.clear(this.leafId);
+	}
+
+	private syncSelectionState(): void {
+		const id = this.selectedComponentId;
+		if (!id) return;
+		if (this.activePage?.components.some((item) => item.id === id)) return;
+		this.selectedComponentId = null;
+		this.plugin.inspectorService.clear(this.leafId);
+	}
+
+	private syncSelectionClasses(): void {
+		if (!this.gridEl) return;
+		for (const child of Array.from(this.gridEl.children)) {
+			const element = child as HTMLElement;
+			const id = element.dataset.componentId;
+			if (!id) continue;
+			element.toggleClass("is-selected", id === this.selectedComponentId);
+		}
+	}
+
+	private inspectorHost(): "sidebar" | "inline" {
+		return resolveInspectorHost(
+			this.plugin.settings.inspectorHost ?? "auto",
+			Platform.isMobile,
 		);
-		if (button && !button.hasAttribute("disabled")) button.focus();
+	}
+
+	private ensureInspectorHost(): void {
+		if (this.inspectorHost() === "sidebar") {
+			this.destroyInlineInspector();
+			void this.plugin.revealInspector();
+			return;
+		}
+		this.ensureInlineInspector();
+	}
+
+	private syncInspector(): void {
+		this.contentEl.toggleClass("is-editing", this.editMode);
+		this.syncSelectionState();
+		this.syncSelectionClasses();
+		if (this.inspectorHost() === "sidebar") {
+			this.destroyInlineInspector();
+			this.plugin.inspectorService.refresh();
+			return;
+		}
+		if (this.selectedComponentId) this.ensureInlineInspector();
+		else this.inspectorEl?.toggleClass("is-hidden", true);
+		this.plugin.inspectorService.refresh();
+	}
+
+	private ensureInlineInspector(): void {
+		if (!this.inspectorEl) {
+			this.inspectorEl = this.contentEl.createDiv({
+				cls: "ioto-inspector-inline",
+			});
+			this.inspector = new ComponentInspector(this.inspectorEl, {
+				patch: (patch) => this.controller?.patch(patch),
+				stepSize: (axis, direction) =>
+					this.controller?.stepSize(axis, direction),
+				resetSize: () => this.controller?.resetSize(),
+				move: (offset) => this.controller?.move(offset),
+				remove: () => this.controller?.remove(),
+			});
+			this.inspectorUnsubscribe =
+				this.plugin.inspectorService.subscribe(() =>
+					this.renderInlineInspector(),
+				);
+		}
+		this.inspectorEl.toggleClass("is-hidden", false);
+		this.contentEl.appendChild(this.inspectorEl);
+		this.renderInlineInspector();
+	}
+
+	private renderInlineInspector(): void {
+		if (!this.inspector) return;
+		const service = this.plugin.inspectorService;
+		const current = service.current();
+		const mine =
+			this.selectedComponentId !== null &&
+			current?.selection.leafId === this.leafId &&
+			current.selection.componentId === this.selectedComponentId;
+		const snapshot = mine ? service.snapshot() : null;
+		const focus = service.consumeFocus();
+		if (!snapshot) {
+			this.inspector.render(null);
+		} else {
+			this.inspector.render({ ...snapshot, focus });
+		}
+		this.inspectorEl?.toggleClass(
+			"is-hidden",
+			this.selectedComponentId === null,
+		);
+	}
+
+	private destroyInlineInspector(): void {
+		this.inspectorUnsubscribe?.();
+		this.inspectorUnsubscribe = null;
+		this.inspector?.destroy();
+		this.inspector = null;
+		this.inspectorEl?.remove();
+		this.inspectorEl = null;
+	}
+
+	private createInspectorController(): InspectorController {
+		return {
+			leafId: this.leafId,
+			isEditable: () => this.editMode,
+			getTarget: () => this.inspectorTarget(),
+			listQueries: () => this.queryRepository().list(),
+			queriesVersion: () => this.queriesVersion,
+			patch: (patch) => {
+				const id = this.selectedComponentId;
+				if (id) void this.updateComponent(id, patch);
+			},
+			stepSize: (axis, direction) => {
+				const id = this.selectedComponentId;
+				if (id) void this.stepComponentSize(id, axis, direction);
+			},
+			resetSize: () => {
+				const id = this.selectedComponentId;
+				if (id) void this.resetComponentSize(id);
+			},
+			move: (offset) => {
+				const id = this.selectedComponentId;
+				if (id) void this.nudgeComponent(id, offset);
+			},
+			remove: () => this.confirmRemoveSelected(),
+		};
+	}
+
+	private inspectorTarget(): InspectorTarget | null {
+		const page = this.activePage;
+		const id = this.selectedComponentId;
+		if (!page || !id) return null;
+		const index = page.components.findIndex((item) => item.id === id);
+		const config = index >= 0 ? page.components[index] : undefined;
+		if (!config) return null;
+		const bounds = this.boundsFor(config);
+		return {
+			pageName: page.name,
+			index,
+			total: page.components.length,
+			config,
+			definition: this.registry.get(config.type),
+			bounds,
+			defaults: this.defaultSizeFor(config, bounds),
+		};
+	}
+
+	private confirmRemoveSelected(): void {
+		const id = this.selectedComponentId;
+		if (!id) return;
+		this.confirmRemove(id);
+	}
+
+	private confirmRemove(componentId: string): void {
+		new ConfirmModal(
+			this.app,
+			t("INSPECTOR_TITLE"),
+			t("INSPECTOR_REMOVE_CONFIRM"),
+			() => void this.removeComponent(componentId),
+		).open();
+	}
+
+	private async removeComponent(componentId: string): Promise<void> {
+		const pageId = this.activePage?.id;
+		if (!pageId) return;
+		this.store = await this.plugin.dashboardRepository.removeComponent(
+			pageId,
+			componentId,
+		);
+		if (this.selectedComponentId === componentId) {
+			this.selectedComponentId = null;
+			this.plugin.inspectorService.clear(this.leafId);
+		}
+		this.render();
 	}
 
 	private observeContainerWidth(): void {
@@ -1568,7 +1566,9 @@ export class CustomDashboardView extends ItemView {
 						config,
 					);
 					this.editMode = true;
+					this.selectedComponentId = config.id;
 					this.render();
+					this.selectComponent(config.id, "first");
 				})();
 			},
 			{

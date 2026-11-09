@@ -1,4 +1,5 @@
 import type {
+	CountBasis,
 	MetricRequest,
 	MetricResult,
 	ProjectProgressGroup,
@@ -7,6 +8,22 @@ import type { QueryDefinition } from "../query/types";
 import type { DashboardComponentConfig } from "./types";
 
 export type ComponentStatus = "loading" | "ready" | "empty" | "error";
+
+export type ComponentSettingGroup = "data" | "display";
+
+export type ComponentSetting =
+	| { key: "queryId"; kind: "query"; group: "data" }
+	| { key: "basis"; kind: "basis"; group: "data"; fallback: CountBasis }
+	| {
+			key: "limit";
+			kind: "number";
+			group: "data";
+			min: number;
+			max: number;
+			step?: number;
+			fallback: number;
+	  }
+	| { key: "title"; kind: "text"; group: "display"; placeholderKey?: string };
 
 export interface ComponentRenderContext {
 	config: DashboardComponentConfig;
@@ -39,6 +56,44 @@ export interface ComponentDefinition {
 	render(el: HTMLElement, ctx: ComponentRenderContext): void;
 	/** Extra size constraints layered on top of the registry defaults. */
 	size?: Partial<SizeBounds>;
+	/** Declarative settings rendered by the inspector panel, in display order. */
+	settings?: ComponentSetting[];
+}
+
+/**
+ * Normalises one inspector input into a component patch. Pure (no DOM), so the
+ * settings contract can be unit-tested; empty/invalid input returns `{}` and
+ * leaves the stored value untouched.
+ */
+export function coerceSettingValue(
+	setting: ComponentSetting,
+	raw: unknown,
+	queryIds: ReadonlySet<string>,
+): Partial<DashboardComponentConfig> {
+	switch (setting.kind) {
+		case "query":
+			return typeof raw === "string" && queryIds.has(raw)
+				? { queryId: raw }
+				: {};
+		case "basis":
+			return raw === "file" || raw === "section" ? { basis: raw } : {};
+		case "number": {
+			const parsed =
+				typeof raw === "number"
+					? raw
+					: typeof raw === "string" && raw.trim() !== ""
+						? Number(raw)
+						: Number.NaN;
+			if (!Number.isFinite(parsed)) return {};
+			const clamped = Math.min(setting.max, Math.max(setting.min, parsed));
+			return { limit: Math.round(clamped) };
+		}
+		case "text": {
+			if (typeof raw !== "string") return {};
+			const trimmed = raw.trim();
+			return trimmed ? { title: trimmed } : { title: undefined };
+		}
+	}
 }
 
 export const MIN_COMPONENT_W = 2;

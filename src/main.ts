@@ -3,8 +3,10 @@ import { DashboardView } from "./views/DashboardView";
 import { TaskView } from "./views/TaskView";
 import { NoteView } from "./views/NoteView";
 import { CustomDashboardView } from "./views/CustomDashboardView";
+import { CustomInspectorView } from "./views/CustomInspectorView";
 import {
 	CUSTOM_DASHBOARD_VIEW_TYPE,
+	CUSTOM_INSPECTOR_VIEW_TYPE,
 	DASHBOARD_VIEW_TYPE,
 	TASK_VIEW_TYPE,
 	NOTE_VIEW_TYPE,
@@ -21,6 +23,7 @@ import { restoreMacWindowButtons } from "./ui/macos-window-buttons";
 import { VaultIndex } from "./data/vault-index";
 import type { IndexConfig, SectionHeadings } from "./data/types";
 import { DashboardRepository } from "./dashboard/repository";
+import { DashboardInspectorService } from "./dashboard/inspector-service";
 import {
 	SnapshotStore,
 	collectDailySnapshot,
@@ -41,11 +44,13 @@ export default class IotoDashboardPlugin extends Plugin {
 	index: VaultIndex;
 	dashboardRepository: DashboardRepository;
 	snapshotStore: SnapshotStore;
+	readonly inspectorService = new DashboardInspectorService();
 	private indexRebuildTimer: number | null = null;
 	private snapshotTimer: number | null = null;
 	private lastSnapshotDate = "";
 	private lastSnapshotAt = 0;
 	private dataQueue: Promise<void> = Promise.resolve();
+	private revealingInspector: Promise<void> | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -69,6 +74,22 @@ export default class IotoDashboardPlugin extends Plugin {
 		this.registerView(
 			CUSTOM_DASHBOARD_VIEW_TYPE,
 			(leaf) => new CustomDashboardView(leaf, this),
+		);
+		this.registerView(
+			CUSTOM_INSPECTOR_VIEW_TYPE,
+			(leaf) => new CustomInspectorView(leaf, this),
+		);
+		this.registerEvent(
+			this.app.workspace.on("layout-change", () => {
+				// The user closed the panel: drop stale controllers.
+				if (
+					this.app.workspace.getLeavesOfType(
+						CUSTOM_INSPECTOR_VIEW_TYPE,
+					).length === 0
+				) {
+					this.inspectorService.clear();
+				}
+			}),
 		);
 		this.app.workspace.onLayoutReady(() =>
 			this.scheduleSnapshotCollect(2000),
@@ -298,6 +319,32 @@ export default class IotoDashboardPlugin extends Plugin {
 		await this.activateCustomView(CUSTOM_DASHBOARD_VIEW_TYPE, options);
 	}
 
+	/**
+	 * Ensures the right-sidebar settings panel exists without replacing the
+	 * user's existing leaves (backlinks / outline) and without stealing focus.
+	 */
+	async revealInspector(): Promise<void> {
+		const { workspace } = this.app;
+		if (workspace.getLeavesOfType(CUSTOM_INSPECTOR_VIEW_TYPE).length > 0) {
+			return;
+		}
+		if (this.revealingInspector) return this.revealingInspector;
+		const run = (async () => {
+			await workspace.ensureSideLeaf(
+				CUSTOM_INSPECTOR_VIEW_TYPE,
+				"right",
+				{ active: false, reveal: false },
+			);
+			if (workspace.rightSplit.collapsed) {
+				workspace.rightSplit.expand();
+			}
+		})();
+		this.revealingInspector = run.finally(() => {
+			this.revealingInspector = null;
+		});
+		return this.revealingInspector;
+	}
+
 	private async activateCustomView(
 		viewType: string,
 		options: { newWindow?: boolean; newTab?: boolean } = {},
@@ -402,6 +449,7 @@ export default class IotoDashboardPlugin extends Plugin {
 			data.savedQueries = this.settings.savedQueries;
 			data.customFilters = this.settings.customFilters;
 			data.modalLayout = this.settings.modalLayout;
+			data.inspectorHost = this.settings.inspectorHost;
 		});
 		this.scheduleIndexRebuild();
 	}

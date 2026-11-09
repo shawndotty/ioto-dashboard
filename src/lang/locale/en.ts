@@ -192,6 +192,30 @@ export default {
 	DASHBOARD_RENAME_COMPONENT: "Rename component",
 	DASHBOARD_RENAME_PLACEHOLDER: "Component title",
 
+	// Component inspector
+	INSPECTOR_TITLE: "Component settings",
+	INSPECTOR_EMPTY_TITLE: "No component selected",
+	INSPECTOR_EMPTY_DESC:
+		"Click a card in edit mode to edit its settings.",
+	INSPECTOR_VIEW_MODE_HINT: "Switch to edit mode to change settings.",
+	INSPECTOR_UNKNOWN_COMPONENT: "Unknown component type",
+	INSPECTOR_SECTION_DATA: "Data",
+	INSPECTOR_SECTION_DISPLAY: "Display",
+	INSPECTOR_SECTION_LAYOUT: "Layout",
+	INSPECTOR_MORE_ACTIONS: "More actions",
+	INSPECTOR_ORDER_LABEL: "Order",
+	INSPECTOR_QUERY_LABEL: "Query",
+	INSPECTOR_BASIS_LABEL: "Counting basis",
+	INSPECTOR_LIMIT_LABEL: "Items shown",
+	INSPECTOR_TITLE_LABEL: "Title",
+	INSPECTOR_TITLE_PLACEHOLDER: "Leave empty to use the default title",
+	INSPECTOR_REMOVE_CONFIRM: "Remove this component?",
+	INSPECTOR_HOST_LABEL: "Settings panel location",
+	INSPECTOR_HOST_DESC: "Where the component settings panel opens.",
+	INSPECTOR_HOST_AUTO: "Automatic",
+	INSPECTOR_HOST_SIDEBAR: "Right sidebar",
+	INSPECTOR_HOST_INLINE: "Inside dashboard",
+
 	// Pages
 	PAGE_TABS_ADD: "Add page",
 	PAGE_RENAME: "Rename page",
@@ -215,7 +239,6 @@ export default {
 		"Open tasks ordered by note modification time.",
 	KPI_BASIS_FILE: "Whole file",
 	KPI_BASIS_SECTION: "Scoped sections",
-	KPI_EDIT_HINT: "Use the header controls to change the query or counting basis.",
 	PROJECT_PROGRESS_EMPTY: "No projects in scope.",
 	PROJECT_PROGRESS_OPEN: "Open",
 	PROJECT_PROGRESS_CANCELLED: "Cancelled",

@@ -1,0 +1,601 @@
+import { Menu, debounce, setIcon, type Debouncer } from "obsidian";
+import { t } from "../../lang/helpers";
+import type { InspectorState } from "../../dashboard/inspector-service";
+import {
+	clampSize,
+	coerceSettingValue,
+	type ComponentSetting,
+} from "../../dashboard/registry";
+import type { DashboardComponentConfig } from "../../dashboard/types";
+
+export interface ComponentInspectorDeps {
+	patch(patch: Partial<DashboardComponentConfig>): void;
+	stepSize(axis: "w" | "h", direction: -1 | 1): void;
+	resetSize(): void;
+	move(offset: -1 | 1): void;
+	remove(): void;
+}
+
+type LabelKey = Parameters<typeof t>[0];
+
+/**
+ * Settings panel for one selected component. Reads everything from the passed
+ * state and writes only through `deps` (never touches the repository directly).
+ */
+export class ComponentInspector {
+	private root: HTMLElement;
+	private signature = "";
+	private state: InspectorState | null = null;
+	private headerEl: HTMLElement | null = null;
+	private menuButtonEl: HTMLButtonElement | null = null;
+	private breadcrumbEl: HTMLElement | null = null;
+	private querySelect: HTMLSelectElement | null = null;
+	private basisSelect: HTMLSelectElement | null = null;
+	private basisFallback: "file" | "section" = "file";
+	private limitInput: HTMLInputElement | null = null;
+	private titleInput: HTMLInputElement | null = null;
+	private widthValueEl: HTMLElement | null = null;
+	private heightValueEl: HTMLElement | null = null;
+	private widthDecEl: HTMLButtonElement | null = null;
+	private widthIncEl: HTMLButtonElement | null = null;
+	private heightDecEl: HTMLButtonElement | null = null;
+	private heightIncEl: HTMLButtonElement | null = null;
+	private resetEl: HTMLButtonElement | null = null;
+	private upEl: HTMLButtonElement | null = null;
+	private downEl: HTMLButtonElement | null = null;
+	private orderPositionEl: HTMLElement | null = null;
+	private titleDebouncer: Debouncer<[string], void> | null = null;
+
+	constructor(
+		container: HTMLElement,
+		private deps: ComponentInspectorDeps,
+	) {
+		this.root = container.createDiv({ cls: "ioto-inspector" });
+	}
+
+	render(state: InspectorState | null): void {
+		if (!state) {
+			this.renderEmpty();
+			return;
+		}
+		const signature = this.signatureOf(state);
+		if (signature !== this.signature) {
+			const scrollTop = this.root.scrollTop;
+			this.signature = signature;
+			this.build(state);
+			this.root.scrollTop = scrollTop;
+		}
+		this.syncValues(state);
+		this.applyFocus(state);
+	}
+
+	destroy(): void {
+		this.cancelTitleDebounce();
+		this.resetRefs();
+		this.root.remove();
+	}
+
+	private signatureOf(state: InspectorState): string {
+		const definition = state.target.definition;
+		return [
+			state.target.config.id,
+			definition?.type ?? "__unknown__",
+			state.editable ? "edit" : "view",
+			(definition?.settings ?? [])
+				.map((setting) => `${setting.group}:${setting.kind}:${setting.key}`)
+				.join(","),
+			String(state.queriesVersion),
+		].join("|");
+	}
+
+	private renderEmpty(): void {
+		if (this.signature === "empty") return;
+		this.signature = "empty";
+		this.cancelTitleDebounce();
+		this.resetRefs();
+		this.root.empty();
+		this.root.removeClass("is-readonly");
+		this.root.createDiv({
+			cls: "ioto-inspector-empty-title",
+			text: t("INSPECTOR_EMPTY_TITLE"),
+		});
+		this.root.createDiv({
+			cls: "ioto-inspector-empty-desc",
+			text: t("INSPECTOR_EMPTY_DESC"),
+		});
+	}
+
+	private build(state: InspectorState): void {
+		this.cancelTitleDebounce();
+		this.resetRefs();
+		this.root.empty();
+		this.root.toggleClass("is-readonly", !state.editable);
+
+		this.headerEl = this.root.createDiv({ cls: "ioto-inspector-header" });
+		this.breadcrumbEl = this.headerEl.createDiv({
+			cls: "ioto-inspector-breadcrumb",
+		});
+		this.breadcrumbEl.setText(this.breadcrumbText(state));
+
+		const definition = state.target.definition;
+		if (!definition) {
+			this.root.createDiv({
+				cls: "ioto-inspector-message",
+				text: t("INSPECTOR_UNKNOWN_COMPONENT"),
+			});
+			return;
+		}
+		this.createMenuButton(this.headerEl);
+		if (!state.editable) {
+			this.root.createDiv({
+				cls: "ioto-inspector-hint",
+				text: t("INSPECTOR_VIEW_MODE_HINT"),
+			});
+		}
+
+		const settings = definition.settings ?? [];
+		const dataSettings = settings.filter(
+			(setting) => setting.group === "data",
+		);
+		if (dataSettings.length > 0) {
+			const section = this.createSection("INSPECTOR_SECTION_DATA");
+			for (const setting of dataSettings) {
+				this.buildSetting(section, setting, state);
+			}
+		}
+		const displaySettings = settings.filter(
+			(setting) => setting.group === "display",
+		);
+		if (displaySettings.length > 0) {
+			const section = this.createSection("INSPECTOR_SECTION_DISPLAY");
+			for (const setting of displaySettings) {
+				this.buildSetting(section, setting, state);
+			}
+		}
+
+		this.buildLayoutSection(state);
+	}
+
+	private createSection(
+		titleKey: LabelKey,
+		buildAction?: (head: HTMLElement) => void,
+	): HTMLElement {
+		const section = this.root.createDiv({ cls: "ioto-inspector-section" });
+		const head = section.createDiv({
+			cls: "ioto-inspector-section-head",
+		});
+		head.createDiv({
+			cls: "ioto-inspector-section-title",
+			text: t(titleKey),
+		});
+		buildAction?.(head);
+		return section;
+	}
+
+	private buildSetting(
+		section: HTMLElement,
+		setting: ComponentSetting,
+		state: InspectorState,
+	): void {
+		const field = section.createDiv({ cls: "ioto-inspector-field" });
+		switch (setting.kind) {
+			case "query": {
+				field.createEl("label", { text: t("INSPECTOR_QUERY_LABEL") });
+				const select = field.createEl("select", { cls: "dropdown" });
+				const queryIds = new Set(state.queries.map((query) => query.id));
+				const current = state.target.config.queryId;
+				if (!queryIds.has(current)) {
+					select.createEl("option", { value: current, text: current });
+				}
+				for (const query of state.queries) {
+					select.createEl("option", {
+						value: query.id,
+						text: query.nameKey
+							? t(query.nameKey as LabelKey)
+							: query.name,
+					});
+				}
+				select.value = current;
+				select.disabled = !state.editable;
+				select.addEventListener("change", () => {
+					const patch = coerceSettingValue(
+						setting,
+						select.value,
+						queryIds,
+					);
+					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+				});
+				this.querySelect = select;
+				return;
+			}
+			case "basis": {
+				field.createEl("label", { text: t("INSPECTOR_BASIS_LABEL") });
+				const select = field.createEl("select", { cls: "dropdown" });
+				select.createEl("option", {
+					value: "file",
+					text: t("KPI_BASIS_FILE"),
+				});
+				select.createEl("option", {
+					value: "section",
+					text: t("KPI_BASIS_SECTION"),
+				});
+				select.value =
+					state.target.config.basis ?? setting.fallback;
+				select.disabled = !state.editable;
+				this.basisFallback = setting.fallback;
+				const queryIds = new Set(
+					state.queries.map((query) => query.id),
+				);
+				select.addEventListener("change", () => {
+					const patch = coerceSettingValue(
+						setting,
+						select.value,
+						queryIds,
+					);
+					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+				});
+				this.basisSelect = select;
+				return;
+			}
+			case "number": {
+				field.createEl("label", {
+					text: t("INSPECTOR_LIMIT_LABEL"),
+				});
+				const input = field.createEl("input", {
+					type: "number",
+					attr: {
+						min: String(setting.min),
+						max: String(setting.max),
+						step: String(setting.step ?? 1),
+					},
+				});
+				input.value = String(
+					state.target.config.limit ?? setting.fallback,
+				);
+				input.disabled = !state.editable;
+				const queryIds = new Set(
+					state.queries.map((query) => query.id),
+				);
+				const commit = (): void => {
+					const patch = coerceSettingValue(
+						setting,
+						input.value,
+						queryIds,
+					);
+					if (patch.limit === undefined) {
+						input.value = String(
+							state.target.config.limit ?? setting.fallback,
+						);
+						return;
+					}
+					input.value = String(patch.limit);
+					this.deps.patch(patch);
+				};
+				input.addEventListener("change", commit);
+				input.addEventListener("keydown", (event) => {
+					if (event.key !== "Enter") return;
+					event.preventDefault();
+					commit();
+				});
+				this.limitInput = input;
+				return;
+			}
+			case "text": {
+				field.createEl("label", { text: t("INSPECTOR_TITLE_LABEL") });
+				const input = field.createEl("input", {
+					type: "text",
+					attr: {
+						placeholder: t(
+							(setting.placeholderKey ??
+								"INSPECTOR_TITLE_PLACEHOLDER") as LabelKey,
+						),
+					},
+				});
+				input.value = state.target.config.title ?? "";
+				input.disabled = !state.editable;
+				const queryIds = new Set(
+					state.queries.map((query) => query.id),
+				);
+				const debouncer = debounce(
+					(value: string) => {
+						this.deps.patch(
+							coerceSettingValue(setting, value, queryIds),
+						);
+					},
+					300,
+					true,
+				);
+				this.titleDebouncer = debouncer;
+				input.addEventListener("input", () =>
+					debouncer(input.value),
+				);
+				input.addEventListener("keydown", (event) => {
+					if (event.key !== "Enter") return;
+					event.preventDefault();
+					debouncer.cancel();
+					this.deps.patch(
+						coerceSettingValue(setting, input.value, queryIds),
+					);
+				});
+				this.titleInput = input;
+				return;
+			}
+		}
+	}
+
+	private buildLayoutSection(state: InspectorState): void {
+		const section = this.createSection("INSPECTOR_SECTION_LAYOUT", (head) => {
+			const reset = head.createEl("button", {
+				cls: "clickable-icon ioto-inspector-reset",
+				attr: {
+					type: "button",
+					"aria-label": t("DASHBOARD_RESET_SIZE"),
+					title: t("DASHBOARD_RESET_SIZE"),
+				},
+				text: "↺",
+			});
+			reset.onClickEvent(() => this.deps.resetSize());
+			this.resetEl = reset;
+		});
+
+		const width = this.buildSizeRow(
+			section,
+			t("DASHBOARD_WIDTH"),
+			"w",
+		);
+		this.widthDecEl = width.dec;
+		this.widthValueEl = width.value;
+		this.widthIncEl = width.inc;
+
+		const height = this.buildSizeRow(
+			section,
+			t("DASHBOARD_HEIGHT"),
+			"h",
+		);
+		this.heightDecEl = height.dec;
+		this.heightValueEl = height.value;
+		this.heightIncEl = height.inc;
+
+		const order = section.createDiv({ cls: "ioto-inspector-row" });
+		order.createSpan({
+			cls: "ioto-inspector-row-label",
+			text: t("INSPECTOR_ORDER_LABEL"),
+		});
+		const orderButtons = order.createDiv({
+			cls: "ioto-inspector-order-buttons",
+		});
+		this.upEl = this.createStepButton(
+			orderButtons,
+			"↑",
+			t("DASHBOARD_MOVE_UP"),
+			() => this.deps.move(-1),
+		);
+		this.downEl = this.createStepButton(
+			orderButtons,
+			"↓",
+			t("DASHBOARD_MOVE_DOWN"),
+			() => this.deps.move(1),
+		);
+		this.orderPositionEl = order.createSpan({
+			cls: "ioto-inspector-order-position",
+		});
+	}
+
+	private buildSizeRow(
+		section: HTMLElement,
+		label: string,
+		axis: "w" | "h",
+	): {
+		dec: HTMLButtonElement;
+		value: HTMLElement;
+		inc: HTMLButtonElement;
+	} {
+		const row = section.createDiv({ cls: "ioto-inspector-row" });
+		row.createSpan({ cls: "ioto-inspector-row-label", text: label });
+		const stepper = row.createDiv({ cls: "ioto-inspector-stepper" });
+		const dec = this.createStepButton(
+			stepper,
+			"−",
+			`${t("DASHBOARD_DECREASE")} ${label}`,
+			() => this.deps.stepSize(axis, -1),
+		);
+		const value = stepper.createSpan({ cls: "ioto-inspector-value" });
+		const inc = this.createStepButton(
+			stepper,
+			"+",
+			`${t("DASHBOARD_INCREASE")} ${label}`,
+			() => this.deps.stepSize(axis, 1),
+		);
+		return { dec, value, inc };
+	}
+
+	private createStepButton(
+		container: HTMLElement,
+		label: string,
+		ariaLabel: string,
+		onClick: () => void,
+	): HTMLButtonElement {
+		const button = container.createEl("button", {
+			cls: "ioto-inspector-step",
+			attr: {
+				type: "button",
+				"aria-label": ariaLabel,
+				title: ariaLabel,
+			},
+			text: label,
+		});
+		button.onClickEvent(onClick);
+		return button;
+	}
+
+	private createMenuButton(header: HTMLElement): void {
+		const button = header.createEl("button", {
+			cls: "clickable-icon",
+			attr: {
+				type: "button",
+				"aria-label": t("INSPECTOR_MORE_ACTIONS"),
+				title: t("INSPECTOR_MORE_ACTIONS"),
+				"aria-haspopup": "menu",
+			},
+		});
+		setIcon(button, "more-horizontal");
+		button.onClickEvent((event) => this.openMoreMenu(event, button));
+		this.menuButtonEl = button;
+	}
+
+	private openMoreMenu(
+		event: MouseEvent,
+		button: HTMLButtonElement,
+	): void {
+		const state = this.state;
+		if (!state?.editable || !state.target.definition) return;
+		const componentId = state.target.config.id;
+		const menu = new Menu();
+		menu.addItem((item) => {
+			item.setTitle(t("DASHBOARD_CONFIG_REMOVE"))
+				.setIcon("trash-2")
+				.setWarning(true)
+				.onClick(() => {
+					if (this.state?.target.config.id !== componentId) return;
+					this.deps.remove();
+				});
+		});
+		if (event.detail > 0) {
+			menu.showAtMouseEvent(event);
+			return;
+		}
+		const rect = button.getBoundingClientRect();
+		menu.showAtPosition({ x: rect.right, y: rect.bottom });
+	}
+
+	private syncValues(state: InspectorState): void {
+		const { config, bounds, defaults } = state.target;
+		this.breadcrumbEl?.setText(this.breadcrumbText(state));
+		if (this.querySelect) {
+			this.querySelect.value = config.queryId;
+			this.querySelect.disabled = !state.editable;
+		}
+		if (this.basisSelect) {
+			this.basisSelect.value = config.basis ?? this.basisFallback;
+			this.basisSelect.disabled = !state.editable;
+		}
+		if (this.limitInput) {
+			if (this.limitInput.ownerDocument.activeElement !== this.limitInput) {
+				const fallback = this.limitFallback(state);
+				this.limitInput.value = String(config.limit ?? fallback);
+			}
+			this.limitInput.disabled = !state.editable;
+		}
+		if (this.titleInput) {
+			if (this.titleInput.ownerDocument.activeElement !== this.titleInput) {
+				this.titleInput.value = config.title ?? "";
+			}
+			this.titleInput.disabled = !state.editable;
+		}
+
+		const size = clampSize(config.w, config.h, bounds);
+		const widthText = `${t("DASHBOARD_WIDTH")}: ${size.w} (${bounds.minW}–${bounds.maxW})`;
+		this.widthValueEl?.setText(String(size.w));
+		if (this.widthValueEl) {
+			this.widthValueEl.setAttr("title", widthText);
+			this.widthValueEl.setAttr("aria-label", widthText);
+		}
+		const heightText = `${t("DASHBOARD_HEIGHT")}: ${size.h} (${bounds.minH}–${bounds.maxH})`;
+		this.heightValueEl?.setText(String(size.h));
+		if (this.heightValueEl) {
+			this.heightValueEl.setAttr("title", heightText);
+			this.heightValueEl.setAttr("aria-label", heightText);
+		}
+		this.orderPositionEl?.setText(
+			`${state.target.index + 1} / ${state.target.total}`,
+		);
+		if (this.widthDecEl) {
+			this.widthDecEl.disabled = !state.editable || size.w <= bounds.minW;
+		}
+		if (this.widthIncEl) {
+			this.widthIncEl.disabled = !state.editable || size.w >= bounds.maxW;
+		}
+		if (this.heightDecEl) {
+			this.heightDecEl.disabled = !state.editable || size.h <= bounds.minH;
+		}
+		if (this.heightIncEl) {
+			this.heightIncEl.disabled = !state.editable || size.h >= bounds.maxH;
+		}
+		if (this.resetEl) {
+			this.resetEl.disabled =
+				!state.editable ||
+				(size.w === defaults.w && size.h === defaults.h);
+		}
+		if (this.upEl) {
+			this.upEl.disabled = !state.editable || state.target.index <= 0;
+		}
+		if (this.downEl) {
+			this.downEl.disabled =
+				!state.editable ||
+				state.target.index >= state.target.total - 1;
+		}
+		this.state = state;
+		if (this.menuButtonEl) {
+			this.menuButtonEl.disabled = !state.editable;
+		}
+	}
+
+	private limitFallback(state: InspectorState): number {
+		const setting = state.target.definition?.settings?.find(
+			(item) => item.kind === "number",
+		);
+		return setting && setting.kind === "number" ? setting.fallback : 20;
+	}
+
+	private breadcrumbText(state: InspectorState): string {
+		const { config, definition, pageName } = state.target;
+		const title = config.title
+			? config.title
+			: definition
+				? t(definition.labelKey as LabelKey)
+				: config.type;
+		return `${pageName} › ${title}`;
+	}
+
+	private applyFocus(state: InspectorState): void {
+		const focus = state.focus;
+		if (!focus || !state.editable) return;
+		if (focus === "title" && this.titleInput) {
+			this.titleInput.focus();
+			this.titleInput.select();
+			return;
+		}
+		const first = this.root.querySelector<HTMLElement>(
+			"select, input",
+		);
+		first?.focus();
+	}
+
+	private cancelTitleDebounce(): void {
+		if (!this.titleDebouncer) return;
+		this.titleDebouncer.cancel();
+		this.titleDebouncer = null;
+	}
+
+	private resetRefs(): void {
+		this.basisFallback = "file";
+		this.state = null;
+		this.headerEl = null;
+		this.menuButtonEl = null;
+		this.breadcrumbEl = null;
+		this.querySelect = null;
+		this.basisSelect = null;
+		this.limitInput = null;
+		this.titleInput = null;
+		this.widthValueEl = null;
+		this.heightValueEl = null;
+		this.widthDecEl = null;
+		this.widthIncEl = null;
+		this.heightDecEl = null;
+		this.heightIncEl = null;
+		this.resetEl = null;
+		this.upEl = null;
+		this.downEl = null;
+		this.orderPositionEl = null;
+	}
+}

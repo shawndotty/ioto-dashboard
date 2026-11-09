@@ -147,7 +147,17 @@ export class DashboardRepository {
 			const component = page?.components.find(
 				(item) => item.id === componentId,
 			);
-			if (component) Object.assign(component, patch);
+			if (component) {
+				Object.assign(component, patch);
+				// `undefined` means "remove this key" (e.g. a cleared title).
+				for (const key of Object.keys(patch)) {
+					if ((patch as Record<string, unknown>)[key] === undefined) {
+						delete (component as unknown as Record<string, unknown>)[
+							key
+						];
+					}
+				}
+			}
 		});
 	}
 

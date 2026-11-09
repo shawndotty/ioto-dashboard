@@ -15,6 +15,11 @@ export const projectProgressComponent: ComponentDefinition = {
 	defaultQueryId: "builtin:tasks-all",
 	createConfig: (queryId) => ({ queryId, basis: "section", w: 6, h: 3 }),
 	size: { maxH: 8 },
+	settings: [
+		{ key: "queryId", kind: "query", group: "data" },
+		{ key: "basis", kind: "basis", group: "data", fallback: "section" },
+		{ key: "title", kind: "text", group: "display" },
+	],
 	toMetricRequest: (config) => ({
 		kind: "project-progress",
 		queryId: config.queryId,

@@ -109,6 +109,30 @@ test('add / update / remove component round-trips through updateData', async () 
 	assert.equal(activePage(store.store).components.length, 0);
 });
 
+test('an undefined patch value removes that component key (cleared title)', async () => {
+	const host = makeHost();
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	await repository.addComponent(
+		DEFAULT_PAGE_ID,
+		component({ title: 'My KPI', limit: 20 }),
+	);
+	await repository.updateComponent(DEFAULT_PAGE_ID, 'component:1', {
+		title: undefined,
+	});
+
+	const stored = activePage((await repository.load()).store).components[0];
+	assert.equal('title' in stored, false, 'title should be deleted, not set to undefined');
+	assert.equal(stored.limit, 20, 'other keys must be untouched');
+
+	await repository.updateComponent(DEFAULT_PAGE_ID, 'component:1', {
+		limit: undefined,
+	});
+	const cleared = activePage((await repository.load()).store).components[0];
+	assert.equal('limit' in cleared, false);
+});
+
 test('component and query entries with broken shapes are dropped on load', async () => {
 	const host = makeHost({
 		dashboardStore: {
