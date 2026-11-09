@@ -191,6 +191,25 @@ export default {
 	DASHBOARD_RESET_SIZE: "Reset to default size",
 	DASHBOARD_RENAME_COMPONENT: "Rename component",
 	DASHBOARD_RENAME_PLACEHOLDER: "Component title",
+	DASHBOARD_MANAGER_TITLE: "Dashboards",
+	DASHBOARD_MANAGER_OPEN: "Manage dashboards…",
+	DASHBOARD_STATUS_OPEN: "Open",
+	DASHBOARD_NEW: "New dashboard",
+	DASHBOARD_RENAME: "Rename",
+	DASHBOARD_DUPLICATE: "Duplicate",
+	DASHBOARD_DELETE: "Delete",
+	DASHBOARD_DELETE_TITLE: "Delete dashboard",
+	DASHBOARD_DELETE_MSG:
+		"Delete “{0}” with {1} page(s) and {2} component(s)? Notes are not affected.",
+	DASHBOARD_DELETE_OPEN_HINT:
+		"This dashboard is open in {0} tab(s); deleting it will close them.",
+	DASHBOARD_LAST_CANNOT_DELETE: "At least one dashboard is required.",
+	DASHBOARD_DEFAULT_NAME: "Dashboard {0}",
+	DASHBOARD_COPY_SUFFIX: "copy",
+	DASHBOARD_PAGES_SUMMARY: "{0} page(s) / {1} component(s)",
+	DASHBOARD_NAME_PLACEHOLDER: "Dashboard name",
+	COMMAND_OPEN_DASHBOARD_PICKER: "Open dashboard…",
+	COMMAND_OPEN_NAMED_DASHBOARD: "Open dashboard: {0}",
 
 	// Component inspector
 	INSPECTOR_TITLE: "Component settings",

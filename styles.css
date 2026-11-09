@@ -459,6 +459,81 @@
     gap: 8px;
 }
 
+/* Dashboard manager modal */
+.ioto-dashboard-manager-modal .ioto-dashboard-manager-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0 16px;
+}
+
+.ioto-dashboard-manager-modal .ioto-dashboard-manager-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.ioto-dashboard-manager-modal .ioto-dashboard-manager-row.is-open {
+    border-color: var(--interactive-accent);
+}
+
+.ioto-dashboard-manager-modal .ioto-dashboard-manager-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+}
+
+.ioto-dashboard-manager-modal .ioto-dashboard-manager-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.ioto-dashboard-manager-modal .ioto-dashboard-manager-summary {
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+
+.ioto-dashboard-manager-modal .ioto-dashboard-manager-status {
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--background-modifier-hover);
+    font-size: 0.75em;
+    color: var(--text-muted);
+}
+
+.ioto-dashboard-manager-modal .ioto-dashboard-manager-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 2px;
+}
+
+.ioto-dashboard-manager-modal .ioto-dashboard-manager-action {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+.ioto-dashboard-manager-modal .ioto-dashboard-manager-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
 .ioto-custom-dashboard-view .ioto-dashboard-grid {
     position: relative;
     display: grid;

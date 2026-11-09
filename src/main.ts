@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf } from "obsidian";
+import { Command, Plugin, WorkspaceLeaf } from "obsidian";
 import { DashboardView } from "./views/DashboardView";
 import { TaskView } from "./views/TaskView";
 import { NoteView } from "./views/NoteView";
@@ -23,6 +23,11 @@ import { restoreMacWindowButtons } from "./ui/macos-window-buttons";
 import { VaultIndex } from "./data/vault-index";
 import type { IndexConfig, SectionHeadings } from "./data/types";
 import { DashboardRepository } from "./dashboard/repository";
+import { dashboardCommandId } from "./dashboard/command-ids";
+import type {
+	DashboardStoreData,
+} from "./dashboard/types";
+import { DashboardPickerModal } from "./ui/dashboard-picker";
 import { DashboardInspectorService } from "./dashboard/inspector-service";
 import {
 	SnapshotStore,
@@ -51,6 +56,12 @@ export default class IotoDashboardPlugin extends Plugin {
 	private lastSnapshotAt = 0;
 	private dataQueue: Promise<void> = Promise.resolve();
 	private revealingInspector: Promise<void> | null = null;
+	private dashboardStore: DashboardStoreData | null = null;
+	private readonly dashboardCommands = new Map<
+		string,
+		{ name: string; command: Command }
+	>();
+	private dashboardCommandTimer: number | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -59,10 +70,24 @@ export default class IotoDashboardPlugin extends Plugin {
 		this.index.attach();
 		this.register(() => this.index.detach());
 
-		this.dashboardRepository = new DashboardRepository({
-			readData: () => this.loadData(),
-			updateData: (mutate) => this.updateData(mutate),
-		});
+		this.dashboardRepository = new DashboardRepository(
+			{
+				readData: () => this.loadData(),
+				updateData: (mutate) => this.updateData(mutate),
+			},
+			{
+				defaultDashboardName: () =>
+					t("DASHBOARD_DEFAULT_NAME", ["1"]),
+			},
+		);
+		this.dashboardStore = (await this.dashboardRepository.load()).store;
+		this.syncDashboardCommands();
+		this.register(
+			this.dashboardRepository.onChange((store) => {
+				this.dashboardStore = store;
+				this.scheduleDashboardCommandSync();
+			}),
+		);
 		this.snapshotStore = new SnapshotStore({
 			adapter: this.app.vault.adapter,
 			dir:
@@ -186,6 +211,14 @@ export default class IotoDashboardPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "open-ioto-canvas-picker",
+			name: t("COMMAND_OPEN_DASHBOARD_PICKER"),
+			callback: () => {
+				this.openDashboardPicker();
+			},
+		});
+
+		this.addCommand({
 			id: "toggle-dashboard-quick-search",
 			name: t("COMMAND_TOGGLE_QUICK_SEARCH"),
 			checkCallback: (checking: boolean) => {
@@ -225,6 +258,10 @@ export default class IotoDashboardPlugin extends Plugin {
 	}
 
 	onunload() {
+		if (this.dashboardCommandTimer !== null) {
+			window.clearTimeout(this.dashboardCommandTimer);
+			this.dashboardCommandTimer = null;
+		}
 		restoreMacWindowButtons();
 		window.activeDocument
 			.querySelectorAll(".ioto-dashboard-modal.is-frame-buttons-hidden")
@@ -317,6 +354,151 @@ export default class IotoDashboardPlugin extends Plugin {
 		options: { newWindow?: boolean; newTab?: boolean } = {},
 	) {
 		await this.activateCustomView(CUSTOM_DASHBOARD_VIEW_TYPE, options);
+	}
+
+	/**
+	 * Opens one dashboard in its own tab. A leaf already bound to it is
+	 * revealed instead (across all windows); otherwise a new tab is spawned.
+	 */
+	async activateCustomDashboard(
+		dashboardId: string,
+		options: { newWindow?: boolean } = {},
+	): Promise<void> {
+		const { workspace } = this.app;
+		let leaf: WorkspaceLeaf | null = null;
+
+		if (options.newWindow) {
+			leaf = workspace.getLeaf("window");
+			await leaf.setViewState({
+				type: CUSTOM_DASHBOARD_VIEW_TYPE,
+				state: { dashboardId },
+				active: true,
+			});
+		} else {
+			const existing = this.findDashboardLeaf(dashboardId);
+			if (existing) {
+				void workspace.revealLeaf(existing);
+				await this.markDashboardActive(dashboardId);
+				return;
+			}
+			leaf = workspace.getLeaf("tab");
+			await leaf.setViewState({
+				type: CUSTOM_DASHBOARD_VIEW_TYPE,
+				state: { dashboardId },
+				active: true,
+			});
+		}
+
+		if (leaf) {
+			void workspace.revealLeaf(leaf);
+			await this.markDashboardActive(dashboardId);
+		}
+	}
+
+	isDashboardOpen(dashboardId: string): boolean {
+		return this.dashboardLeaves(dashboardId).length > 0;
+	}
+
+	openDashboardCount(dashboardId: string): number {
+		return this.dashboardLeaves(dashboardId).length;
+	}
+
+	/**
+	 * Snapshot of leaves showing this dashboard. Call before deleting it: the
+	 * repository broadcast makes bound views fall back synchronously, so the
+	 * binding is gone by the time `removeDashboard` resolves.
+	 */
+	getDashboardLeaves(
+		dashboardId: string,
+		opts: { except?: WorkspaceLeaf } = {},
+	): WorkspaceLeaf[] {
+		return this.dashboardLeaves(dashboardId).filter(
+			(leaf) => leaf !== opts.except,
+		);
+	}
+
+	detachLeaves(leaves: readonly WorkspaceLeaf[]): void {
+		for (const leaf of leaves) leaf.detach();
+	}
+
+	private dashboardLeaves(dashboardId: string): WorkspaceLeaf[] {
+		const matches: WorkspaceLeaf[] = [];
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			const view = leaf.view;
+			if (
+				view instanceof CustomDashboardView &&
+				view.getDashboardId() === dashboardId
+			) {
+				matches.push(leaf);
+			}
+		});
+		return matches;
+	}
+
+	private findDashboardLeaf(dashboardId: string): WorkspaceLeaf | null {
+		return this.dashboardLeaves(dashboardId)[0] ?? null;
+	}
+
+	/** `activeDashboardId` only seeds ribbon / command entry points. */
+	private async markDashboardActive(dashboardId: string): Promise<void> {
+		if (this.dashboardStore?.activeDashboardId === dashboardId) return;
+		await this.dashboardRepository.setActiveDashboard(dashboardId);
+	}
+
+	private openDashboardPicker(): void {
+		new DashboardPickerModal(
+			this.app,
+			this.dashboardStore?.dashboards ?? [],
+			(dashboard) => {
+				void this.activateCustomDashboard(dashboard.id);
+			},
+		).open();
+	}
+
+	private scheduleDashboardCommandSync(): void {
+		if (this.dashboardCommandTimer !== null) {
+			window.clearTimeout(this.dashboardCommandTimer);
+		}
+		this.dashboardCommandTimer = window.setTimeout(() => {
+			this.dashboardCommandTimer = null;
+			this.syncDashboardCommands();
+		}, 100);
+	}
+
+	/** Keeps one dedicated command per dashboard, keyed by its stable id. */
+	private syncDashboardCommands(): void {
+		const desired = new Map<string, { id: string; name: string }>();
+		for (const dashboard of this.dashboardStore?.dashboards ?? []) {
+			desired.set(dashboardCommandId(dashboard.id), {
+				id: dashboard.id,
+				name: t("COMMAND_OPEN_NAMED_DASHBOARD", [dashboard.name]),
+			});
+		}
+		const commands = this.app.commands as unknown as {
+			removeCommand?: (command: Command) => void;
+		};
+		for (const [commandId, entry] of Array.from(
+			this.dashboardCommands,
+		)) {
+			const want = desired.get(commandId);
+			if (want && want.name === entry.name) continue;
+			commands.removeCommand?.(entry.command);
+			this.dashboardCommands.delete(commandId);
+		}
+		for (const [commandId, want] of desired) {
+			if (this.dashboardCommands.has(commandId)) continue;
+			const command = this.addCommand({
+				id: commandId,
+				name: want.name,
+				callback: () => {
+					void this.activateCustomDashboard(want.id);
+				},
+			});
+			this.dashboardCommands.set(commandId, {
+				name: want.name,
+				command,
+			});
+		}
 	}
 
 	/**

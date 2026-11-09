@@ -33,22 +33,29 @@ import {
 	type SizeBounds,
 } from "../dashboard/registry";
 import {
+	activeDashboard as activeDashboardOf,
+	activePageOf,
+	findDashboardForPage,
 	type DashboardComponentConfig,
 	type DashboardPage,
 	type DashboardStoreData,
+	type DashboardWorkspace,
 } from "../dashboard/types";
 import { metricKey, type MetricRequest, type MetricResult, type ProjectProgressGroup } from "../metrics/types";
 import { QueryRepository } from "../query/repository";
 import type { QueryDefinition } from "../query/types";
 import { ComponentPickerModal } from "../ui/component-picker";
 import { ConfirmModal } from "../ui/ConfirmModal";
+import { DashboardManagerModal } from "../ui/dashboard-manager";
 import { PageNameModal } from "../ui/page-name-modal";
 import { QueryEditModal, QueryManagerModal } from "../ui/query-editor";
 import { ComponentInspector } from "./components/ComponentInspector";
 
 export class CustomDashboardView extends ItemView {
 	private store: DashboardStoreData | null = null;
+	private leafDashboardId: string | null = null;
 	private leafPageId: string | null = null;
+	private storeSignature = "";
 	private hub: DataHub | null = null;
 	private registry = createComponentRegistry();
 	private editMode = false;
@@ -93,7 +100,9 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return t("CUSTOM_DASHBOARD_TITLE");
+		return (
+			this.activeDashboard?.name ?? t("CUSTOM_DASHBOARD_TITLE")
+		);
 	}
 
 	getIcon(): string {
@@ -105,15 +114,8 @@ export class CustomDashboardView extends ItemView {
 		this.contentEl.addClass("ioto-custom-dashboard-view");
 		this.resetShell();
 		await this.loadStore();
-
-		const fallback =
-			this.store?.activePageId ?? this.store?.pages[0]?.id ?? null;
-		if (
-			!this.leafPageId ||
-			!this.store?.pages.some((page) => page.id === this.leafPageId)
-		) {
-			this.leafPageId = fallback;
-		}
+		this.resolveLeafTargets();
+		this.storeSignature = signatureOf(this.store);
 
 		this.hub = new DataHub({
 			index: this.plugin.index,
@@ -130,6 +132,11 @@ export class CustomDashboardView extends ItemView {
 		);
 		this.unsubscribers.push(
 			this.plugin.index.subscribe(() => this.hub?.scheduleRefresh()),
+		);
+		this.unsubscribers.push(
+			this.plugin.dashboardRepository.onChange((store) =>
+				this.handleStoreChange(store),
+			),
 		);
 		this.registerEvent(
 			this.app.workspace.on("layout-change", () => this.updateVisibility()),
@@ -189,31 +196,91 @@ export class CustomDashboardView extends ItemView {
 
 	getState() {
 		return {
-			activePageId: this.leafPageId ?? this.store?.activePageId,
+			dashboardId:
+				this.leafDashboardId ?? this.store?.activeDashboardId,
+			pageId: this.leafPageId ?? undefined,
 		};
 	}
 
 	async setState(state: unknown, result: ViewStateResult) {
-		const s = (state ?? {}) as { activePageId?: unknown };
-		if (typeof s.activePageId === "string") {
+		const s = (state ?? {}) as {
+			activePageId?: unknown;
+			dashboardId?: unknown;
+			pageId?: unknown;
+		};
+		if (typeof s.dashboardId === "string") {
+			this.leafDashboardId = s.dashboardId;
+		}
+		if (typeof s.pageId === "string") {
+			this.leafPageId = s.pageId;
+		} else if (typeof s.activePageId === "string") {
+			// Legacy layout state without a dashboard id.
 			this.leafPageId = s.activePageId;
 		}
 		await super.setState(state, result);
 		if (this.store) {
-			// A restored layout may point at a page that has been deleted.
-			if (!this.store.pages.some((page) => page.id === this.leafPageId)) {
-				this.leafPageId = this.store.pages[0]?.id ?? null;
-			}
+			this.resolveLeafTargets();
 			this.render();
 		}
 	}
 
-	private get activePage(): DashboardPage | undefined {
+	private get activeDashboard(): DashboardWorkspace | undefined {
 		if (!this.store) return undefined;
-		return (
-			this.store.pages.find((page) => page.id === this.leafPageId) ??
-			this.store.pages[0]
+		return this.store.dashboards.find(
+			(dashboard) => dashboard.id === this.leafDashboardId,
 		);
+	}
+
+	private get activePage(): DashboardPage | undefined {
+		return activePageOf(this.activeDashboard);
+	}
+
+	/**
+	 * Picks the dashboard/page this leaf shows. Resolution order: the leaf's own
+	 * dashboard (or the dashboard owning its legacy page) → global active
+	 * dashboard; page: leaf page → dashboard `lastPageId` → first page.
+	 */
+	private resolveLeafTargets(): void {
+		const store = this.store;
+		if (!store) {
+			this.leafDashboardId = null;
+			this.leafPageId = null;
+			return;
+		}
+		let dashboard = this.leafDashboardId
+			? store.dashboards.find(
+					(item) => item.id === this.leafDashboardId,
+				)
+			: undefined;
+		if (!dashboard && this.leafPageId) {
+			dashboard = findDashboardForPage(store, this.leafPageId);
+		}
+		if (!dashboard) dashboard = activeDashboardOf(store);
+		this.leafDashboardId = dashboard?.id ?? null;
+		this.leafPageId = this.pickPage(dashboard)?.id ?? null;
+	}
+
+	private pickPage(
+		dashboard: DashboardWorkspace | undefined,
+	): DashboardPage | undefined {
+		if (!dashboard) return undefined;
+		const current = this.leafPageId
+			? dashboard.pages.find((page) => page.id === this.leafPageId)
+			: undefined;
+		if (current) return current;
+		const last = dashboard.lastPageId
+			? dashboard.pages.find((page) => page.id === dashboard.lastPageId)
+			: undefined;
+		return last ?? dashboard.pages[0];
+	}
+
+	private handleStoreChange(store: DashboardStoreData): void {
+		if (signatureOf(store) === this.storeSignature) return;
+		this.store = store;
+		this.storeSignature = signatureOf(store);
+		this.resolveLeafTargets();
+		this.render();
+		this.refreshHeader();
 	}
 
 	private resetShell(): void {
@@ -263,13 +330,20 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private syncToolbar(): void {
-		const signature = this.editMode ? "edit" : "view";
+		const dashboard = this.activeDashboard;
+		const signature = [
+			this.editMode ? "edit" : "view",
+			dashboard?.id ?? "",
+			dashboard?.name ?? "",
+		].join("|");
 		if (signature === this.toolbarSignature) return;
 		this.toolbarSignature = signature;
 		const toolbar = this.toolbarEl;
 		if (!toolbar) return;
 		toolbar.empty();
-		toolbar.createEl("h2", { text: t("CUSTOM_DASHBOARD_TITLE") });
+		toolbar.createEl("h2", {
+			text: dashboard?.name ?? t("CUSTOM_DASHBOARD_TITLE"),
+		});
 		const actions = toolbar.createDiv({ cls: "ioto-dashboard-actions" });
 		this.addToolbarButton(actions, "edit", t("DASHBOARD_MANAGE_QUERIES"), () =>
 			this.openQueryManager(),
@@ -284,6 +358,12 @@ export class CustomDashboardView extends ItemView {
 		}
 		this.addToolbarButton(
 			actions,
+			"settings-2",
+			t("DASHBOARD_MANAGER_OPEN"),
+			() => this.openDashboardManager(),
+		);
+		this.addToolbarButton(
+			actions,
 			this.editMode ? "eye" : "pencil",
 			this.editMode ? t("DASHBOARD_VIEW_MODE") : t("DASHBOARD_EDIT_MODE"),
 			() => {
@@ -291,6 +371,107 @@ export class CustomDashboardView extends ItemView {
 				this.render();
 			},
 		);
+	}
+
+	private openDashboardManager(): void {
+		new DashboardManagerModal(this.app, {
+			getStore: () => this.store,
+			isOpen: (id) => this.plugin.isDashboardOpen(id),
+			openCount: (id) => this.plugin.openDashboardCount(id),
+			onOpen: (id) => {
+				void this.plugin.activateCustomDashboard(id);
+			},
+			onCreate: async (name) => {
+				const workspace = this.createDashboardWorkspace(name);
+				this.store = await this.plugin.dashboardRepository.addDashboard(
+					workspace,
+				);
+				await this.plugin.activateCustomDashboard(workspace.id);
+				this.refreshHeader();
+			},
+			onRename: async (id, name) => {
+				this.store = await this.plugin.dashboardRepository.renameDashboard(
+					id,
+					name,
+				);
+				this.render();
+				this.refreshHeader();
+			},
+			onDuplicate: async (id, name) => {
+				const store =
+					await this.plugin.dashboardRepository.duplicateDashboard(
+						id,
+						name,
+					);
+				this.store = store;
+				const copy = store.dashboards[store.dashboards.length - 1];
+				if (copy) {
+					await this.plugin.activateCustomDashboard(copy.id);
+				}
+				this.refreshHeader();
+			},
+			onDelete: async (id) => {
+				const staleLeaves = this.plugin.getDashboardLeaves(id, {
+					except: this.leaf,
+				});
+				const store =
+					await this.plugin.dashboardRepository.removeDashboard(id);
+				this.store = store;
+				if (!store.dashboards.some((item) => item.id === id)) {
+					this.plugin.detachLeaves(staleLeaves);
+				}
+				this.resolveLeafTargets();
+				this.render();
+				this.app.workspace.requestSaveLayout();
+				this.refreshHeader();
+			},
+		}).open();
+	}
+
+	private createDashboardWorkspace(name: string): DashboardWorkspace {
+		const taken = new Set(
+			this.store?.dashboards.map((dashboard) => dashboard.id) ?? [],
+		);
+		const base = `dashboard:${Date.now()}`;
+		let id = base;
+		let index = 2;
+		while (taken.has(id)) id = `${base}-${index++}`;
+		const pageId = this.uniquePageId();
+		return {
+			id,
+			name,
+			pages: [
+				{
+					id: pageId,
+					name: t("PAGE_DEFAULT_NAME", ["1"]),
+					components: [],
+				},
+			],
+			lastPageId: pageId,
+		};
+	}
+
+	private uniquePageId(): string {
+		const taken = new Set(
+			this.store?.dashboards.flatMap((dashboard) =>
+				dashboard.pages.map((page) => page.id),
+			) ?? [],
+		);
+		const base = `page:${Date.now()}`;
+		let id = base;
+		let index = 2;
+		while (taken.has(id)) id = `${base}-${index++}`;
+		return id;
+	}
+
+	/** The dashboard this leaf is bound to; used for open-or-focus matching. */
+	getDashboardId(): string | null {
+		return this.leafDashboardId;
+	}
+
+	private refreshHeader(): void {
+		const leaf = this.leaf as WorkspaceLeaf & { updateHeader?: () => void };
+		if (typeof leaf.updateHeader === "function") leaf.updateHeader();
 	}
 
 	private syncBanner(): void {
@@ -338,7 +519,7 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private syncPagesBar(): void {
-		const pages = this.store?.pages ?? [];
+		const pages = this.activeDashboard?.pages ?? [];
 		const signature = [
 			this.editMode ? "edit" : "view",
 			this.activePage?.id ?? "",
@@ -397,26 +578,42 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private switchPage(pageId: string): void {
-		if (pageId === this.activePage?.id) return;
+		const dashboard = this.activeDashboard;
+		if (!dashboard || pageId === this.activePage?.id) return;
 		this.clearSelection();
 		this.leafPageId = pageId;
 		this.render();
 		this.app.workspace.requestSaveLayout();
-		void this.plugin.dashboardRepository.setActivePage(pageId);
+		void this.plugin.dashboardRepository.setLastPage(
+			dashboard.id,
+			pageId,
+		);
 	}
 
 	private async createPage(): Promise<void> {
+		const dashboard = this.activeDashboard;
+		if (!dashboard) return;
 		this.clearSelection();
-		const taken = new Set(this.store?.pages.map((page) => page.id) ?? []);
-		let id = `page:${Date.now()}`;
-		let n = 2;
-		while (taken.has(id)) id = `page:${Date.now()}-${n++}`;
+		const taken = new Set(
+			this.store?.dashboards.flatMap((item) =>
+				item.pages.map((page) => page.id),
+			) ?? [],
+		);
+		const base = `page:${Date.now()}`;
+		let id = base;
+		let index = 2;
+		while (taken.has(id)) id = `${base}-${index++}`;
 		const page: DashboardPage = {
 			id,
-			name: t("PAGE_DEFAULT_NAME", [String((this.store?.pages.length ?? 0) + 1)]),
+			name: t("PAGE_DEFAULT_NAME", [
+				String(dashboard.pages.length + 1),
+			]),
 			components: [],
 		};
-		this.store = await this.plugin.dashboardRepository.addPage(page);
+		this.store = await this.plugin.dashboardRepository.addPage(
+			dashboard.id,
+			page,
+		);
 		this.leafPageId = id;
 		this.render();
 		this.app.workspace.requestSaveLayout();
@@ -435,7 +632,8 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private confirmRemovePage(page: DashboardPage): void {
-		if ((this.store?.pages.length ?? 0) <= 1) {
+		const dashboard = this.activeDashboard;
+		if (!dashboard || dashboard.pages.length <= 1) {
 			new Notice(t("PAGE_LAST_CANNOT_DELETE"));
 			return;
 		}
@@ -449,7 +647,8 @@ export class CustomDashboardView extends ItemView {
 						page.id,
 					);
 					if (this.leafPageId === page.id) {
-						this.leafPageId = this.store?.pages[0]?.id ?? null;
+						this.leafPageId =
+							activePageOf(this.activeDashboard)?.id ?? null;
 					}
 					this.render();
 					this.app.workspace.requestSaveLayout();
@@ -1520,16 +1719,18 @@ export class CustomDashboardView extends ItemView {
 		if (!this.store || !this.hub) return;
 		const requests: MetricRequest[] = [];
 		const seen = new Set<string>();
-		for (const page of this.store.pages) {
-			for (const config of page.components) {
-				const definition = this.registry.get(config.type);
-				if (!definition) continue;
-				const request = definition.toMetricRequest(config);
-				const key = metricKey(request);
-				// metricKey has no pageId, so duplicates can be shared safely.
-				if (seen.has(key)) continue;
-				seen.add(key);
-				requests.push(request);
+		for (const dashboard of this.store.dashboards) {
+			for (const page of dashboard.pages) {
+				for (const config of page.components) {
+					const definition = this.registry.get(config.type);
+					if (!definition) continue;
+					const request = definition.toMetricRequest(config);
+					const key = metricKey(request);
+					// metricKey has no pageId, so duplicates can be shared safely.
+					if (seen.has(key)) continue;
+					seen.add(key);
+					requests.push(request);
+				}
 			}
 		}
 		this.hub.setRequests(requests);
@@ -1703,4 +1904,17 @@ function uniqueCopyName(name: string, taken: Set<string>): string {
 	let n = 2;
 	while (taken.has(`${base} ${n}`)) n++;
 	return `${base} ${n}`;
+}
+
+/** Ignores component content: only dashboard/page identity and names matter. */
+function signatureOf(store: DashboardStoreData | null): string {
+	if (!store) return "";
+	return store.dashboards
+		.map(
+			(dashboard) =>
+				`${dashboard.id}:${dashboard.name}[${dashboard.pages
+					.map((page) => `${page.id}:${page.name}`)
+					.join(",")}]`,
+		)
+		.join("|");
 }

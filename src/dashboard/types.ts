@@ -1,8 +1,10 @@
 import type { CountBasis } from "../metrics/types";
 import type { QueryDefinition } from "../query/types";
 
-export const DASHBOARD_SCHEMA_VERSION = 3;
+export const DASHBOARD_SCHEMA_VERSION = 4;
 export const DASHBOARD_STORE_KEY = "dashboardStore";
+export const DEFAULT_DASHBOARD_ID = "dashboard:default";
+export const DEFAULT_PAGE_ID = "page:default";
 
 export interface DashboardComponentConfig {
 	id: string;
@@ -24,36 +26,69 @@ export interface DashboardPage {
 	components: DashboardComponentConfig[];
 }
 
+export interface DashboardWorkspace {
+	id: string;
+	name: string;
+	pages: DashboardPage[];
+	/** The page this dashboard was last left on. */
+	lastPageId?: string;
+}
+
 export interface DashboardStoreData {
 	schemaVersion: number;
-	pages: DashboardPage[];
-	activePageId?: string;
-	/** Only `user:*` queries are persisted here. */
+	dashboards: DashboardWorkspace[];
+	/** Default landing target for the ribbon / global commands. */
+	activeDashboardId?: string;
+	/** Only `user:*` queries are persisted here; shared by every dashboard. */
 	queries: QueryDefinition[];
 }
 
-export const DEFAULT_PAGE_ID = "page:default";
-
-export function createDefaultStore(): DashboardStoreData {
+export function createDefaultStore(defaultName = "Dashboard 1"): DashboardStoreData {
 	return {
 		schemaVersion: DASHBOARD_SCHEMA_VERSION,
-		pages: [
+		dashboards: [
 			{
-				id: DEFAULT_PAGE_ID,
-				name: "Page 1",
-				components: [],
+				id: DEFAULT_DASHBOARD_ID,
+				name: defaultName,
+				pages: [
+					{
+						id: DEFAULT_PAGE_ID,
+						name: "Page 1",
+						components: [],
+					},
+				],
+				lastPageId: DEFAULT_PAGE_ID,
 			},
 		],
-		activePageId: DEFAULT_PAGE_ID,
+		activeDashboardId: DEFAULT_DASHBOARD_ID,
 		queries: [],
 	};
 }
 
-export function activePage(
+export function activeDashboard(
 	store: DashboardStoreData,
-): DashboardPage | undefined {
+): DashboardWorkspace | undefined {
 	return (
-		store.pages.find((item) => item.id === store.activePageId) ??
-		store.pages[0]
+		store.dashboards.find((item) => item.id === store.activeDashboardId) ??
+		store.dashboards[0]
+	);
+}
+
+export function activePageOf(
+	dashboard: DashboardWorkspace | undefined,
+): DashboardPage | undefined {
+	if (!dashboard) return undefined;
+	return (
+		dashboard.pages.find((page) => page.id === dashboard.lastPageId) ??
+		dashboard.pages[0]
+	);
+}
+
+export function findDashboardForPage(
+	store: DashboardStoreData,
+	pageId: string,
+): DashboardWorkspace | undefined {
+	return store.dashboards.find((dashboard) =>
+		dashboard.pages.some((page) => page.id === pageId),
 	);
 }

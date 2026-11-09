@@ -2,11 +2,14 @@ import type {
 	DashboardComponentConfig,
 	DashboardPage,
 	DashboardStoreData,
+	DashboardWorkspace,
 } from "./types";
 import {
 	DASHBOARD_SCHEMA_VERSION,
 	DASHBOARD_STORE_KEY,
-	activePage,
+	DEFAULT_DASHBOARD_ID,
+	activeDashboard,
+	activePageOf,
 	createDefaultStore,
 } from "./types";
 
@@ -21,6 +24,14 @@ export interface DashboardLoadResult {
 	/** JSON existed but was malformed: the raw data is kept, never overwritten. */
 	damaged: boolean;
 }
+
+export interface DashboardRepositoryOptions {
+	/** Localised default name for the first dashboard. */
+	defaultDashboardName?: () => string;
+}
+
+const DEFAULT_DASHBOARD_NAME = "Dashboard 1";
+const DEFAULT_PAGE_NAME = "Page 1";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -54,56 +65,202 @@ function isQuery(value: unknown): boolean {
 	);
 }
 
+function uniqueId(base: string, taken: Set<string>): string {
+	if (!taken.has(base)) return base;
+	let index = 2;
+	let candidate = `${base}-${index}`;
+	while (taken.has(candidate)) {
+		index += 1;
+		candidate = `${base}-${index}`;
+	}
+	return candidate;
+}
+
+function slugOf(value: string): string {
+	const slug = value.replace(/[^A-Za-z0-9_-]/g, "-");
+	return slug.length > 0 ? slug : "dashboard";
+}
+
+function toPage(value: unknown): DashboardPage | null {
+	if (!isPage(value)) return null;
+	const name =
+		typeof value.name === "string" && value.name.trim().length > 0
+			? value.name.trim()
+			: DEFAULT_PAGE_NAME;
+	return {
+		id: value.id,
+		name,
+		components: value.components.filter(isComponent),
+	};
+}
+
 export class DashboardRepository {
-	constructor(private host: DashboardDataHost) {}
+	private readonly listeners = new Set<
+		(store: DashboardStoreData) => void
+	>();
+
+	constructor(
+		private host: DashboardDataHost,
+		private options: DashboardRepositoryOptions = {},
+	) {}
+
+	private defaultName(): string {
+		return this.options.defaultDashboardName?.() ?? DEFAULT_DASHBOARD_NAME;
+	}
+
+	private defaultStore(): DashboardStoreData {
+		return createDefaultStore(this.defaultName());
+	}
 
 	async load(): Promise<DashboardLoadResult> {
 		const data = await this.host.readData();
 		const raw = isRecord(data) ? data[DASHBOARD_STORE_KEY] : undefined;
 		if (raw === undefined) {
-			const store = createDefaultStore();
+			const store = this.defaultStore();
 			await this.save(store);
 			return { store, damaged: false };
 		}
 		const store = this.normalize(raw);
-		if (!store) return { store: createDefaultStore(), damaged: true };
+		if (!store) return { store: this.defaultStore(), damaged: true };
 		return { store, damaged: false };
 	}
 
+	private normalizePages(candidates: unknown[]): DashboardPage[] {
+		const pages: DashboardPage[] = [];
+		for (const candidate of candidates) {
+			const page = toPage(candidate);
+			if (page) pages.push(page);
+		}
+		return pages;
+	}
+
+	private normalizeDashboard(
+		value: Record<string, unknown>,
+	): DashboardWorkspace | null {
+		if (typeof value.id !== "string") return null;
+		const pages = this.normalizePages(
+			Array.isArray(value.pages) ? value.pages : [],
+		);
+		const name =
+			typeof value.name === "string" && value.name.trim().length > 0
+				? value.name.trim()
+				: this.defaultName();
+		const dashboard: DashboardWorkspace = { id: value.id, name, pages };
+		const lastPageId =
+			typeof value.lastPageId === "string" ? value.lastPageId : undefined;
+		if (lastPageId && pages.some((page) => page.id === lastPageId)) {
+			dashboard.lastPageId = lastPageId;
+		}
+		return dashboard;
+	}
+
+	/**
+	 * Shape-based migration, not trusting `schemaVersion`:
+	 * - `pages[]` → v3, wrapped in the default dashboard;
+	 * - `dashboards[]` → v4 elements (with `pages`) and/or v2 elements (with
+	 *   `components`, wrapped into a trailing default dashboard).
+	 */
 	private normalize(raw: unknown): DashboardStoreData | null {
 		if (!isRecord(raw)) return null;
-		const candidates = Array.isArray(raw.pages)
-			? raw.pages
-			: Array.isArray(raw.dashboards)
-				? raw.dashboards
-				: [];
-		const pages = candidates
-			.filter(isPage)
-			.map((page) => ({
-				id: page.id,
-				name: typeof page.name === "string" ? page.name : "Page 1",
-				components: page.components.filter(isComponent),
-			}));
-		const source = pages.length > 0 ? pages : createDefaultStore().pages;
+
+		const parsed: DashboardWorkspace[] = [];
+		const legacyPages: DashboardPage[] = [];
+
+		if (Array.isArray(raw.pages)) {
+			const pages = this.normalizePages(raw.pages);
+			const dashboard: DashboardWorkspace = {
+				id: DEFAULT_DASHBOARD_ID,
+				name: this.defaultName(),
+				pages,
+			};
+			const lastPageId =
+				typeof raw.activePageId === "string"
+					? raw.activePageId
+					: undefined;
+			if (lastPageId && pages.some((page) => page.id === lastPageId)) {
+				dashboard.lastPageId = lastPageId;
+			}
+			parsed.push(dashboard);
+		} else if (Array.isArray(raw.dashboards)) {
+			for (const entry of raw.dashboards) {
+				if (!isRecord(entry)) continue;
+				if (Array.isArray(entry.pages)) {
+					const dashboard = this.normalizeDashboard(entry);
+					if (dashboard) parsed.push(dashboard);
+				} else if (Array.isArray(entry.components)) {
+					const page = toPage(entry);
+					if (page) legacyPages.push(page);
+				}
+			}
+		}
+
+		const takenDashboardIds = new Set<string>();
+		const takenPageIds = new Set<string>();
+		const dashboards: DashboardWorkspace[] = [];
+
+		const pushDashboard = (dashboard: DashboardWorkspace): void => {
+			if (takenDashboardIds.has(dashboard.id)) return;
+			takenDashboardIds.add(dashboard.id);
+
+			const pages: DashboardPage[] = [];
+			for (const page of dashboard.pages) {
+				if (takenPageIds.has(page.id)) continue;
+				takenPageIds.add(page.id);
+				pages.push(page);
+			}
+			if (pages.length === 0) {
+				const pageId = uniqueId(
+					`page:default-${slugOf(dashboard.id)}`,
+					takenPageIds,
+				);
+				takenPageIds.add(pageId);
+				pages.push({ id: pageId, name: DEFAULT_PAGE_NAME, components: [] });
+			}
+
+			const next: DashboardWorkspace = {
+				id: dashboard.id,
+				name: dashboard.name,
+				pages,
+			};
+			const lastPageId = dashboard.lastPageId;
+			if (lastPageId && pages.some((page) => page.id === lastPageId)) {
+				next.lastPageId = lastPageId;
+			}
+			dashboards.push(next);
+		};
+
+		for (const dashboard of parsed) pushDashboard(dashboard);
+
+		if (legacyPages.length > 0) {
+			pushDashboard({
+				id: uniqueId(DEFAULT_DASHBOARD_ID, takenDashboardIds),
+				name: this.defaultName(),
+				pages: legacyPages,
+			});
+		}
+
 		const queries = Array.isArray(raw.queries)
 			? raw.queries.filter(isQuery)
 			: [];
-		const requestedId =
-			typeof raw.activePageId === "string"
-				? raw.activePageId
-				: typeof raw.activeDashboardId === "string"
-					? raw.activeDashboardId
-					: undefined;
-		const activeId =
-			requestedId && source.some((item) => item.id === requestedId)
-				? requestedId
-				: source[0]?.id;
-		const store: DashboardStoreData = {
-			schemaVersion: DASHBOARD_SCHEMA_VERSION,
-			pages: source,
-			queries: queries as DashboardStoreData["queries"],
-		};
-		if (activeId) store.activePageId = activeId;
+
+		const store = this.defaultStore();
+		if (dashboards.length === 0) {
+			store.queries = queries as DashboardStoreData["queries"];
+			return store;
+		}
+
+		const requested =
+			typeof raw.activeDashboardId === "string"
+				? raw.activeDashboardId
+				: undefined;
+		const activeDashboardId =
+			requested && dashboards.some((item) => item.id === requested)
+				? requested
+				: dashboards[0]!.id;
+
+		store.dashboards = dashboards;
+		store.activeDashboardId = activeDashboardId;
+		store.queries = queries as DashboardStoreData["queries"];
 		return store;
 	}
 
@@ -115,6 +272,25 @@ export class DashboardRepository {
 		await this.host.updateData((data) => {
 			data[DASHBOARD_STORE_KEY] = payload;
 		});
+		this.notify(payload);
+	}
+
+	/** Fires once after every successful write (single notification point). */
+	onChange(listener: (store: DashboardStoreData) => void): () => void {
+		this.listeners.add(listener);
+		return () => {
+			this.listeners.delete(listener);
+		};
+	}
+
+	private notify(store: DashboardStoreData): void {
+		for (const listener of Array.from(this.listeners)) {
+			try {
+				listener(store);
+			} catch (error) {
+				console.warn("IOTO Dashboard: change listener failed", error);
+			}
+		}
 	}
 
 	private async mutate(
@@ -127,13 +303,23 @@ export class DashboardRepository {
 		return store;
 	}
 
+	private findPage(
+		store: DashboardStoreData,
+		pageId: string,
+	): { dashboard: DashboardWorkspace; page: DashboardPage } | null {
+		for (const dashboard of store.dashboards) {
+			const page = dashboard.pages.find((item) => item.id === pageId);
+			if (page) return { dashboard, page };
+		}
+		return null;
+	}
+
 	async addComponent(
 		pageId: string,
 		component: DashboardComponentConfig,
 	): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
-			const page = store.pages.find((item) => item.id === pageId);
-			if (page) page.components.push(component);
+			this.findPage(store, pageId)?.page.components.push(component);
 		});
 	}
 
@@ -143,7 +329,7 @@ export class DashboardRepository {
 		patch: Partial<DashboardComponentConfig>,
 	): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
-			const page = store.pages.find((item) => item.id === pageId);
+			const page = this.findPage(store, pageId)?.page;
 			const component = page?.components.find(
 				(item) => item.id === componentId,
 			);
@@ -167,7 +353,7 @@ export class DashboardRepository {
 		toIndex: number,
 	): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
-			const page = store.pages.find((item) => item.id === pageId);
+			const page = this.findPage(store, pageId)?.page;
 			if (!page) return;
 			const from = page.components.findIndex(
 				(item) => item.id === componentId,
@@ -188,7 +374,7 @@ export class DashboardRepository {
 		componentId: string,
 	): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
-			const page = store.pages.find((item) => item.id === pageId);
+			const page = this.findPage(store, pageId)?.page;
 			if (!page) return;
 			page.components = page.components.filter(
 				(item) => item.id !== componentId,
@@ -196,10 +382,18 @@ export class DashboardRepository {
 		});
 	}
 
-	async addPage(page: DashboardPage): Promise<DashboardStoreData> {
+	async addPage(
+		dashboardId: string,
+		page: DashboardPage,
+	): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
-			if (store.pages.some((item) => item.id === page.id)) return;
-			store.pages.push(page);
+			const dashboard = store.dashboards.find(
+				(item) => item.id === dashboardId,
+			);
+			if (!dashboard) return;
+			if (this.findPage(store, page.id)) return;
+			dashboard.pages.push(page);
+			dashboard.lastPageId = page.id;
 		});
 	}
 
@@ -207,31 +401,207 @@ export class DashboardRepository {
 		const trimmed = name.trim();
 		return this.mutate((store) => {
 			if (!trimmed) return;
-			const page = store.pages.find((item) => item.id === pageId);
+			const page = this.findPage(store, pageId)?.page;
 			if (page) page.name = trimmed;
 		});
 	}
 
 	async removePage(pageId: string): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
-			// The last page is never removed: the view needs a canvas.
-			if (store.pages.length <= 1) return;
-			const remaining = store.pages.filter((page) => page.id !== pageId);
-			if (remaining.length === store.pages.length) return;
-			store.pages = remaining;
-			if (store.activePageId === pageId) {
-				store.activePageId = remaining[0]?.id;
+			const hit = this.findPage(store, pageId);
+			if (!hit) return;
+			const { dashboard } = hit;
+			// The last page of a dashboard is never removed: it needs a canvas.
+			if (dashboard.pages.length <= 1) return;
+			dashboard.pages = dashboard.pages.filter(
+				(page) => page.id !== pageId,
+			);
+			if (dashboard.lastPageId === pageId) {
+				dashboard.lastPageId = dashboard.pages[0]?.id;
 			}
 		});
 	}
 
+	async addDashboard(
+		workspace: DashboardWorkspace,
+	): Promise<DashboardStoreData> {
+		return this.mutate((store) => {
+			if (store.dashboards.some((item) => item.id === workspace.id)) {
+				return;
+			}
+			const takenPageIds = new Set(
+				store.dashboards.flatMap((item) =>
+					item.pages.map((page) => page.id),
+				),
+			);
+			const pages =
+				workspace.pages.length > 0
+					? workspace.pages
+					: [
+							{
+								id: uniqueId(
+									`page:default-${slugOf(workspace.id)}`,
+									takenPageIds,
+								),
+								name: DEFAULT_PAGE_NAME,
+								components: [],
+							},
+						];
+			const lastPageId =
+				workspace.lastPageId ?? pages[0]?.id;
+			const dashboard: DashboardWorkspace = {
+				id: workspace.id,
+				name: workspace.name,
+				pages,
+			};
+			if (
+				lastPageId &&
+				pages.some((page) => page.id === lastPageId)
+			) {
+				dashboard.lastPageId = lastPageId;
+			}
+			store.dashboards.push(dashboard);
+			store.activeDashboardId = dashboard.id;
+		});
+	}
+
+	async renameDashboard(
+		dashboardId: string,
+		name: string,
+	): Promise<DashboardStoreData> {
+		const trimmed = name.trim();
+		return this.mutate((store) => {
+			if (!trimmed) return;
+			const dashboard = store.dashboards.find(
+				(item) => item.id === dashboardId,
+			);
+			if (dashboard) dashboard.name = trimmed;
+		});
+	}
+
+	async duplicateDashboard(
+		dashboardId: string,
+		name: string,
+	): Promise<DashboardStoreData> {
+		const trimmed = name.trim();
+		return this.mutate((store) => {
+			const source = store.dashboards.find(
+				(item) => item.id === dashboardId,
+			);
+			if (!source) return;
+
+			const timestamp = Date.now();
+			const takenDashboardIds = new Set(
+				store.dashboards.map((item) => item.id),
+			);
+			const takenPageIds = new Set(
+				store.dashboards.flatMap((item) =>
+					item.pages.map((page) => page.id),
+				),
+			);
+			const takenComponentIds = new Set(
+				store.dashboards.flatMap((item) =>
+					item.pages.flatMap((page) =>
+						page.components.map((component) => component.id),
+					),
+				),
+			);
+
+			const newId = uniqueId(`dashboard:${timestamp}`, takenDashboardIds);
+
+			const pages: DashboardPage[] = source.pages.map(
+				(page, pageIndex) => {
+					const pageId = uniqueId(
+						`page:${timestamp}-${pageIndex + 1}`,
+						takenPageIds,
+					);
+					takenPageIds.add(pageId);
+					const components = page.components.map(
+						(component, componentIndex) => {
+							const componentId = uniqueId(
+								`component:${timestamp}-${pageIndex + 1}-${componentIndex + 1}`,
+								takenComponentIds,
+							);
+							takenComponentIds.add(componentId);
+							return {
+								...structuredClone(component),
+								id: componentId,
+							};
+						},
+					);
+					return { id: pageId, name: page.name, components };
+				},
+			);
+
+			const dashboard: DashboardWorkspace = {
+				id: newId,
+				name: trimmed.length > 0 ? trimmed : source.name,
+				pages,
+			};
+			const lastIndex = source.pages.findIndex(
+				(page) => page.id === source.lastPageId,
+			);
+			const lastPage = pages[lastIndex >= 0 ? lastIndex : 0];
+			if (lastPage) dashboard.lastPageId = lastPage.id;
+
+			store.dashboards.push(dashboard);
+			store.activeDashboardId = dashboard.id;
+		});
+	}
+
+	async removeDashboard(
+		dashboardId: string,
+	): Promise<DashboardStoreData> {
+		return this.mutate((store) => {
+			// The last dashboard is never removed: the ribbon needs a landing.
+			if (store.dashboards.length <= 1) return;
+			const remaining = store.dashboards.filter(
+				(item) => item.id !== dashboardId,
+			);
+			if (remaining.length === store.dashboards.length) return;
+			store.dashboards = remaining;
+			if (store.activeDashboardId === dashboardId) {
+				store.activeDashboardId = store.dashboards[0]?.id;
+			}
+		});
+	}
+
+	async setActiveDashboard(
+		dashboardId: string,
+	): Promise<DashboardStoreData> {
+		return this.mutate((store) => {
+			if (store.dashboards.some((item) => item.id === dashboardId)) {
+				store.activeDashboardId = dashboardId;
+			}
+		});
+	}
+
+	async setLastPage(
+		dashboardId: string,
+		pageId: string,
+	): Promise<DashboardStoreData> {
+		return this.mutate((store) => {
+			const dashboard = store.dashboards.find(
+				(item) => item.id === dashboardId,
+			);
+			if (!dashboard) return;
+			if (!dashboard.pages.some((page) => page.id === pageId)) return;
+			dashboard.lastPageId = pageId;
+		});
+	}
+
 	referenceCount(store: DashboardStoreData, queryId: string): number {
-		return store.pages.reduce(
-			(total, page) =>
+		return store.dashboards.reduce(
+			(total, dashboard) =>
 				total +
-				page.components.filter(
-					(component) => component.queryId === queryId,
-				).length,
+				dashboard.pages.reduce(
+					(sum, page) =>
+						sum +
+						page.components.filter(
+							(component) => component.queryId === queryId,
+						).length,
+					0,
+				),
 			0,
 		);
 	}
@@ -259,14 +629,6 @@ export class DashboardRepository {
 		});
 	}
 
-	async setActivePage(pageId: string): Promise<DashboardStoreData> {
-		return this.mutate((store) => {
-			if (store.pages.some((item) => item.id === pageId)) {
-				store.activePageId = pageId;
-			}
-		});
-	}
-
 	exportJson(store: DashboardStoreData): string {
 		return JSON.stringify(store, null, 2);
 	}
@@ -282,6 +644,6 @@ export class DashboardRepository {
 	}
 
 	current(store: DashboardStoreData) {
-		return activePage(store);
+		return activePageOf(activeDashboard(store));
 	}
 }
