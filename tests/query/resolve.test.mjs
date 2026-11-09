@@ -163,3 +163,43 @@ test('builtins cover both targets with stable ids', () => {
 	assert.ok(queries.some((item) => item.id === 'builtin:tasks-unfinished'));
 	for (const item of queries) assert.ok(['note', 'task'].includes(item.target));
 });
+
+test('file target filters by folder scope and file name', () => {
+	const tree = {
+		...snapshot,
+		files: [
+			{ path: '3-任务/Alpha/a.md', basename: 'a', extension: 'md', folder: '3-任务/Alpha', size: 1, ctime: 1, mtime: 1 },
+			{ path: '3-任务/Alpha/sub/b.png', basename: 'b', extension: 'png', folder: '3-任务/Alpha/sub', size: 2, ctime: 1, mtime: 1 },
+			{ path: '1-输入/c.md', basename: 'c', extension: 'md', folder: '1-输入', size: 3, ctime: 1, mtime: 1 },
+		],
+	};
+	const scoped = resolveQuery(
+		tree,
+		definition({
+			target: 'file',
+			scope: { folders: ['3-任务/Alpha'], includeSubfolders: true },
+		}),
+	);
+	assert.deepEqual(scoped.files.map((file) => file.basename), ['a', 'b']);
+
+	const named = resolveQuery(
+		tree,
+		definition({ target: 'file', filters: { ...createDefaultFilterState(), name: 'b' } }),
+	);
+	assert.deepEqual(named.files.map((file) => file.basename), ['b']);
+});
+
+test('folder target filters the folder records and ignores a missing tree', () => {
+	const tree = {
+		...snapshot,
+		folders: [
+			{ path: '3-任务/Alpha', name: 'Alpha', depth: 2, directFiles: 1, directFolders: 1, fileCount: 2, noteCount: 1, totalSize: 3, latestMtime: 2 },
+			{ path: '3-任务/Beta', name: 'Beta', depth: 2, directFiles: 1, directFolders: 0, fileCount: 1, noteCount: 1, totalSize: 1, latestMtime: 1 },
+		],
+	};
+	const result = resolveQuery(tree, definition({ target: 'folder' }));
+	assert.deepEqual(result.folders.map((folder) => folder.name), ['Alpha', 'Beta']);
+
+	const missing = resolveQuery(snapshot, definition({ target: 'folder' }));
+	assert.deepEqual(missing.folders, []);
+});

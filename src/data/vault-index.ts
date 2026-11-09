@@ -15,6 +15,7 @@ import {
 } from "./note-source";
 import { buildProjectRecord } from "./project-source";
 import { extractTasks } from "./task-source";
+import { fileRecords, folderRecords } from "./file-source";
 import type {
 	IndexConfig,
 	IndexSnapshot,
@@ -141,7 +142,9 @@ export class VaultIndex {
 		this.notify();
 	}
 
-	async getSnapshot(): Promise<IndexSnapshot> {
+	async getSnapshot(
+		options: { withTree?: boolean } = {},
+	): Promise<IndexSnapshot> {
 		await this.ensureBuilt();
 		await this.flushDirty();
 		const notes: NoteRecord[] = [];
@@ -153,7 +156,23 @@ export class VaultIndex {
 			if (entry.project) projects.push(entry.project);
 		}
 		notes.sort((a, b) => a.path.localeCompare(b.path));
-		return { notes, tasks, projects };
+		const snapshot: IndexSnapshot = { notes, tasks, projects };
+		if (options.withTree) {
+			const tree = this.collectTree(this.getConfig());
+			const files = fileRecords(
+				tree.files.map((file) => ({
+					path: file.path,
+					basename: file.basename,
+					extension: file.extension,
+					size: file.stat.size,
+					ctime: file.stat.ctime,
+					mtime: file.stat.mtime,
+				})),
+			);
+			snapshot.files = files;
+			snapshot.folders = folderRecords(files, tree.folders);
+		}
+		return snapshot;
 	}
 
 	async getNotes(): Promise<NoteRecord[]> {
@@ -198,44 +217,58 @@ export class VaultIndex {
 		await this.building;
 	}
 
-	private collectFiles(config: IndexConfig): TFile[] {
+	private collectTree(config: IndexConfig): {
+		files: TFile[];
+		folders: string[];
+	} {
 		const roots = [
 			config.inputFolder,
 			config.outputFolder,
 			config.taskFolder,
 			config.outcomeFolder,
 		];
-		const seen = new Set<string>();
+		const seenFiles = new Set<string>();
+		const seenFolders = new Set<string>();
 		const files: TFile[] = [];
+		const folders: string[] = [];
 		for (const rawRoot of roots) {
 			const root = normalizeFolder(rawRoot);
 			if (!root) continue;
 			const node = this.app.vault.getAbstractFileByPath(root);
 			if (!node || !isFolder(node)) continue;
-			for (const file of this.walk(node)) {
-				if (seen.has(file.path)) continue;
-				seen.add(file.path);
-				files.push(file);
-			}
+			seenFolders.add(root);
+			folders.push(root);
+			this.walk(node, seenFiles, files, seenFolders, folders);
 		}
-		return files;
+		return { files, folders };
 	}
 
-	private walk(folder: TFolder): TFile[] {
-		const result: TFile[] = [];
+	private walk(
+		folder: TFolder,
+		seenFiles: Set<string>,
+		files: TFile[],
+		seenFolders: Set<string>,
+		folders: string[],
+	): void {
 		for (const child of folder.children) {
 			if (isFolder(child)) {
-				result.push(...this.walk(child));
-			} else if (child instanceof TFile && child.extension === "md") {
-				result.push(child);
+				if (!seenFolders.has(child.path)) {
+					seenFolders.add(child.path);
+					folders.push(child.path);
+				}
+				this.walk(child, seenFiles, files, seenFolders, folders);
+			} else if (child instanceof TFile && !seenFiles.has(child.path)) {
+				seenFiles.add(child.path);
+				files.push(child);
 			}
 		}
-		return result;
 	}
 
 	private async buildAll(): Promise<void> {
 		const config = this.getConfig();
-		const files = this.collectFiles(config);
+		const files = this.collectTree(config).files.filter(
+			(file) => file.extension === "md",
+		);
 		const previous = this.records;
 		const next = new Map<string, CachedFile>();
 

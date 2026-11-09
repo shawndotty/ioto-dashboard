@@ -170,6 +170,32 @@ export interface IndexSnapshot {
 	notes: NoteRecord[];
 	tasks: TaskRecord[];
 	projects: ProjectRecord[];
+	/** Built on demand (`getSnapshot({ withTree: true })`): every file under the roots. */
+	files?: FileRecord[];
+	/** Built on demand: recursive aggregates for every folder under the roots. */
+	folders?: FolderRecord[];
+}
+
+export interface FileRecord {
+	path: string;
+	basename: string;
+	extension: string;
+	folder: string;
+	size: number;
+	ctime: number;
+	mtime: number;
+}
+
+export interface FolderRecord {
+	path: string;
+	name: string;
+	depth: number;
+	directFiles: number;
+	directFolders: number;
+	fileCount: number;
+	noteCount: number;
+	totalSize: number;
+	latestMtime: number;
 }
 
 export interface NoteFacets {

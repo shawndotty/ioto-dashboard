@@ -133,7 +133,9 @@ export class ComponentInspector {
 			});
 		}
 
-		const settings = definition.settings ?? [];
+		const settings = (definition.settings ?? []).filter(
+			(setting) => !setting.when || setting.when(state.target.config),
+		);
 		const dataSettings = settings.filter(
 			(setting) => setting.group === "data",
 		);
@@ -318,6 +320,72 @@ export class ComponentInspector {
 					);
 				});
 				this.titleInput = input;
+				return;
+			}
+			case "select": {
+				field.createEl("label", { text: t(setting.labelKey as LabelKey) });
+				const select = field.createEl("select", { cls: "dropdown" });
+				for (const option of setting.options) {
+					select.createEl("option", {
+						value: option.value,
+						text: t(option.labelKey as LabelKey),
+					});
+				}
+				select.value = String(
+					this.storedSettingValue(state, setting) ?? setting.fallback,
+				);
+				select.disabled = !state.editable;
+				const queryIds = new Set(
+					state.queries.map((query) => query.id),
+				);
+				select.addEventListener("change", () => {
+					const patch = coerceSettingValue(
+						setting,
+						select.value,
+						queryIds,
+					);
+					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+				});
+				return;
+			}
+			case "toggle": {
+				field.createEl("label", { text: t(setting.labelKey as LabelKey) });
+				const input = field.createEl("input", { type: "checkbox" });
+				const stored = this.storedSettingValue(state, setting);
+				input.checked =
+					typeof stored === "boolean" ? stored : setting.fallback;
+				input.disabled = !state.editable;
+				const queryIds = new Set(
+					state.queries.map((query) => query.id),
+				);
+				input.addEventListener("change", () => {
+					const patch = coerceSettingValue(
+						setting,
+						input.checked,
+						queryIds,
+					);
+					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+				});
+				return;
+			}
+			case "color": {
+				field.createEl("label", { text: t(setting.labelKey as LabelKey) });
+				const input = field.createEl("input", { type: "color" });
+				const stored = this.storedSettingValue(state, setting);
+				input.value =
+					typeof stored === "string" ? stored : "#5772ff";
+				input.disabled = !state.editable;
+				const queryIds = new Set(
+					state.queries.map((query) => query.id),
+				);
+				input.addEventListener("change", () => {
+					const patch = coerceSettingValue(
+						setting,
+						input.value,
+						queryIds,
+					);
+					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+				});
 				return;
 			}
 		}
@@ -538,6 +606,21 @@ export class ComponentInspector {
 		if (this.menuButtonEl) {
 			this.menuButtonEl.disabled = !state.editable;
 		}
+	}
+
+	private storedSettingValue(
+		state: InspectorState,
+		setting: ComponentSetting,
+	): string | number | boolean | undefined {
+		const config = state.target.config;
+		if ("target" in setting && setting.target === "options") {
+			return config.options?.[setting.key];
+		}
+		return (config as unknown as Record<string, unknown>)[setting.key] as
+			| string
+			| number
+			| boolean
+			| undefined;
 	}
 
 	private limitFallback(state: InspectorState): number {

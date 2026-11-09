@@ -236,9 +236,13 @@ export class QueryEditModal extends Modal {
 				dropdown
 					.addOption("task", t("QUERY_TARGET_TASK"))
 					.addOption("note", t("QUERY_TARGET_NOTE"))
+					.addOption("file", t("QUERY_TARGET_FILE"))
+					.addOption("folder", t("QUERY_TARGET_FOLDER"))
 					.setValue(this.draft.target)
 					.onChange((value) => {
 						this.draft.target = value as QueryTarget;
+						this.contentEl.empty();
+						this.onOpen();
 					}),
 			);
 
@@ -286,50 +290,52 @@ export class QueryEditModal extends Modal {
 					}),
 			);
 
-		body.createEl("h3", {
-			cls: "setting-item-heading",
-			text: t("QUERY_SECTION_FILTERS"),
-		});
-
-		const filters = body.createDiv({ cls: "ioto-modal-filters" });
-		this.addFilterInput(
-			filters,
-			t("QUERY_FILTER_NAME"),
-			"name",
-			this.draft.filters.name,
-		);
-		this.addFilterInput(
-			filters,
-			t("QUERY_FILTER_PROJECT"),
-			"project",
-			this.draft.filters.project,
-		);
-		this.addFilterInput(
-			filters,
-			t("QUERY_FILTER_SUBJECT"),
-			"subject",
-			this.draft.filters.subject,
-		);
-
-		new Setting(body)
-			.setName(t("QUERY_FILTER_DATE_PRESET"))
-			.addDropdown((dropdown) => {
-				const options: Array<[FilterState["datePreset"], string]> = [
-					["all", t("FILTER_DATE_PRESET_ALL")],
-					["last1day", t("FILTER_DATE_PRESET_LAST_1_DAY")],
-					["last7days", t("FILTER_DATE_PRESET_LAST_7_DAYS")],
-					["last30days", t("FILTER_DATE_PRESET_LAST_30_DAYS")],
-					["custom", t("FILTER_DATE_PRESET_CUSTOM")],
-				];
-				for (const [value, label] of options)
-					dropdown.addOption(value, label);
-				dropdown
-					.setValue(this.draft.filters.datePreset)
-					.onChange((value) => {
-						this.draft.filters.datePreset =
-							value as FilterState["datePreset"];
-					});
+		if (this.draft.target === "task" || this.draft.target === "note") {
+			body.createEl("h3", {
+				cls: "setting-item-heading",
+				text: t("QUERY_SECTION_FILTERS"),
 			});
+
+			const filters = body.createDiv({ cls: "ioto-modal-filters" });
+			this.addFilterInput(
+				filters,
+				t("QUERY_FILTER_NAME"),
+				"name",
+				this.draft.filters.name,
+			);
+			this.addFilterInput(
+				filters,
+				t("QUERY_FILTER_PROJECT"),
+				"project",
+				this.draft.filters.project,
+			);
+			this.addFilterInput(
+				filters,
+				t("QUERY_FILTER_SUBJECT"),
+				"subject",
+				this.draft.filters.subject,
+			);
+
+			new Setting(body)
+				.setName(t("QUERY_FILTER_DATE_PRESET"))
+				.addDropdown((dropdown) => {
+					const options: Array<[FilterState["datePreset"], string]> = [
+						["all", t("FILTER_DATE_PRESET_ALL")],
+						["last1day", t("FILTER_DATE_PRESET_LAST_1_DAY")],
+						["last7days", t("FILTER_DATE_PRESET_LAST_7_DAYS")],
+						["last30days", t("FILTER_DATE_PRESET_LAST_30_DAYS")],
+						["custom", t("FILTER_DATE_PRESET_CUSTOM")],
+					];
+					for (const [value, label] of options)
+						dropdown.addOption(value, label);
+					dropdown
+						.setValue(this.draft.filters.datePreset)
+						.onChange((value) => {
+							this.draft.filters.datePreset =
+								value as FilterState["datePreset"];
+						});
+				});
+		}
 
 		const footer = contentEl.createDiv({ cls: "ioto-modal-footer" });
 		new Setting(footer)

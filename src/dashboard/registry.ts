@@ -5,36 +5,98 @@ import type {
 	ProjectProgressGroup,
 } from "../metrics/types";
 import type { QueryDefinition } from "../query/types";
+import type {
+	Dataset,
+	DatasetRequest,
+	DataObject,
+	MeasureId,
+	ViewId,
+} from "./dataset/types";
 import type { DashboardComponentConfig } from "./types";
 
 export type ComponentStatus = "loading" | "ready" | "empty" | "error";
 
 export type ComponentSettingGroup = "data" | "display";
 
-export type ComponentSetting =
-	| { key: "queryId"; kind: "query"; group: "data" }
-	| { key: "basis"; kind: "basis"; group: "data"; fallback: CountBasis }
-	| {
-			key: "limit";
-			kind: "number";
-			group: "data";
-			min: number;
-			max: number;
-			step?: number;
-			fallback: number;
-	  }
-	| { key: "title"; kind: "text"; group: "display"; placeholderKey?: string };
+export type ComponentCategory =
+	| "overview"
+	| "analysis"
+	| "navigation"
+	| "action";
+
+interface SettingBase {
+	/** Hides the row when the predicate returns false. */
+	when?(config: DashboardComponentConfig): boolean;
+}
+
+export type ComponentSetting = SettingBase &
+	(
+		| { key: "queryId"; kind: "query"; group: "data" }
+		| {
+				key: "basis";
+				kind: "basis";
+				group: "data";
+				fallback: CountBasis;
+		  }
+		| {
+				key: "limit";
+				kind: "number";
+				group: "data";
+				min: number;
+				max: number;
+				step?: number;
+				fallback: number;
+		  }
+		| {
+				key: "title";
+				kind: "text";
+				group: "display";
+				placeholderKey?: string;
+		  }
+		| {
+				key: string;
+				kind: "select";
+				group: "data" | "display";
+				labelKey: string;
+				options: Array<{ value: string; labelKey: string }>;
+				fallback: string;
+				/** `options` keys land in `config.options`, everything else on config. */
+				target?: "config" | "options";
+		  }
+		| {
+				key: string;
+				kind: "toggle";
+				group: "display";
+				labelKey: string;
+				fallback: boolean;
+				target?: "config" | "options";
+		  }
+		| {
+				key: string;
+				kind: "color";
+				group: "display";
+				labelKey: string;
+				target?: "config" | "options";
+		  }
+	);
 
 export interface ComponentRenderContext {
 	config: DashboardComponentConfig;
 	query: QueryDefinition | undefined;
 	result: MetricResult | undefined;
+	dataset?: Dataset;
 	status: ComponentStatus;
 	messageKey?: string;
 	message?: string;
 	editMode: boolean;
 	openNote(path: string, line?: number): void;
 	openProject(group: ProjectProgressGroup): void;
+	/** Any vault file, not just Markdown. */
+	openFile(path: string, line?: number): void;
+	openFolder(path: string): void;
+	revealInExplorer(path: string): void;
+	/** Renders Markdown owned by the current view, so it unloads with the card. */
+	renderMarkdown(el: HTMLElement, path: string): Promise<void>;
 }
 
 export interface SizeBounds {
@@ -48,9 +110,25 @@ export interface ComponentDefinition {
 	type: string;
 	labelKey: string;
 	descriptionKey: string;
+	category?: ComponentCategory;
+	/** Query targets this component understands (picker hints). */
+	objects?: DataObject[];
+	views?: ViewId[];
+	viewDefault?: ViewId;
+	measureDefault?: MeasureId;
 	defaultQueryId: string;
 	createConfig(queryId: string): Partial<DashboardComponentConfig>;
-	toMetricRequest(config: DashboardComponentConfig): MetricRequest;
+	toMetricRequest?(
+		config: DashboardComponentConfig,
+		query?: QueryDefinition,
+	): MetricRequest;
+	/** Set on components that read the Dataset pipeline. */
+	toDatasetRequest?(
+		config: DashboardComponentConfig,
+		query?: QueryDefinition,
+	): DatasetRequest;
+	/** Dataset emptiness; defaults to `dataset.total === 0`. */
+	isEmptyDataset?(dataset: Dataset): boolean;
 	/** `true` when the metric is valid but has nothing meaningful to show. */
 	isEmpty(result: MetricResult): boolean;
 	render(el: HTMLElement, ctx: ComponentRenderContext): void;
@@ -92,6 +170,33 @@ export function coerceSettingValue(
 			if (typeof raw !== "string") return {};
 			const trimmed = raw.trim();
 			return trimmed ? { title: trimmed } : { title: undefined };
+		}
+		case "select": {
+			if (typeof raw !== "string") return {};
+			if (!setting.options.some((option) => option.value === raw)) return {};
+			return setting.target === "options"
+				? { options: { [setting.key]: raw } }
+				: ({
+						[setting.key]: raw,
+					} as Partial<DashboardComponentConfig>);
+		}
+		case "toggle": {
+			if (typeof raw !== "boolean") return {};
+			return setting.target === "options"
+				? { options: { [setting.key]: raw } }
+				: ({
+						[setting.key]: raw,
+					} as Partial<DashboardComponentConfig>);
+		}
+		case "color": {
+			if (typeof raw !== "string" || !/^#[0-9a-fA-F]{6}$/.test(raw)) {
+				return {};
+			}
+			return setting.target === "options"
+				? { options: { [setting.key]: raw } }
+				: ({
+						[setting.key]: raw,
+					} as Partial<DashboardComponentConfig>);
 		}
 	}
 }

@@ -564,7 +564,7 @@ test('reference counts span dashboards and survive dashboard deletion', async ()
 	assert.deepEqual(store.queries.map((item) => item.id), ['user:1']);
 });
 
-test('importing v3 / v2 JSON upgrades it to the v4 shape', async () => {
+test('importing v3 / v2 JSON upgrades it to the v5 shape', async () => {
 	const repository = new DashboardRepository(makeHost());
 	const v3 = JSON.stringify({
 		schemaVersion: 3,
@@ -580,11 +580,11 @@ test('importing v3 / v2 JSON upgrades it to the v4 shape', async () => {
 	});
 
 	const importedV3 = repository.importJson(v3);
-	assert.equal(importedV3.schemaVersion, 4);
+	assert.equal(importedV3.schemaVersion, 5);
 	assert.equal(importedV3.dashboards[0].pages[0].id, 'page:home');
 
 	const importedV2 = repository.importJson(v2);
-	assert.equal(importedV2.schemaVersion, 4);
+	assert.equal(importedV2.schemaVersion, 5);
 	assert.equal(importedV2.dashboards[0].pages[0].id, 'dashboard:default');
 	assert.deepEqual(importedV2.queries, [query()]);
 });

@@ -6,7 +6,11 @@ import {
 	restoreMacWindowButtons,
 } from "./macos-window-buttons";
 
-export type ModalKind = "query-manager" | "query-editor" | "component-picker";
+export type ModalKind =
+	| "query-manager"
+	| "query-editor"
+	| "component-picker"
+	| "page-layout";
 
 export interface ModalShellOptions {
 	kind: ModalKind;

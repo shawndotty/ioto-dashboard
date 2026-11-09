@@ -10,9 +10,23 @@ const { projectProgressComponent } = await load(
 const { unfinishedTasksComponent } = await load(
 	'../../src/dashboard/components/unfinished-tasks.ts',
 );
+const { tableComponent } = await load('../../src/dashboard/components/table.ts');
+const { lineChartComponent } = await load(
+	'../../src/dashboard/components/line-chart.ts',
+);
+const { barChartComponent } = await load(
+	'../../src/dashboard/components/bar-chart.ts',
+);
 
-const COMPONENTS = [kpiComponent, projectProgressComponent, unfinishedTasksComponent];
-const CONFIG_KEYS = new Set(['id', 'type', 'queryId', 'basis', 'limit', 'title', 'x', 'y', 'w', 'h']);
+const COMPONENTS = [
+	kpiComponent,
+	projectProgressComponent,
+	unfinishedTasksComponent,
+	tableComponent,
+	lineChartComponent,
+	barChartComponent,
+];
+const CONFIG_KEYS = new Set(['id', 'type', 'queryId', 'basis', 'limit', 'title', 'view', 'measure', 'options', 'x', 'y', 'w', 'h']);
 const QUERY_IDS = new Set(['builtin:tasks-all', 'builtin:tasks-unfinished', 'user:1']);
 
 test('every component declares settings whose keys are valid config fields', () => {
@@ -21,8 +35,12 @@ test('every component declares settings whose keys are valid config fields', () 
 		assert.equal(component.settings[0].kind, 'query', `${component.type} should lead with the query`);
 		const keys = component.settings.map((setting) => setting.key);
 		assert.equal(new Set(keys).size, keys.length, `${component.type} has duplicate setting keys`);
-		for (const key of keys) {
-			assert.ok(CONFIG_KEYS.has(key), `${component.type}.${key} is not a DashboardComponentConfig key`);
+		for (const setting of component.settings) {
+			if (setting.target === 'options') continue;
+			assert.ok(
+				CONFIG_KEYS.has(setting.key),
+				`${component.type}.${setting.key} is not a DashboardComponentConfig key`,
+			);
 		}
 		assert.ok(keys.includes('title'), `${component.type} should expose the title setting`);
 	}
@@ -37,6 +55,20 @@ test('setting fallbacks match the values createConfig writes', () => {
 			}
 			if (setting.kind === 'number') {
 				assert.equal(created[setting.key], setting.fallback, `${component.type} ${setting.key} fallback`);
+			}
+			if (setting.kind === 'select') {
+				const stored =
+					setting.target === 'options'
+						? created.options?.[setting.key]
+						: created[setting.key];
+				assert.equal(stored, setting.fallback, `${component.type} ${setting.key} fallback`);
+			}
+			if (setting.kind === 'toggle') {
+				const stored =
+					setting.target === 'options'
+						? created.options?.[setting.key]
+						: created[setting.key];
+				assert.equal(stored, setting.fallback, `${component.type} ${setting.key} fallback`);
 			}
 		}
 	}

@@ -1,7 +1,8 @@
 import type { CountBasis } from "../metrics/types";
+import type { MeasureId, ViewId } from "./dataset/types";
 import type { QueryDefinition } from "../query/types";
 
-export const DASHBOARD_SCHEMA_VERSION = 4;
+export const DASHBOARD_SCHEMA_VERSION = 5;
 export const DASHBOARD_STORE_KEY = "dashboardStore";
 export const DEFAULT_DASHBOARD_ID = "dashboard:default";
 export const DEFAULT_PAGE_ID = "page:default";
@@ -13,6 +14,12 @@ export interface DashboardComponentConfig {
 	basis?: CountBasis;
 	limit?: number;
 	title?: string;
+	/** Presentation form; `undefined` falls back to the component default. */
+	view?: ViewId;
+	/** What the component computes; `undefined` falls back to the component default. */
+	measure?: MeasureId;
+	/** View-specific display parameters (scalar values only). */
+	options?: Record<string, string | number | boolean>;
 	/** Schema keeps x/y; the MVP auto-grid only consumes w/h. */
 	x?: number;
 	y?: number;
@@ -23,6 +30,10 @@ export interface DashboardComponentConfig {
 export interface DashboardPage {
 	id: string;
 	name: string;
+	/** Page-level layout: 12 (default) or 24 columns. */
+	columns?: 12 | 24;
+	/** Page-level row height in px. */
+	rowHeight?: number;
 	components: DashboardComponentConfig[];
 }
 

@@ -1,3 +1,4 @@
+import { MEASURE_IDS, VIEW_IDS } from "./dataset/types";
 import type {
 	DashboardComponentConfig,
 	DashboardPage,
@@ -59,10 +60,65 @@ function isQuery(value: unknown): boolean {
 		isRecord(value) &&
 		typeof value.id === "string" &&
 		typeof value.name === "string" &&
-		(value.target === "note" || value.target === "task") &&
+		(value.target === "note" ||
+			value.target === "task" ||
+			value.target === "file" ||
+			value.target === "folder") &&
 		isRecord(value.scope) &&
 		isRecord(value.filters)
 	);
+}
+
+const VIEW_SET = new Set<string>(VIEW_IDS);
+const MEASURE_SET = new Set<string>(MEASURE_IDS);
+
+function toOptions(
+	value: unknown,
+): Record<string, string | number | boolean> | undefined {
+	if (!isRecord(value)) return undefined;
+	const options: Record<string, string | number | boolean> = {};
+	for (const [key, raw] of Object.entries(value)) {
+		if (
+			typeof raw === "string" ||
+			typeof raw === "boolean" ||
+			(typeof raw === "number" && Number.isFinite(raw))
+		) {
+			options[key] = raw;
+		}
+	}
+	return Object.keys(options).length > 0 ? options : undefined;
+}
+
+/** Whitelists stored fields so unknown/dirty keys never survive a load. */
+function toComponent(value: unknown): DashboardComponentConfig | null {
+	if (!isComponent(value)) return null;
+	const component: DashboardComponentConfig = {
+		id: value.id,
+		type: value.type,
+		queryId: value.queryId,
+	};
+	if (value.basis === "file" || value.basis === "section") {
+		component.basis = value.basis;
+	}
+	if (typeof value.limit === "number" && Number.isFinite(value.limit)) {
+		component.limit = value.limit;
+	}
+	if (typeof value.title === "string") component.title = value.title;
+	if (typeof value.view === "string" && VIEW_SET.has(value.view)) {
+		component.view = value.view as DashboardComponentConfig["view"];
+	}
+	if (typeof value.measure === "string" && MEASURE_SET.has(value.measure)) {
+		component.measure = value.measure as DashboardComponentConfig["measure"];
+	}
+	const options = toOptions(value.options);
+	if (options) component.options = options;
+	for (const axis of ["x", "y", "w", "h"] as const) {
+		const raw = value[axis];
+		if (typeof raw === "number" && Number.isFinite(raw)) {
+			component[axis] = raw;
+		}
+	}
+	return component;
 }
 
 function uniqueId(base: string, taken: Set<string>): string {
@@ -87,11 +143,20 @@ function toPage(value: unknown): DashboardPage | null {
 		typeof value.name === "string" && value.name.trim().length > 0
 			? value.name.trim()
 			: DEFAULT_PAGE_NAME;
-	return {
+	const page: DashboardPage = {
 		id: value.id,
 		name,
-		components: value.components.filter(isComponent),
+		components: value.components
+			.map(toComponent)
+			.filter((item): item is DashboardComponentConfig => item !== null),
 	};
+	if (value.columns === 12 || value.columns === 24) {
+		page.columns = value.columns;
+	}
+	if (typeof value.rowHeight === "number" && Number.isFinite(value.rowHeight)) {
+		page.rowHeight = Math.min(200, Math.max(40, Math.round(value.rowHeight)));
+	}
+	return page;
 }
 
 export class DashboardRepository {
@@ -334,10 +399,14 @@ export class DashboardRepository {
 				(item) => item.id === componentId,
 			);
 			if (component) {
-				Object.assign(component, patch);
+				const { options, ...rest } = patch;
+				Object.assign(component, rest);
+				if (options !== undefined) {
+					component.options = { ...component.options, ...options };
+				}
 				// `undefined` means "remove this key" (e.g. a cleared title).
-				for (const key of Object.keys(patch)) {
-					if ((patch as Record<string, unknown>)[key] === undefined) {
+				for (const key of Object.keys(rest)) {
+					if ((rest as Record<string, unknown>)[key] === undefined) {
 						delete (component as unknown as Record<string, unknown>)[
 							key
 						];
@@ -403,6 +472,22 @@ export class DashboardRepository {
 			if (!trimmed) return;
 			const page = this.findPage(store, pageId)?.page;
 			if (page) page.name = trimmed;
+		});
+	}
+
+	async updatePageLayout(
+		pageId: string,
+		columns: 12 | 24,
+		rowHeight: number,
+	): Promise<DashboardStoreData> {
+		return this.mutate((store) => {
+			const page = this.findPage(store, pageId)?.page;
+			if (!page) return;
+			page.columns = columns === 24 ? 24 : 12;
+			page.rowHeight = Math.min(
+				200,
+				Math.max(40, Math.round(rowHeight) || 72),
+			);
 		});
 	}
 

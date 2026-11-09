@@ -1,12 +1,14 @@
 import type {
+	FileRecord,
 	FilterState,
+	FolderRecord,
 	IoType,
 	NoteRecord,
 	SectionRole,
 	TaskRecord,
 } from "../data/types";
 
-export type QueryTarget = "note" | "task";
+export type QueryTarget = "note" | "task" | "file" | "folder";
 
 /**
  * "What to query". Sorting / grouping / paging belong to the presentation
@@ -35,4 +37,8 @@ export interface QueryDefinition {
 export interface QueryResolution {
 	notes: NoteRecord[];
 	tasks: TaskRecord[];
+	/** Only populated for `file` targets. */
+	files?: FileRecord[];
+	/** Only populated for `folder` targets. */
+	folders?: FolderRecord[];
 }

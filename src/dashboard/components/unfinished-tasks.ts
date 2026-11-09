@@ -5,8 +5,21 @@ export const unfinishedTasksComponent: ComponentDefinition = {
 	type: "unfinished-tasks",
 	labelKey: "COMPONENT_UNFINISHED_NAME",
 	descriptionKey: "COMPONENT_UNFINISHED_DESC",
+	category: "overview",
+	objects: ["task"],
+	views: ["list"],
+	viewDefault: "list",
+	measureDefault: "open",
 	defaultQueryId: "builtin:tasks-unfinished",
-	createConfig: (queryId) => ({ queryId, basis: "section", limit: 20, w: 6, h: 3 }),
+	createConfig: (queryId) => ({
+		queryId,
+		basis: "section",
+		measure: "open",
+		view: "list",
+		limit: 20,
+		w: 6,
+		h: 3,
+	}),
 	size: { maxH: 24 },
 	settings: [
 		{ key: "queryId", kind: "query", group: "data" },
@@ -22,37 +35,53 @@ export const unfinishedTasksComponent: ComponentDefinition = {
 		},
 		{ key: "title", kind: "text", group: "display" },
 	],
-	toMetricRequest: (config) => ({
-		kind: "unfinished-tasks",
+	toDatasetRequest: (config) => ({
+		object: "task",
+		measure: "open",
 		queryId: config.queryId,
 		basis: config.basis ?? "section",
 		limit: config.limit ?? 20,
 	}),
+	isEmptyDataset: (dataset) => dataset.total === 0,
 	isEmpty: (result) => (result.items ?? []).length === 0,
 	render: (el, ctx) => {
 		el.addClass("ioto-unfinished");
-		const items = ctx.result?.items ?? [];
-		if (items.length === 0) {
+		const rows = ctx.dataset?.rows ?? [];
+		if (rows.length === 0) {
 			el.createDiv({ cls: "ioto-empty-state", text: t("UNFINISHED_EMPTY") });
 			return;
 		}
 		const list = el.createDiv({ cls: "ioto-unfinished-list" });
-		for (const item of items) {
-			const row = list.createDiv({ cls: "ioto-unfinished-row" });
-			row.setAttr("role", "button");
-			row.setAttr("tabindex", "0");
-			const open = () => ctx.openNote(item.path, item.line);
-			row.onClickEvent(open);
-			row.addEventListener("keydown", (event) => {
-				if (event.key === "Enter" || event.key === " ") {
-					event.preventDefault();
-					open();
-				}
+		for (const row of rows) {
+			const textCell = row.cells.text;
+			const noteCell = row.cells.note;
+			const projectCell = row.cells.project;
+			const path = textCell?.path ?? noteCell?.path;
+			const rowEl = list.createDiv({ cls: "ioto-unfinished-row" });
+			if (path) {
+				rowEl.setAttr("role", "button");
+				rowEl.setAttr("tabindex", "0");
+				const open = () => ctx.openFile(path, textCell?.line);
+				rowEl.onClickEvent(open);
+				rowEl.addEventListener("keydown", (event) => {
+					if (event.key === "Enter" || event.key === " ") {
+						event.preventDefault();
+						open();
+					}
+				});
+			}
+			rowEl.createDiv({
+				cls: "ioto-unfinished-text",
+				text: textCell?.text ?? "",
 			});
-			row.createDiv({ cls: "ioto-unfinished-text", text: item.text });
-			row.createDiv({
+			rowEl.createDiv({
 				cls: "ioto-unfinished-meta",
-				text: `${item.noteBasename}${item.project ? ` · ${item.project}` : ""}`,
+				text: [
+					noteCell?.text ?? "",
+					projectCell?.text ?? "",
+				]
+					.filter((value) => value.length > 0)
+					.join(" · "),
 			});
 		}
 	},

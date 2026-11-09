@@ -1,8 +1,10 @@
 import {
 	ItemView,
+	MarkdownRenderer,
 	Notice,
 	Platform,
 	TFile,
+	TFolder,
 	ViewStateResult,
 	WorkspaceLeaf,
 } from "obsidian";
@@ -11,6 +13,7 @@ import type IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { createComponentRegistry } from "../dashboard/components";
 import { DataHub } from "../dashboard/data-hub";
+import { datasetKey, type DatasetRequest } from "../dashboard/dataset/types";
 import type {
 	InspectorController,
 	InspectorFocus,
@@ -47,6 +50,7 @@ import type { QueryDefinition } from "../query/types";
 import { ComponentPickerModal } from "../ui/component-picker";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { DashboardManagerModal } from "../ui/dashboard-manager";
+import { PageLayoutModal } from "../ui/page-layout-modal";
 import { PageNameModal } from "../ui/page-name-modal";
 import { QueryEditModal, QueryManagerModal } from "../ui/query-editor";
 import { ComponentInspector } from "./components/ComponentInspector";
@@ -313,6 +317,7 @@ export class CustomDashboardView extends ItemView {
 		} else {
 			this.setEmptyVisible(false);
 			const grid = this.ensureGrid();
+			this.applyPageLayout(grid);
 			this.syncCards(grid, page.components);
 			this.publishRequests();
 		}
@@ -516,11 +521,24 @@ export class CustomDashboardView extends ItemView {
 	private ensureGrid(): HTMLElement {
 		if (!this.gridEl) {
 			this.gridEl = this.contentEl.createDiv({ cls: "ioto-dashboard-grid" });
+			this.applyPageLayout(this.gridEl);
 			this.gridEl.addEventListener("click", (event) => {
 				if (event.target === this.gridEl) this.clearSelection();
 			});
 		}
 		return this.gridEl;
+	}
+
+	private applyPageLayout(grid: HTMLElement): void {
+		const page = this.activePage;
+		grid.style.setProperty(
+			"--ioto-dashboard-columns",
+			String(page?.columns === 24 ? 24 : 12),
+		);
+		grid.style.setProperty(
+			"--ioto-dashboard-row-height",
+			`${page?.rowHeight ?? 72}px`,
+		);
 	}
 
 	private syncPagesBar(): void {
@@ -562,6 +580,18 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private renderPageTabTools(tab: HTMLElement, page: DashboardPage): void {
+		const layout = tab.createEl("button", {
+			cls: "ioto-dashboard-page-close",
+			attr: {
+				"aria-label": t("PAGE_LAYOUT_TITLE"),
+				title: t("PAGE_LAYOUT_TITLE"),
+			},
+			text: "▦",
+		});
+		layout.onClickEvent((event) => {
+			event.stopPropagation();
+			this.openPageLayout(page);
+		});
 		const rename = tab.createEl("button", {
 			cls: "ioto-dashboard-page-close",
 			attr: { "aria-label": t("PAGE_RENAME"), title: t("PAGE_RENAME") },
@@ -637,6 +667,24 @@ export class CustomDashboardView extends ItemView {
 				this.render();
 			})();
 		}).open();
+	}
+
+	private openPageLayout(page: DashboardPage): void {
+		new PageLayoutModal(
+			this.app,
+			{ columns: page.columns, rowHeight: page.rowHeight },
+			(columns, rowHeight) => {
+				void (async () => {
+					this.store =
+						await this.plugin.dashboardRepository.updatePageLayout(
+							page.id,
+							columns,
+							rowHeight,
+						);
+					this.render();
+				})();
+			},
+		).open();
 	}
 
 	private confirmRemovePage(page: DashboardPage): void {
@@ -737,6 +785,9 @@ export class CustomDashboardView extends ItemView {
 			config.type,
 			config.queryId,
 			config.basis ?? "",
+			config.view ?? "",
+			config.measure ?? "",
+			JSON.stringify(config.options ?? {}),
 			String(config.limit ?? ""),
 			config.title ?? "",
 			String(size.w),
@@ -801,7 +852,16 @@ export class CustomDashboardView extends ItemView {
 			return card;
 		}
 
-		const { status, messageKey } = this.statusOf(definition, query, result);
+		const datasetRequest = definition.toDatasetRequest?.(config, query);
+		const dataset = datasetRequest
+			? this.hub?.getDataset(datasetKey(datasetRequest))
+			: undefined;
+		const { status, messageKey } = this.statusOf(
+			definition,
+			query,
+			result,
+			dataset,
+		);
 		if (status === "loading") {
 			body.createDiv({ cls: "ioto-loading", text: t("DASHBOARD_LOADING") });
 			return card;
@@ -819,11 +879,16 @@ export class CustomDashboardView extends ItemView {
 			config,
 			query,
 			result,
+			dataset,
 			status,
 			messageKey,
 			editMode: this.editMode,
 			openNote: (path, line) => void this.openNote(path, line),
 			openProject: (group) => void this.openProject(group),
+			openFile: (path, line) => void this.openNote(path, line),
+			openFolder: (path) => void this.openFolder(path),
+			revealInExplorer: (path) => void this.revealInExplorer(path),
+			renderMarkdown: (el, path) => this.renderMarkdown(el, path),
 		});
 		return card;
 	}
@@ -832,8 +897,17 @@ export class CustomDashboardView extends ItemView {
 		definition: ComponentDefinition,
 		query: QueryDefinition | undefined,
 		result: MetricResult | undefined,
+		dataset: import("../dashboard/dataset/types").Dataset | undefined,
 	): { status: ComponentStatus; messageKey?: string } {
 		if (!query) return { status: "error", messageKey: "DASHBOARD_ERROR_CONFIG" };
+		if (definition.toDatasetRequest) {
+			if (!dataset) return { status: "loading" };
+			const empty = definition.isEmptyDataset
+				? definition.isEmptyDataset(dataset)
+				: dataset.total === 0;
+			if (empty) return { status: "empty" };
+			return { status: "ready" };
+		}
 		if (this.hub?.isLoading() && !result) return { status: "loading" };
 		if (!result) return { status: "loading" };
 		if (definition.isEmpty(result)) return { status: "empty" };
@@ -903,7 +977,9 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private boundsFor(config: DashboardComponentConfig): SizeBounds {
-		return boundsForType(this.registry, config.type);
+		const bounds = boundsForType(this.registry, config.type);
+		const columns = this.activePage?.columns ?? 12;
+		return { ...bounds, maxW: Math.max(bounds.minW, columns) };
 	}
 
 	private defaultSizeFor(
@@ -1584,7 +1660,12 @@ export class CustomDashboardView extends ItemView {
 			);
 			if (Number.isFinite(parsedRow) && parsedRow > 0) rowHeight = parsedRow;
 		}
-		return gridMetrics(grid.clientWidth, 12, gap, rowHeight);
+		return gridMetrics(
+			grid.clientWidth,
+			this.activePage?.columns === 24 ? 24 : 12,
+			gap,
+			rowHeight,
+		);
 	}
 
 	private startResize(
@@ -1726,14 +1807,18 @@ export class CustomDashboardView extends ItemView {
 
 	private publishRequests(): void {
 		if (!this.store || !this.hub) return;
+		const queries = this.queryRepository();
 		const requests: MetricRequest[] = [];
 		const seen = new Set<string>();
 		for (const dashboard of this.store.dashboards) {
 			for (const page of dashboard.pages) {
 				for (const config of page.components) {
 					const definition = this.registry.get(config.type);
-					if (!definition) continue;
-					const request = definition.toMetricRequest(config);
+					if (!definition?.toMetricRequest) continue;
+					const request = definition.toMetricRequest(
+						config,
+						queries.get(config.queryId),
+					);
 					const key = metricKey(request);
 					// metricKey has no pageId, so duplicates can be shared safely.
 					if (seen.has(key)) continue;
@@ -1743,12 +1828,41 @@ export class CustomDashboardView extends ItemView {
 			}
 		}
 		this.hub.setRequests(requests);
+		this.publishDatasetRequests(queries);
+	}
+
+	private publishDatasetRequests(queries: QueryRepository): void {
+		if (!this.store || !this.hub) return;
+		const requests: DatasetRequest[] = [];
+		const seen = new Set<string>();
+		for (const dashboard of this.store.dashboards) {
+			for (const page of dashboard.pages) {
+				for (const config of page.components) {
+					const definition = this.registry.get(config.type);
+					if (!definition?.toDatasetRequest) continue;
+					const request = definition.toDatasetRequest(
+						config,
+						queries.get(config.queryId),
+					);
+					const key = datasetKey(request);
+					if (seen.has(key)) continue;
+					seen.add(key);
+					requests.push(request);
+				}
+			}
+		}
+		this.hub.setDatasetRequests(requests);
 	}
 
 	private metricKeyOf(config: DashboardComponentConfig): string {
 		const definition = this.registry.get(config.type);
-		if (!definition) return "";
-		return metricKey(definition.toMetricRequest(config));
+		if (!definition?.toMetricRequest) return "";
+		return metricKey(
+			definition.toMetricRequest(
+				config,
+				this.queryRepository().get(config.queryId),
+			),
+		);
 	}
 
 	private openComponentPicker(): void {
@@ -1759,10 +1873,25 @@ export class CustomDashboardView extends ItemView {
 				void (async () => {
 					const queries = this.queryRepository();
 					const preferred = queries.get(definition.defaultQueryId);
+					const object = definition.objects?.[0];
+					const target: "task" | "note" | "file" | "folder" =
+						object === "note" || object === "file" || object === "folder"
+							? object
+							: "task";
+					const objectQuery = queries.defaultFor(target);
 					const queryId =
 						preferred?.id ??
+						objectQuery?.id ??
 						queries.defaultFor("task")?.id ??
 						"builtin:tasks-all";
+					if (
+						!preferred &&
+						!objectQuery &&
+						(object === "file" || object === "folder")
+					) {
+						new Notice(t("DASHBOARD_NEED_QUERY"));
+						return;
+					}
 					const config: DashboardComponentConfig = {
 						...definition.createConfig(queryId),
 						id: `component:${Date.now()}`,
@@ -1896,6 +2025,40 @@ export class CustomDashboardView extends ItemView {
 		}
 		if (executed) return;
 		await this.openNote(`${group.folder}/_project.md`);
+	}
+
+	private async openFolder(path: string): Promise<void> {
+		const node = this.app.vault.getAbstractFileByPath(path);
+		if (node instanceof TFile || node instanceof TFolder) {
+			await this.revealNode(node);
+		}
+	}
+
+	private async revealInExplorer(path: string): Promise<void> {
+		const node = this.app.vault.getAbstractFileByPath(path);
+		if (node instanceof TFile || node instanceof TFolder) {
+			await this.revealNode(node);
+		}
+	}
+
+	private async revealNode(node: TFile | TFolder): Promise<void> {
+		if (!this.app.workspace.getLeavesOfType("file-explorer").length) {
+			await this.app.workspace.getLeaf(false).setViewState({
+				type: "file-explorer",
+			});
+		}
+		const leaf = this.app.workspace.getLeavesOfType("file-explorer")[0];
+		const view = leaf?.view as
+			| { revealInFolder?: (target: TFile | TFolder) => void }
+			| undefined;
+		view?.revealInFolder?.(node);
+	}
+
+	private async renderMarkdown(el: HTMLElement, path: string): Promise<void> {
+		const file = this.app.vault.getAbstractFileByPath(path);
+		if (!(file instanceof TFile)) return;
+		const content = await this.app.vault.cachedRead(file);
+		await MarkdownRenderer.render(this.app, content, el, file.path, this);
 	}
 }
 

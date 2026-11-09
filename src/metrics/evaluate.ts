@@ -185,9 +185,17 @@ export function evaluateMetric(
 					? resolvedNotes(ctx, query).length
 					: new Set(tasks.map((task) => task.path)).size;
 			break;
-		case "task-count":
-			result.scalar = tasks.length;
+		case "task-count": {
+			const measure = request.measure ?? "count";
+			if (measure === "completed" || measure === "open" || measure === "ratio") {
+				const bucket = bucketOf(tasks);
+				if (measure === "ratio") result.bucket = bucket;
+				else result.scalar = measure === "completed" ? bucket.completed : bucket.open;
+			} else {
+				result.scalar = tasks.length;
+			}
 			break;
+		}
 		case "task-completion":
 			result.bucket = bucketOf(tasks);
 			break;

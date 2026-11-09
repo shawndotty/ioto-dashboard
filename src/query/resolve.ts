@@ -21,6 +21,9 @@ export function resolveQuery(
 	options: ResolveOptions = {},
 ): QueryResolution {
 	const paths = query.scope.folders;
+	if (query.target === "file" || query.target === "folder") {
+		return resolveTreeQuery(snapshot, query);
+	}
 	if (query.target === "note") {
 		const notes = queryNotes(
 			snapshot.notes,
@@ -53,4 +56,45 @@ export function resolveQuery(
 		options.now?.() ?? Date.now(),
 	);
 	return { notes: [], tasks };
+}
+
+function inFolderScope(
+	folder: string,
+	paths: string[],
+	includeSubfolders: boolean,
+): boolean {
+	if (paths.length === 0) return true;
+	return paths.some((path) =>
+		includeSubfolders
+			? folder === path || folder.startsWith(`${path}/`)
+			: folder === path,
+	);
+}
+
+function matchesName(name: string, filter: string): boolean {
+	const needle = filter.trim().toLowerCase();
+	return needle.length === 0 || name.toLowerCase().includes(needle);
+}
+
+/** `file` / `folder` targets read the optional tree records from the snapshot. */
+function resolveTreeQuery(
+	snapshot: IndexSnapshot,
+	query: QueryDefinition,
+): QueryResolution {
+	const paths = query.scope.folders;
+	const includeSubfolders = query.scope.includeSubfolders ?? true;
+	if (query.target === "file") {
+		const files = (snapshot.files ?? []).filter(
+			(file) =>
+				inFolderScope(file.folder, paths, includeSubfolders) &&
+				matchesName(file.basename, query.filters.name),
+		);
+		return { notes: [], tasks: [], files };
+	}
+	const folders = (snapshot.folders ?? []).filter(
+		(folder) =>
+			inFolderScope(folder.path, paths, includeSubfolders) &&
+			matchesName(folder.name, query.filters.name),
+	);
+	return { notes: [], tasks: [], folders };
 }

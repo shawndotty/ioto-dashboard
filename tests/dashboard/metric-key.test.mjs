@@ -38,3 +38,20 @@ test('omitted optional fields stay distinct from explicit values', () => {
 		metricKey({ kind: 'unfinished-tasks', queryId: 'q', limit: undefined }),
 	);
 });
+
+test('the measure participates in the metric key', () => {
+	const base = { kind: 'task-count', queryId: 'q', basis: 'file' };
+	assert.notEqual(metricKey(base), metricKey({ ...base, measure: 'completed' }));
+	assert.notEqual(
+		metricKey({ ...base, measure: 'completed' }),
+		metricKey({ ...base, measure: 'open' }),
+	);
+	assert.notEqual(
+		metricKey(base),
+		metricKey({ ...base, measure: 'count' }),
+	);
+	assert.equal(
+		metricKey(base),
+		metricKey({ ...base, measure: undefined }),
+	);
+});

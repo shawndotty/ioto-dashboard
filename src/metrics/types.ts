@@ -7,6 +7,9 @@ import type { QueryDefinition } from "../query/types";
 
 export type CountBasis = "file" | "section";
 
+/** Which number a metric should report; only meaningful for counting kinds. */
+export type MetricMeasure = "count" | "completed" | "open" | "ratio";
+
 export type MetricKind =
 	| "note-count"
 	| "task-count"
@@ -29,6 +32,8 @@ export interface MetricRequest {
 	kind: MetricKind;
 	queryId: string;
 	basis?: CountBasis;
+	/** Counting kinds only; omitted keeps the historical `count` behaviour. */
+	measure?: MetricMeasure;
 	groupBy?: "project" | "ioType" | "sectionRole";
 	limit?: number;
 }
@@ -86,6 +91,7 @@ export function metricKey(request: MetricRequest): string {
 		request.kind,
 		request.queryId,
 		request.basis ?? "",
+		request.measure ?? "",
 		request.groupBy ?? "",
 		request.limit === undefined ? "" : String(request.limit),
 	].join("|");
