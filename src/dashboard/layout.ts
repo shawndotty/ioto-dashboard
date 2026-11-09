@@ -1,4 +1,4 @@
-import { clampSize } from "./registry";
+import { clampSize, DEFAULT_SIZE_BOUNDS, type SizeBounds } from "./registry";
 import type { DashboardComponentConfig } from "./types";
 
 export interface CardRect {
@@ -87,10 +87,11 @@ export function stepSize(
 	h: number | undefined,
 	axis: "w" | "h",
 	direction: -1 | 1,
+	bounds: SizeBounds = DEFAULT_SIZE_BOUNDS,
 ): { w: number; h: number } {
-	const current = clampSize(w, h);
-	if (axis === "w") return clampSize(current.w + direction, current.h);
-	return clampSize(current.w, current.h + direction);
+	const current = clampSize(w, h, bounds);
+	if (axis === "w") return clampSize(current.w + direction, current.h, bounds);
+	return clampSize(current.w, current.h + direction, bounds);
 }
 
 export function resizeByDelta(
@@ -99,13 +100,14 @@ export function resizeByDelta(
 	dx: number,
 	dy: number,
 	metrics: GridMetrics,
+	bounds: SizeBounds = DEFAULT_SIZE_BOUNDS,
 ): { w: number; h: number; dw: number; dh: number } {
-	const current = clampSize(w, h);
+	const current = clampSize(w, h, bounds);
 	const stepX = metrics.stepX > 0 ? metrics.stepX : 1;
 	const stepY = metrics.stepY > 0 ? metrics.stepY : 1;
 	const dw = Math.round(dx / stepX);
 	const dh = Math.round(dy / stepY);
-	const next = clampSize(current.w + dw, current.h + dh);
+	const next = clampSize(current.w + dw, current.h + dh, bounds);
 	return { w: next.w, h: next.h, dw, dh };
 }
 
@@ -118,6 +120,7 @@ export function snapSize(
 	pxWidth: number,
 	pxHeight: number,
 	metrics: GridMetrics,
+	bounds: SizeBounds = DEFAULT_SIZE_BOUNDS,
 ): { w: number; h: number } {
 	const gap = Number.isFinite(metrics.gap) ? Math.max(0, metrics.gap) : 0;
 	const stepX = metrics.stepX > 0 ? metrics.stepX : 1;
@@ -127,6 +130,7 @@ export function snapSize(
 	return clampSize(
 		Math.round((width + gap) / stepX),
 		Math.round((height + gap) / stepY),
+		bounds,
 	);
 }
 

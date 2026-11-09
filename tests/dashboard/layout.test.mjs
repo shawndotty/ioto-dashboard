@@ -17,7 +17,10 @@ const {
 	MIN_COMPONENT_H,
 	MAX_COMPONENT_W,
 	MAX_COMPONENT_H,
+	DEFAULT_SIZE_BOUNDS,
 } = await load('../../src/dashboard/registry.ts');
+
+const KPI_BOUNDS = { ...DEFAULT_SIZE_BOUNDS, maxH: 6 };
 
 function component(id, overrides = {}) {
 	return { id, type: 'kpi', queryId: 'builtin:tasks-all', ...overrides };
@@ -84,6 +87,13 @@ test('stepSize walks to the registry bounds and stops there', () => {
 		h: MIN_COMPONENT_H,
 	});
 	assert.deepEqual(stepSize(undefined, undefined, 'h', 1), { w: 3, h: 3 });
+});
+
+test('stepSize stops at a component-specific maxH', () => {
+	assert.deepEqual(stepSize(3, 6, 'h', 1, KPI_BOUNDS), { w: 3, h: 6 });
+	assert.deepEqual(stepSize(3, 5, 'h', 1, KPI_BOUNDS), { w: 3, h: 6 });
+	assert.deepEqual(stepSize(3, 6, 'h', 1), { w: 3, h: 7 });
+	assert.deepEqual(stepSize(3, 24, 'h', 1), { w: 3, h: MAX_COMPONENT_H });
 });
 
 test('resizeByDelta rounds to whole steps and clamps to bounds', () => {
@@ -172,6 +182,16 @@ test('snapSize clamps out-of-range and degenerate input', () => {
 	const snapped = snapSize(400, 200, broken);
 	assert.ok(Number.isFinite(snapped.w));
 	assert.ok(Number.isFinite(snapped.h));
+});
+
+test('snapSize and resizeByDelta respect component-specific bounds', () => {
+	const metrics = gridMetrics(1200, 12, 12, 72);
+
+	assert.equal(snapSize(1e6, 1e6, metrics, KPI_BOUNDS).h, 6);
+	assert.equal(snapSize(1e6, 1e6, metrics).h, MAX_COMPONENT_H);
+
+	const grown = resizeByDelta(3, 5, 0, metrics.stepY * 10, metrics, KPI_BOUNDS);
+	assert.deepEqual({ w: grown.w, h: grown.h }, { w: 3, h: 6 });
 });
 
 test('dropIndex maps the pointer to a reading-order insertion point', () => {

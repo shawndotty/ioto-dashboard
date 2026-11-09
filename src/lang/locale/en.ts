@@ -186,6 +186,9 @@ export default {
 	DASHBOARD_HEIGHT: "Height",
 	DASHBOARD_DECREASE: "Decrease",
 	DASHBOARD_INCREASE: "Increase",
+	DASHBOARD_SIZE_MAX_HINT: "Maximum height reached: {0} rows",
+	DASHBOARD_SIZE_MIN_HINT: "Minimum height reached: {0} row",
+	DASHBOARD_RESET_SIZE: "Reset to default size",
 	DASHBOARD_RENAME_COMPONENT: "Rename component",
 	DASHBOARD_RENAME_PLACEHOLDER: "Component title",
 

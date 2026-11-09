@@ -14,6 +14,7 @@ export const projectProgressComponent: ComponentDefinition = {
 	descriptionKey: "COMPONENT_PROJECT_PROGRESS_DESC",
 	defaultQueryId: "builtin:tasks-all",
 	createConfig: (queryId) => ({ queryId, basis: "section", w: 6, h: 3 }),
+	size: { maxH: 8 },
 	toMetricRequest: (config) => ({
 		kind: "project-progress",
 		queryId: config.queryId,

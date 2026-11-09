@@ -7,6 +7,7 @@ export const kpiComponent: ComponentDefinition = {
 	descriptionKey: "COMPONENT_KPI_DESC",
 	defaultQueryId: "builtin:tasks-all",
 	createConfig: (queryId) => ({ queryId, basis: "file", w: 3, h: 2 }),
+	size: { maxH: 6 },
 	toMetricRequest: (config) => ({
 		kind: "task-count",
 		queryId: config.queryId,

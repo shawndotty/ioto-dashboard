@@ -20,6 +20,13 @@ export interface ComponentRenderContext {
 	openProject(group: ProjectProgressGroup): void;
 }
 
+export interface SizeBounds {
+	minW: number;
+	maxW: number;
+	minH: number;
+	maxH: number;
+}
+
 export interface ComponentDefinition {
 	type: string;
 	labelKey: string;
@@ -30,21 +37,38 @@ export interface ComponentDefinition {
 	/** `true` when the metric is valid but has nothing meaningful to show. */
 	isEmpty(result: MetricResult): boolean;
 	render(el: HTMLElement, ctx: ComponentRenderContext): void;
+	/** Extra size constraints layered on top of the registry defaults. */
+	size?: Partial<SizeBounds>;
 }
 
 export const MIN_COMPONENT_W = 2;
 export const MIN_COMPONENT_H = 1;
 export const MAX_COMPONENT_W = 12;
-export const MAX_COMPONENT_H = 6;
+/** Global hard cap (24 rows ≈ 2004px); components may declare a lower cap. */
+export const MAX_COMPONENT_H = 24;
 
-export function clampSize(w: number | undefined, h: number | undefined): {
-	w: number;
-	h: number;
-} {
+export const DEFAULT_SIZE_BOUNDS: SizeBounds = {
+	minW: MIN_COMPONENT_W,
+	maxW: MAX_COMPONENT_W,
+	minH: MIN_COMPONENT_H,
+	maxH: MAX_COMPONENT_H,
+};
+
+export function clampSize(
+	w: number | undefined,
+	h: number | undefined,
+	bounds: SizeBounds = DEFAULT_SIZE_BOUNDS,
+): { w: number; h: number } {
 	return {
-		w: Math.min(MAX_COMPONENT_W, Math.max(MIN_COMPONENT_W, w ?? 3)),
-		h: Math.min(MAX_COMPONENT_H, Math.max(MIN_COMPONENT_H, h ?? 2)),
+		w: Math.min(bounds.maxW, Math.max(bounds.minW, w ?? 3)),
+		h: Math.min(bounds.maxH, Math.max(bounds.minH, h ?? 2)),
 	};
+}
+
+export function boundsForSizeOverride(
+	override?: Partial<SizeBounds>,
+): SizeBounds {
+	return { ...DEFAULT_SIZE_BOUNDS, ...override };
 }
 
 export class ComponentRegistry {
@@ -69,4 +93,12 @@ export class ComponentRegistry {
 			text: `Unknown component: ${type}`,
 		});
 	}
+}
+
+/** Resolves the size bounds declared by a component type, defaulting to global. */
+export function boundsForType(
+	registry: ComponentRegistry,
+	type: string,
+): SizeBounds {
+	return boundsForSizeOverride(registry.get(type)?.size);
 }

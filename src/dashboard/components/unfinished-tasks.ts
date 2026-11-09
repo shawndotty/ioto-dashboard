@@ -7,6 +7,7 @@ export const unfinishedTasksComponent: ComponentDefinition = {
 	descriptionKey: "COMPONENT_UNFINISHED_DESC",
 	defaultQueryId: "builtin:tasks-unfinished",
 	createConfig: (queryId) => ({ queryId, basis: "section", limit: 20, w: 6, h: 3 }),
+	size: { maxH: 24 },
 	toMetricRequest: (config) => ({
 		kind: "unfinished-tasks",
 		queryId: config.queryId,

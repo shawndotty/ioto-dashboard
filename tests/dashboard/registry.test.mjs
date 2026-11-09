@@ -5,6 +5,8 @@ import { load } from '../data/helpers.mjs';
 const {
 	ComponentRegistry,
 	clampSize,
+	DEFAULT_SIZE_BOUNDS,
+	boundsForSizeOverride,
 	MIN_COMPONENT_W,
 	MIN_COMPONENT_H,
 	MAX_COMPONENT_W,
@@ -29,6 +31,22 @@ test('clampSize applies defaults and clamps both dimensions', () => {
 	assert.deepEqual(clampSize(1, 0), { w: MIN_COMPONENT_W, h: MIN_COMPONENT_H });
 	assert.deepEqual(clampSize(99, 99), { w: MAX_COMPONENT_W, h: MAX_COMPONENT_H });
 	assert.deepEqual(clampSize(6, 3), { w: 6, h: 3 });
+});
+
+test('clampSize honours custom bounds', () => {
+	const kpiBounds = { ...DEFAULT_SIZE_BOUNDS, maxH: 6 };
+
+	assert.deepEqual(clampSize(99, 99, kpiBounds), { w: MAX_COMPONENT_W, h: 6 });
+	assert.deepEqual(clampSize(undefined, undefined, kpiBounds), { w: 3, h: 2 });
+	assert.deepEqual(clampSize(4, 3, kpiBounds), { w: 4, h: 3 });
+});
+
+test('boundsForSizeOverride layers partial overrides on the defaults', () => {
+	assert.deepEqual(boundsForSizeOverride(undefined), DEFAULT_SIZE_BOUNDS);
+	assert.deepEqual(boundsForSizeOverride({ maxH: 8 }), {
+		...DEFAULT_SIZE_BOUNDS,
+		maxH: 8,
+	});
 });
 
 test('register / get / list keep insertion order', () => {

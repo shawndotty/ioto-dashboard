@@ -909,7 +909,8 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 }
 
 .ioto-custom-dashboard-view .ioto-card-control-value {
-    min-width: 1.2em;
+    min-width: 3.2em;
+    white-space: nowrap;
     text-align: center;
     font-variant-numeric: tabular-nums;
     font-size: var(--font-ui-smaller);
@@ -1008,6 +1009,11 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     border: 2px solid var(--interactive-accent);
     background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
     z-index: 2;
+}
+
+.ioto-custom-dashboard-view .ioto-card-resize-snap[data-limit="max"] {
+    border-color: var(--text-warning);
+    background: color-mix(in srgb, var(--text-warning) 12%, transparent);
 }
 
 .ioto-custom-dashboard-view.is-narrow .ioto-card-drag-handle,

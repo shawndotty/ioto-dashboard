@@ -19,13 +19,11 @@ import {
 	type GridMetrics,
 } from "../dashboard/layout";
 import {
+	boundsForType,
 	clampSize,
-	MAX_COMPONENT_H,
-	MAX_COMPONENT_W,
-	MIN_COMPONENT_H,
-	MIN_COMPONENT_W,
 	type ComponentDefinition,
 	type ComponentStatus,
+	type SizeBounds,
 } from "../dashboard/registry";
 import {
 	type DashboardComponentConfig,
@@ -499,7 +497,7 @@ export class CustomDashboardView extends ItemView {
 
 	/** Rebuild triggers: config, edit state, data refresh and query edits. */
 	private cardSignature(config: DashboardComponentConfig): string {
-		const size = clampSize(config.w, config.h);
+		const size = clampSize(config.w, config.h, this.boundsFor(config));
 		return [
 			config.type,
 			config.queryId,
@@ -525,7 +523,7 @@ export class CustomDashboardView extends ItemView {
 		const card = grid.ownerDocument.createElement("div");
 		card.addClass("ioto-dashboard-card");
 		card.setAttr("data-component-id", config.id);
-		const size = clampSize(config.w, config.h);
+		const size = clampSize(config.w, config.h, this.boundsFor(config));
 		card.style.gridColumn = `span ${size.w}`;
 		card.style.gridRow = `span ${size.h}`;
 
@@ -707,12 +705,32 @@ export class CustomDashboardView extends ItemView {
 		this.renderOrderControls(toolbar, config);
 	}
 
+	private boundsFor(config: DashboardComponentConfig): SizeBounds {
+		return boundsForType(this.registry, config.type);
+	}
+
+	private defaultSizeFor(
+		config: DashboardComponentConfig,
+		bounds: SizeBounds,
+	): { w: number; h: number } {
+		const definition = this.registry.get(config.type);
+		const defaults = definition?.createConfig(definition.defaultQueryId);
+		return clampSize(defaults?.w, defaults?.h, bounds);
+	}
+
 	private renderSizeControls(
 		toolbar: HTMLElement,
 		config: DashboardComponentConfig,
 	): void {
-		const size = clampSize(config.w, config.h);
+		const bounds = this.boundsFor(config);
+		const size = clampSize(config.w, config.h, bounds);
 		const group = toolbar.createDiv({ cls: "ioto-card-size-controls" });
+
+		if (size.h <= bounds.minH) {
+			group.setAttr("title", t("DASHBOARD_SIZE_MIN_HINT", [String(bounds.minH)]));
+		} else if (size.h >= bounds.maxH) {
+			group.setAttr("title", t("DASHBOARD_SIZE_MAX_HINT", [String(bounds.maxH)]));
+		}
 
 		group.createSpan({
 			cls: "ioto-card-control-label",
@@ -723,7 +741,7 @@ export class CustomDashboardView extends ItemView {
 			"width-dec",
 			"−",
 			`${t("DASHBOARD_DECREASE")} ${t("DASHBOARD_WIDTH")} ${size.w}`,
-			size.w <= MIN_COMPONENT_W,
+			size.w <= bounds.minW,
 			config.id,
 			() => void this.stepComponentSize(config.id, "w", -1),
 		);
@@ -736,7 +754,7 @@ export class CustomDashboardView extends ItemView {
 			"width-inc",
 			"+",
 			`${t("DASHBOARD_INCREASE")} ${t("DASHBOARD_WIDTH")} ${size.w}`,
-			size.w >= MAX_COMPONENT_W,
+			size.w >= bounds.maxW,
 			config.id,
 			() => void this.stepComponentSize(config.id, "w", 1),
 		);
@@ -750,22 +768,35 @@ export class CustomDashboardView extends ItemView {
 			"height-dec",
 			"−",
 			`${t("DASHBOARD_DECREASE")} ${t("DASHBOARD_HEIGHT")} ${size.h}`,
-			size.h <= MIN_COMPONENT_H,
+			size.h <= bounds.minH,
 			config.id,
 			() => void this.stepComponentSize(config.id, "h", -1),
+			t("DASHBOARD_SIZE_MIN_HINT", [String(bounds.minH)]),
 		);
 		group.createSpan({
 			cls: "ioto-card-control-value",
-			text: String(size.h),
+			text: `${size.h} / ${bounds.maxH}`,
 		});
 		this.renderStepButton(
 			group,
 			"height-inc",
 			"+",
 			`${t("DASHBOARD_INCREASE")} ${t("DASHBOARD_HEIGHT")} ${size.h}`,
-			size.h >= MAX_COMPONENT_H,
+			size.h >= bounds.maxH,
 			config.id,
 			() => void this.stepComponentSize(config.id, "h", 1),
+			t("DASHBOARD_SIZE_MAX_HINT", [String(bounds.maxH)]),
+		);
+
+		const defaults = this.defaultSizeFor(config, bounds);
+		this.renderStepButton(
+			group,
+			"size-reset",
+			"↺",
+			t("DASHBOARD_RESET_SIZE"),
+			size.w === defaults.w && size.h === defaults.h,
+			config.id,
+			() => void this.resetComponentSize(config.id),
 		);
 	}
 
@@ -806,13 +837,15 @@ export class CustomDashboardView extends ItemView {
 		disabled: boolean,
 		componentId: string,
 		onStep: () => void,
+		hint?: string,
 	): void {
+		const labelText = disabled && hint ? hint : ariaLabel;
 		const button = container.createEl("button", {
 			cls: "clickable-icon ioto-card-step",
 			attr: {
 				type: "button",
-				"aria-label": ariaLabel,
-				title: ariaLabel,
+				"aria-label": labelText,
+				title: labelText,
 				"data-action": action,
 			},
 			text: label,
@@ -832,8 +865,9 @@ export class CustomDashboardView extends ItemView {
 		const page = this.activePage;
 		const config = page?.components.find((item) => item.id === componentId);
 		if (!page || !config) return;
-		const current = clampSize(config.w, config.h);
-		const next = stepSize(config.w, config.h, axis, direction);
+		const bounds = this.boundsFor(config);
+		const current = clampSize(config.w, config.h, bounds);
+		const next = stepSize(config.w, config.h, axis, direction, bounds);
 		if (next.w === current.w && next.h === current.h) return;
 		this.pendingFocus = {
 			componentId,
@@ -843,6 +877,23 @@ export class CustomDashboardView extends ItemView {
 			page.id,
 			componentId,
 			next,
+		);
+		this.render();
+	}
+
+	private async resetComponentSize(componentId: string): Promise<void> {
+		const page = this.activePage;
+		const config = page?.components.find((item) => item.id === componentId);
+		if (!page || !config) return;
+		const bounds = this.boundsFor(config);
+		const current = clampSize(config.w, config.h, bounds);
+		const defaults = this.defaultSizeFor(config, bounds);
+		if (defaults.w === current.w && defaults.h === current.h) return;
+		this.pendingFocus = { componentId, action: "size-reset" };
+		this.store = await this.plugin.dashboardRepository.updateComponent(
+			page.id,
+			componentId,
+			defaults,
 		);
 		this.render();
 	}
@@ -1346,7 +1397,8 @@ export class CustomDashboardView extends ItemView {
 		const startX = event.clientX;
 		const startY = event.clientY;
 		const metrics = this.readGridMetrics(grid);
-		const startSize = clampSize(config.w, config.h);
+		const bounds = this.boundsFor(config);
+		const startSize = clampSize(config.w, config.h, bounds);
 		const startRect = card.getBoundingClientRect();
 		const overlays = this.createResizeOverlays(grid);
 		const pointer = { x: startX, y: startY };
@@ -1366,19 +1418,27 @@ export class CustomDashboardView extends ItemView {
 				maxWidth,
 				Math.max(60, startRect.width + (pointer.x - startX)),
 			);
-			const height = Math.max(40, startRect.height + (pointer.y - startY));
+			const rawHeight = Math.max(40, startRect.height + (pointer.y - startY));
+			snapped = snapSize(width, rawHeight, metrics, bounds);
+			const rowHeight = Math.max(1, metrics.stepY - metrics.gap);
+			const snapWidth = snapped.w * metrics.columnWidth + (snapped.w - 1) * metrics.gap;
+			const snapHeight = snapped.h * rowHeight + (snapped.h - 1) * metrics.gap;
+			const ghostWidth =
+				snapped.w >= bounds.maxW ? Math.min(width, snapWidth) : width;
+			const ghostHeight =
+				snapped.h >= bounds.maxH ? Math.min(rawHeight, snapHeight) : rawHeight;
 			overlays.ghost.style.left = `${left}px`;
 			overlays.ghost.style.top = `${top}px`;
-			overlays.ghost.style.width = `${width}px`;
-			overlays.ghost.style.height = `${height}px`;
-			overlays.ghost.dataset.size = `${Math.round(width)}×${Math.round(height)}`;
+			overlays.ghost.style.width = `${ghostWidth}px`;
+			overlays.ghost.style.height = `${ghostHeight}px`;
+			overlays.ghost.dataset.size = `${Math.round(ghostWidth)}×${Math.round(ghostHeight)}`;
 
-			snapped = snapSize(width, height, metrics);
-			const rowHeight = Math.max(1, metrics.stepY - metrics.gap);
 			overlays.snap.style.left = `${left}px`;
 			overlays.snap.style.top = `${top}px`;
-			overlays.snap.style.width = `${snapped.w * metrics.columnWidth + (snapped.w - 1) * metrics.gap}px`;
-			overlays.snap.style.height = `${snapped.h * rowHeight + (snapped.h - 1) * metrics.gap}px`;
+			overlays.snap.style.width = `${snapWidth}px`;
+			overlays.snap.style.height = `${snapHeight}px`;
+			if (snapped.h >= bounds.maxH) overlays.snap.dataset.limit = "max";
+			else delete overlays.snap.dataset.limit;
 		};
 		const schedule = (): void => {
 			if (frame === null) frame = win.requestAnimationFrame(tick);
