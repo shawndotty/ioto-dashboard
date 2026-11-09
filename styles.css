@@ -1238,7 +1238,7 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     display: none;
 }
 
-.ioto-custom-dashboard-view .ioto-dashboard-card.is-selected {
+.ioto-custom-dashboard-view.is-editing .ioto-dashboard-card.is-selected {
     outline: 2px solid var(--interactive-accent);
     outline-offset: -2px;
 }

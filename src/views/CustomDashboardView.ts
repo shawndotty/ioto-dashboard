@@ -1082,6 +1082,7 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private syncInspector(): void {
+		if (!this.editMode && this.selectedComponentId) this.clearSelection();
 		this.contentEl.toggleClass("is-editing", this.editMode);
 		this.syncSelectionState();
 		this.syncSelectionClasses();
