@@ -1030,13 +1030,13 @@ export class CustomDashboardView extends ItemView {
 		if (!pageId) return;
 		this.selectedComponentId = id;
 		this.syncSelectionClasses();
-		this.ensureInspectorHost();
 		if (!this.controller) return;
 		this.plugin.inspectorService.select(
 			{ leafId: this.leafId, pageId, componentId: id },
 			this.controller,
 			{ focus },
 		);
+		this.ensureInspectorHost();
 	}
 
 	private clearSelection(): void {

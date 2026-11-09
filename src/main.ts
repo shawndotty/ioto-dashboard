@@ -502,24 +502,24 @@ export default class IotoDashboardPlugin extends Plugin {
 	}
 
 	/**
-	 * Ensures the right-sidebar settings panel exists without replacing the
-	 * user's existing leaves (backlinks / outline) and without stealing focus.
+	 * Shows the component settings panel in the right sidebar: reuses the
+	 * existing leaf when present, otherwise creates it, then reveals it so a
+	 * collapsed sidebar expands and another active tab is switched away.
 	 */
 	async revealInspector(): Promise<void> {
 		const { workspace } = this.app;
-		if (workspace.getLeavesOfType(CUSTOM_INSPECTOR_VIEW_TYPE).length > 0) {
-			return;
-		}
 		if (this.revealingInspector) return this.revealingInspector;
 		const run = (async () => {
-			await workspace.ensureSideLeaf(
-				CUSTOM_INSPECTOR_VIEW_TYPE,
-				"right",
-				{ active: false, reveal: false },
-			);
-			if (workspace.rightSplit.collapsed) {
-				workspace.rightSplit.expand();
+			let leaf =
+				workspace.getLeavesOfType(CUSTOM_INSPECTOR_VIEW_TYPE)[0] ?? null;
+			if (!leaf) {
+				leaf = await workspace.ensureSideLeaf(
+					CUSTOM_INSPECTOR_VIEW_TYPE,
+					"right",
+					{ active: false, reveal: false },
+				);
 			}
+			await workspace.revealLeaf(leaf);
 		})();
 		this.revealingInspector = run.finally(() => {
 			this.revealingInspector = null;
