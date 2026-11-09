@@ -173,13 +173,23 @@ export default {
 	DASHBOARD_VIEW_MODE: "完成",
 	DASHBOARD_EMPTY_TITLE: "还没有组件",
 	DASHBOARD_EMPTY_DESC:
-		"添加 KPI、项目进度或未完成任务组件，并绑定一个查询。",
+		"向此页面添加 KPI、项目进度或未完成任务组件，并绑定到一个查询。",
 	DASHBOARD_LOADING: "加载中…",
 	DASHBOARD_ERROR_CONFIG: "查询不存在，请重新选择。",
 	DASHBOARD_EMPTY_RESULT: "暂无内容。",
 	DASHBOARD_STORE_DAMAGED:
 		"仪表盘配置已损坏。原始数据已保留，面板回退到空仪表盘。",
 	DASHBOARD_CONFIG_REMOVE: "移除组件",
+
+	// Pages
+	PAGE_TABS_ADD: "新建页面",
+	PAGE_RENAME: "重命名页面",
+	PAGE_DELETE: "删除页面",
+	PAGE_DELETE_TITLE: "删除页面",
+	PAGE_DELETE_MSG: "删除「{0}」及其 {1} 个组件？不会影响笔记内容。",
+	PAGE_LAST_CANNOT_DELETE: "至少需要保留一个页面。",
+	PAGE_NAME_PLACEHOLDER: "页面名称",
+	PAGE_DEFAULT_NAME: "页面 {0}",
 
 	// Components
 	COMPONENT_PICKER_TITLE: "添加组件",
@@ -205,6 +215,8 @@ export default {
 	QUERY_MANAGER_DUPLICATE: "复制",
 	QUERY_MANAGER_DELETE: "删除",
 	QUERY_MANAGER_REFERENCES: "被引用",
+	QUERY_DUPLICATED: "已复制查询：{0}",
+	QUERY_DUPLICATE_FAILED: "复制查询失败。",
 	QUERY_EDITOR_TITLE_NEW: "新建查询",
 	QUERY_EDITOR_TITLE_EDIT: "编辑查询",
 	QUERY_NAME: "名称",

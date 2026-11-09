@@ -1,4 +1,4 @@
-import { App, ButtonComponent, Modal, Setting } from "obsidian";
+import { App, ButtonComponent, Modal, Notice, Setting } from "obsidian";
 import { t } from "../lang/helpers";
 import { createDefaultFilterState } from "../data/saved-query-adapter";
 import type { FilterState } from "../data/types";
@@ -12,10 +12,16 @@ import {
 import { applyModalShell, createLayoutToggle } from "./modal-shell";
 import { FolderPickerModal } from "./pickers/folder-picker";
 
+export interface DuplicatedQuery {
+	queries: QueryDefinition[];
+	created: QueryDefinition;
+}
+
 export interface QueryManagerActions {
 	onNew(): void;
 	onEdit(query: QueryDefinition): void;
-	onDuplicate(query: QueryDefinition): void;
+	/** Persists a copy and returns the fresh list; null means the write failed. */
+	onDuplicate(query: QueryDefinition): Promise<DuplicatedQuery | null>;
 	onDelete(query: QueryDefinition): void;
 }
 
@@ -33,6 +39,7 @@ function displayName(query: QueryDefinition): string {
 export class QueryManagerModal extends Modal {
 	private layout: CollectionLayout;
 	private collectionEl: HTMLElement | null = null;
+	private duplicating = false;
 
 	constructor(
 		app: App,
@@ -49,6 +56,7 @@ export class QueryManagerModal extends Modal {
 		const { contentEl } = this;
 		applyModalShell(this, {
 			kind: "query-manager",
+			restore: true,
 			title: t("QUERY_MANAGER_TITLE"),
 		});
 
@@ -91,10 +99,7 @@ export class QueryManagerModal extends Modal {
 				{
 					icon: "copy",
 					label: t("QUERY_MANAGER_DUPLICATE"),
-					onClick: () => {
-						this.close();
-						this.actions.onDuplicate(query);
-					},
+					onClick: () => void this.duplicate(query),
 				},
 			];
 
@@ -130,6 +135,34 @@ export class QueryManagerModal extends Modal {
 		});
 
 		renderCollection(this.collectionEl, items, this.layout);
+	}
+
+	private async duplicate(query: QueryDefinition): Promise<void> {
+		if (this.duplicating) return;
+		this.duplicating = true;
+		try {
+			const result = await this.actions.onDuplicate(query);
+			if (!result) {
+				new Notice(t("QUERY_DUPLICATE_FAILED"));
+				return;
+			}
+			this.queries = result.queries;
+			this.renderItems();
+			this.revealItem(result.created.id);
+			new Notice(t("QUERY_DUPLICATED", [result.created.name]));
+		} finally {
+			this.duplicating = false;
+		}
+	}
+
+	private revealItem(id: string): void {
+		const el = this.collectionEl?.querySelector<HTMLElement>(
+			`[data-id="${id}"]`,
+		);
+		if (!el) return;
+		el.scrollIntoView({ block: "nearest" });
+		el.addClass("is-newly-copied");
+		window.setTimeout(() => el.removeClass("is-newly-copied"), 1600);
 	}
 
 	onClose(): void {

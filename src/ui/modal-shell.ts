@@ -17,7 +17,6 @@ export interface ModalShellOptions {
 }
 
 const sessionState = new Map<ModalKind, boolean>();
-let lastFullscreen = false;
 
 const SHELL_FLAG = "iotoShellKind";
 const TOOLS_CLASS = "ioto-dashboard-modal__tools";
@@ -75,8 +74,8 @@ export function applyModalShell(
 	if (options.title) modal.setTitle(options.title);
 
 	if (options.restore) {
-		const remembered = sessionState.get(options.kind) ?? lastFullscreen;
-		setFullscreen(modal, remembered);
+		// 只认本 kind 记住的形态，避免不同类型弹窗互相串味。
+		setFullscreen(modal, sessionState.get(options.kind) ?? false);
 	}
 
 	modal.modalEl.dataset[SHELL_FLAG] = options.kind;
@@ -94,7 +93,6 @@ export function applyModalShell(
 			setFullscreen(modal, next);
 			updateFullscreenButton(button, next);
 			sessionState.set(options.kind, next);
-			lastFullscreen = next;
 		});
 	}
 
@@ -110,7 +108,6 @@ export function applyModalShell(
 	modal.onClose = () => {
 		const state = isFullscreen(modal);
 		sessionState.set(options.kind, state);
-		lastFullscreen = state;
 		restoreFrameButtons(modal);
 		previousOnClose();
 	};

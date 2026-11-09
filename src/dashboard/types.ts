@@ -1,7 +1,7 @@
 import type { CountBasis } from "../metrics/types";
 import type { QueryDefinition } from "../query/types";
 
-export const DASHBOARD_SCHEMA_VERSION = 2;
+export const DASHBOARD_SCHEMA_VERSION = 3;
 export const DASHBOARD_STORE_KEY = "dashboardStore";
 
 export interface DashboardComponentConfig {
@@ -18,7 +18,7 @@ export interface DashboardComponentConfig {
 	h?: number;
 }
 
-export interface DashboardConfig {
+export interface DashboardPage {
 	id: string;
 	name: string;
 	components: DashboardComponentConfig[];
@@ -26,34 +26,34 @@ export interface DashboardConfig {
 
 export interface DashboardStoreData {
 	schemaVersion: number;
-	dashboards: DashboardConfig[];
-	activeDashboardId?: string;
+	pages: DashboardPage[];
+	activePageId?: string;
 	/** Only `user:*` queries are persisted here. */
 	queries: QueryDefinition[];
 }
 
-export const DEFAULT_DASHBOARD_ID = "dashboard:default";
+export const DEFAULT_PAGE_ID = "page:default";
 
 export function createDefaultStore(): DashboardStoreData {
 	return {
 		schemaVersion: DASHBOARD_SCHEMA_VERSION,
-		dashboards: [
+		pages: [
 			{
-				id: DEFAULT_DASHBOARD_ID,
-				name: "My Dashboard",
+				id: DEFAULT_PAGE_ID,
+				name: "Page 1",
 				components: [],
 			},
 		],
-		activeDashboardId: DEFAULT_DASHBOARD_ID,
+		activePageId: DEFAULT_PAGE_ID,
 		queries: [],
 	};
 }
 
-export function activeDashboard(
+export function activePage(
 	store: DashboardStoreData,
-): DashboardConfig | undefined {
+): DashboardPage | undefined {
 	return (
-		store.dashboards.find((item) => item.id === store.activeDashboardId) ??
-		store.dashboards[0]
+		store.pages.find((item) => item.id === store.activePageId) ??
+		store.pages[0]
 	);
 }

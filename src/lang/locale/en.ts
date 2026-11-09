@@ -171,13 +171,24 @@ export default {
 	DASHBOARD_VIEW_MODE: "Done",
 	DASHBOARD_EMPTY_TITLE: "No components yet",
 	DASHBOARD_EMPTY_DESC:
-		"Add a KPI, project progress or unfinished-task component and bind it to a query.",
+		"Add a KPI, project progress or unfinished-task component to this page and bind it to a query.",
 	DASHBOARD_LOADING: "Loading…",
 	DASHBOARD_ERROR_CONFIG: "Query missing — pick another query.",
 	DASHBOARD_EMPTY_RESULT: "Nothing to show.",
 	DASHBOARD_STORE_DAMAGED:
 		"Dashboard configuration is damaged. The raw data was kept; the panel fell back to an empty dashboard.",
 	DASHBOARD_CONFIG_REMOVE: "Remove component",
+
+	// Pages
+	PAGE_TABS_ADD: "Add page",
+	PAGE_RENAME: "Rename page",
+	PAGE_DELETE: "Delete page",
+	PAGE_DELETE_TITLE: "Delete page",
+	PAGE_DELETE_MSG:
+		"Delete “{0}” and its {1} component(s)? Notes are not affected.",
+	PAGE_LAST_CANNOT_DELETE: "At least one page is required.",
+	PAGE_NAME_PLACEHOLDER: "Page name",
+	PAGE_DEFAULT_NAME: "Page {0}",
 
 	// Components
 	COMPONENT_PICKER_TITLE: "Add component",
@@ -205,6 +216,8 @@ export default {
 	QUERY_MANAGER_DUPLICATE: "Duplicate",
 	QUERY_MANAGER_DELETE: "Delete",
 	QUERY_MANAGER_REFERENCES: "referenced by",
+	QUERY_DUPLICATED: "Copied query: {0}",
+	QUERY_DUPLICATE_FAILED: "Could not copy the query.",
 	QUERY_EDITOR_TITLE_NEW: "New query",
 	QUERY_EDITOR_TITLE_EDIT: "Edit query",
 	QUERY_NAME: "Name",

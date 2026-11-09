@@ -172,13 +172,23 @@ export default {
 	DASHBOARD_VIEW_MODE: "完成",
 	DASHBOARD_EMPTY_TITLE: "還沒有元件",
 	DASHBOARD_EMPTY_DESC:
-		"新增 KPI、專案進度或未完成任務元件，並綁定一個查詢。",
+		"向此頁面新增 KPI、專案進度或未完成任務元件，並綁定到一個查詢。",
 	DASHBOARD_LOADING: "載入中…",
 	DASHBOARD_ERROR_CONFIG: "查詢不存在，請重新選擇。",
 	DASHBOARD_EMPTY_RESULT: "暫無內容。",
 	DASHBOARD_STORE_DAMAGED:
 		"儀表板設定已損毀。原始資料已保留，面板回退到空儀表板。",
 	DASHBOARD_CONFIG_REMOVE: "移除元件",
+
+	// Pages
+	PAGE_TABS_ADD: "新增頁面",
+	PAGE_RENAME: "重新命名頁面",
+	PAGE_DELETE: "刪除頁面",
+	PAGE_DELETE_TITLE: "刪除頁面",
+	PAGE_DELETE_MSG: "刪除「{0}」及其 {1} 個元件？不會影響筆記內容。",
+	PAGE_LAST_CANNOT_DELETE: "至少需要保留一個頁面。",
+	PAGE_NAME_PLACEHOLDER: "頁面名稱",
+	PAGE_DEFAULT_NAME: "頁面 {0}",
 
 	// Components
 	COMPONENT_PICKER_TITLE: "新增元件",
@@ -204,6 +214,8 @@ export default {
 	QUERY_MANAGER_DUPLICATE: "複製",
 	QUERY_MANAGER_DELETE: "刪除",
 	QUERY_MANAGER_REFERENCES: "被引用",
+	QUERY_DUPLICATED: "已複製查詢：{0}",
+	QUERY_DUPLICATE_FAILED: "複製查詢失敗。",
 	QUERY_EDITOR_TITLE_NEW: "新增查詢",
 	QUERY_EDITOR_TITLE_EDIT: "編輯查詢",
 	QUERY_NAME: "名稱",

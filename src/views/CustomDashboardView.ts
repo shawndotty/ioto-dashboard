@@ -1,20 +1,32 @@
-import { ItemView, Notice, TFile, WorkspaceLeaf } from "obsidian";
+import {
+	ItemView,
+	Notice,
+	TFile,
+	ViewStateResult,
+	WorkspaceLeaf,
+} from "obsidian";
 import { CUSTOM_DASHBOARD_VIEW_TYPE } from "../models/constants";
 import type IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { createComponentRegistry } from "../dashboard/components";
 import { DataHub } from "../dashboard/data-hub";
 import { clampSize, type ComponentDefinition, type ComponentStatus } from "../dashboard/registry";
-import { activeDashboard, type DashboardComponentConfig, type DashboardStoreData } from "../dashboard/types";
+import {
+	type DashboardComponentConfig,
+	type DashboardPage,
+	type DashboardStoreData,
+} from "../dashboard/types";
 import { metricKey, type MetricRequest, type MetricResult, type ProjectProgressGroup } from "../metrics/types";
 import { QueryRepository } from "../query/repository";
 import type { QueryDefinition } from "../query/types";
 import { ComponentPickerModal } from "../ui/component-picker";
 import { ConfirmModal } from "../ui/ConfirmModal";
+import { PageNameModal } from "../ui/page-name-modal";
 import { QueryEditModal, QueryManagerModal } from "../ui/query-editor";
 
 export class CustomDashboardView extends ItemView {
 	private store: DashboardStoreData | null = null;
+	private leafPageId: string | null = null;
 	private hub: DataHub | null = null;
 	private registry = createComponentRegistry();
 	private editMode = false;
@@ -44,6 +56,15 @@ export class CustomDashboardView extends ItemView {
 		this.contentEl.empty();
 		this.contentEl.addClass("ioto-custom-dashboard-view");
 		await this.loadStore();
+
+		const fallback =
+			this.store?.activePageId ?? this.store?.pages[0]?.id ?? null;
+		if (
+			!this.leafPageId ||
+			!this.store?.pages.some((page) => page.id === this.leafPageId)
+		) {
+			this.leafPageId = fallback;
+		}
 
 		this.hub = new DataHub({
 			index: this.plugin.index,
@@ -100,22 +121,41 @@ export class CustomDashboardView extends ItemView {
 		);
 	}
 
-	private get dashboardId(): string {
-		const dashboard = this.store ? activeDashboard(this.store) : undefined;
-		return dashboard?.id ?? "";
+	getState() {
+		return {
+			activePageId: this.leafPageId ?? this.store?.activePageId,
+		};
+	}
+
+	async setState(state: unknown, result: ViewStateResult) {
+		const s = (state ?? {}) as { activePageId?: unknown };
+		if (typeof s.activePageId === "string") {
+			this.leafPageId = s.activePageId;
+		}
+		await super.setState(state, result);
+		if (this.store) {
+			// A restored layout may point at a page that has been deleted.
+			if (!this.store.pages.some((page) => page.id === this.leafPageId)) {
+				this.leafPageId = this.store.pages[0]?.id ?? null;
+			}
+			this.render();
+		}
+	}
+
+	private get activePage(): DashboardPage | undefined {
+		if (!this.store) return undefined;
+		return (
+			this.store.pages.find((page) => page.id === this.leafPageId) ??
+			this.store.pages[0]
+		);
 	}
 
 	private render(): void {
-		const dashboard = this.store
-			? activeDashboard(this.store)
-			: undefined;
 		this.contentEl.empty();
 		this.contentEl.addClass("ioto-custom-dashboard-view");
 
 		const toolbar = this.contentEl.createDiv({ cls: "ioto-dashboard-toolbar" });
-		toolbar.createEl("h2", {
-			text: dashboard?.name ?? t("CUSTOM_DASHBOARD_TITLE"),
-		});
+		toolbar.createEl("h2", { text: t("CUSTOM_DASHBOARD_TITLE") });
 		const actions = toolbar.createDiv({ cls: "ioto-dashboard-actions" });
 		this.addToolbarButton(actions, "edit", t("DASHBOARD_MANAGE_QUERIES"), () =>
 			this.openQueryManager(),
@@ -145,7 +185,9 @@ export class CustomDashboardView extends ItemView {
 			});
 		}
 
-		if (!dashboard || dashboard.components.length === 0) {
+		this.renderPagesBar();
+
+		if (!this.activePage || this.activePage.components.length === 0) {
 			this.renderEmptyState();
 			this.publishRequests();
 			return;
@@ -153,10 +195,119 @@ export class CustomDashboardView extends ItemView {
 
 		const grid = this.contentEl.createDiv({ cls: "ioto-dashboard-grid" });
 		const queries = this.queryRepository();
-		for (const config of dashboard.components) {
+		for (const config of this.activePage.components) {
 			this.renderComponent(grid, config, queries);
 		}
 		this.publishRequests();
+	}
+
+	private renderPagesBar(): void {
+		const pagesBar = this.contentEl.createDiv({ cls: "ioto-dashboard-pages" });
+		for (const page of this.store?.pages ?? []) {
+			const active = page.id === this.activePage?.id;
+			const tab = pagesBar.createEl("button", {
+				cls: `ioto-dashboard-page-tab${active ? " is-active" : ""}`,
+				attr: { "aria-pressed": active ? "true" : "false" },
+			});
+			tab.createSpan({
+				cls: "ioto-dashboard-page-tab-label",
+				text: page.name,
+			});
+			tab.onClickEvent(() => this.switchPage(page.id));
+			tab.addEventListener("dblclick", () => this.openRenamePage(page));
+			if (this.editMode) {
+				this.renderPageTabTools(tab, page);
+			}
+		}
+		if (this.editMode) {
+			const add = pagesBar.createEl("button", {
+				cls: "ioto-dashboard-page-add clickable-icon",
+				attr: { "aria-label": t("PAGE_TABS_ADD"), title: t("PAGE_TABS_ADD") },
+				text: "+",
+			});
+			add.onClickEvent(() => void this.createPage());
+		}
+	}
+
+	private renderPageTabTools(tab: HTMLElement, page: DashboardPage): void {
+		const rename = tab.createEl("button", {
+			cls: "ioto-dashboard-page-close",
+			attr: { "aria-label": t("PAGE_RENAME"), title: t("PAGE_RENAME") },
+			text: "✎",
+		});
+		rename.onClickEvent((event) => {
+			event.stopPropagation();
+			this.openRenamePage(page);
+		});
+		const remove = tab.createEl("button", {
+			cls: "ioto-dashboard-page-close",
+			attr: { "aria-label": t("PAGE_DELETE"), title: t("PAGE_DELETE") },
+			text: "×",
+		});
+		remove.onClickEvent((event) => {
+			event.stopPropagation();
+			this.confirmRemovePage(page);
+		});
+	}
+
+	private switchPage(pageId: string): void {
+		if (pageId === this.activePage?.id) return;
+		this.leafPageId = pageId;
+		this.render();
+		this.app.workspace.requestSaveLayout();
+		void this.plugin.dashboardRepository.setActivePage(pageId);
+	}
+
+	private async createPage(): Promise<void> {
+		const taken = new Set(this.store?.pages.map((page) => page.id) ?? []);
+		let id = `page:${Date.now()}`;
+		let n = 2;
+		while (taken.has(id)) id = `page:${Date.now()}-${n++}`;
+		const page: DashboardPage = {
+			id,
+			name: t("PAGE_DEFAULT_NAME", [String((this.store?.pages.length ?? 0) + 1)]),
+			components: [],
+		};
+		this.store = await this.plugin.dashboardRepository.addPage(page);
+		this.leafPageId = id;
+		this.render();
+		this.app.workspace.requestSaveLayout();
+	}
+
+	private openRenamePage(page: DashboardPage): void {
+		new PageNameModal(this.app, page.name, (name) => {
+			void (async () => {
+				this.store = await this.plugin.dashboardRepository.renamePage(
+					page.id,
+					name,
+				);
+				this.render();
+			})();
+		}).open();
+	}
+
+	private confirmRemovePage(page: DashboardPage): void {
+		if ((this.store?.pages.length ?? 0) <= 1) {
+			new Notice(t("PAGE_LAST_CANNOT_DELETE"));
+			return;
+		}
+		new ConfirmModal(
+			this.app,
+			t("PAGE_DELETE_TITLE"),
+			t("PAGE_DELETE_MSG", [page.name, String(page.components.length)]),
+			() => {
+				void (async () => {
+					this.store = await this.plugin.dashboardRepository.removePage(
+						page.id,
+					);
+					if (this.leafPageId === page.id) {
+						this.leafPageId = this.store?.pages[0]?.id ?? null;
+					}
+					this.render();
+					this.app.workspace.requestSaveLayout();
+				})();
+			},
+		).open();
 	}
 
 	private addToolbarButton(
@@ -301,8 +452,10 @@ export class CustomDashboardView extends ItemView {
 			text: "×",
 		});
 		remove.onClickEvent(async () => {
+			const pageId = this.activePage?.id;
+			if (!pageId) return;
 			this.store = await this.plugin.dashboardRepository.removeComponent(
-				this.dashboardId,
+				pageId,
 				config.id,
 			);
 			this.render();
@@ -313,8 +466,10 @@ export class CustomDashboardView extends ItemView {
 		componentId: string,
 		patch: Partial<DashboardComponentConfig>,
 	): Promise<void> {
+		const pageId = this.activePage?.id;
+		if (!pageId) return;
 		this.store = await this.plugin.dashboardRepository.updateComponent(
-			this.dashboardId,
+			pageId,
 			componentId,
 			patch,
 		);
@@ -322,13 +477,20 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private publishRequests(): void {
-		const dashboard = this.store ? activeDashboard(this.store) : undefined;
-		if (!dashboard || !this.hub) return;
+		if (!this.store || !this.hub) return;
 		const requests: MetricRequest[] = [];
-		for (const config of dashboard.components) {
-			const definition = this.registry.get(config.type);
-			if (!definition) continue;
-			requests.push(definition.toMetricRequest(config));
+		const seen = new Set<string>();
+		for (const page of this.store.pages) {
+			for (const config of page.components) {
+				const definition = this.registry.get(config.type);
+				if (!definition) continue;
+				const request = definition.toMetricRequest(config);
+				const key = metricKey(request);
+				// metricKey has no pageId, so duplicates can be shared safely.
+				if (seen.has(key)) continue;
+				seen.add(key);
+				requests.push(request);
+			}
 		}
 		this.hub.setRequests(requests);
 	}
@@ -357,8 +519,10 @@ export class CustomDashboardView extends ItemView {
 						type: definition.type,
 						queryId,
 					};
+					const pageId = this.activePage?.id;
+					if (!pageId) return;
 					this.store = await this.plugin.dashboardRepository.addComponent(
-						this.dashboardId,
+						pageId,
 						config,
 					);
 					this.editMode = true;
@@ -390,17 +554,27 @@ export class CustomDashboardView extends ItemView {
 			{
 				onNew: () => this.openQueryEditor(null),
 				onEdit: (query) => this.openQueryEditor(query),
-				onDuplicate: (query) => {
-					void (async () => {
-						const copy: QueryDefinition = {
-							...structuredClone(query),
-							id: `user:${Date.now()}`,
-							name: `${query.name} copy`,
-						};
-						delete copy.nameKey;
-						this.store = await this.plugin.dashboardRepository.addQuery(copy);
-						this.render();
-					})();
+				onDuplicate: async (query) => {
+					const all = this.queryRepository().list();
+					const takenIds = new Set(all.map((item) => item.id));
+					const takenNames = new Set(all.map((item) => item.name));
+					const sourceName = query.nameKey
+						? t(query.nameKey as Parameters<typeof t>[0])
+						: query.name;
+					const copy: QueryDefinition = {
+						...structuredClone(query),
+						id: uniqueQueryId(takenIds),
+						name: uniqueCopyName(sourceName, takenNames),
+					};
+					delete copy.nameKey;
+					this.store = await this.plugin.dashboardRepository.addQuery(copy);
+					this.render();
+					const created = this.store?.queries.find(
+						(item) => item.id === copy.id,
+					);
+					return created
+						? { queries: this.queryRepository().list(), created }
+						: null;
 				},
 				onDelete: (query) => {
 					const references = this.store
@@ -468,4 +642,20 @@ export class CustomDashboardView extends ItemView {
 		if (executed) return;
 		await this.openNote(`${group.folder}/_project.md`);
 	}
+}
+
+function uniqueQueryId(taken: Set<string>): string {
+	const base = `user:${Date.now()}`;
+	let id = base;
+	let n = 2;
+	while (taken.has(id)) id = `${base}-${n++}`;
+	return id;
+}
+
+function uniqueCopyName(name: string, taken: Set<string>): string {
+	const base = `${name} copy`;
+	if (!taken.has(base)) return base;
+	let n = 2;
+	while (taken.has(`${base} ${n}`)) n++;
+	return `${base} ${n}`;
 }

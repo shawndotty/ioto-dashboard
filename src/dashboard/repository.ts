@@ -1,8 +1,12 @@
-import type { DashboardComponentConfig, DashboardStoreData } from "./types";
+import type {
+	DashboardComponentConfig,
+	DashboardPage,
+	DashboardStoreData,
+} from "./types";
 import {
 	DASHBOARD_SCHEMA_VERSION,
 	DASHBOARD_STORE_KEY,
-	activeDashboard,
+	activePage,
 	createDefaultStore,
 } from "./types";
 
@@ -31,7 +35,7 @@ function isComponent(value: unknown): value is DashboardComponentConfig {
 	);
 }
 
-function isDashboard(value: unknown): boolean {
+function isPage(value: unknown): value is DashboardPage {
 	return (
 		isRecord(value) &&
 		typeof value.id === "string" &&
@@ -68,39 +72,38 @@ export class DashboardRepository {
 
 	private normalize(raw: unknown): DashboardStoreData | null {
 		if (!isRecord(raw)) return null;
-		const dashboards = Array.isArray(raw.dashboards)
-			? raw.dashboards
-					.filter(isDashboard)
-					.map((dashboard) => {
-						const record = dashboard as Record<string, unknown>;
-						return {
-							id: record.id as string,
-							name:
-								typeof record.name === "string"
-									? record.name
-									: "My Dashboard",
-							components: (record.components as unknown[]).filter(
-								isComponent,
-							),
-						};
-					})
-			: [];
-		const source =
-			dashboards.length > 0 ? dashboards : createDefaultStore().dashboards;
+		const candidates = Array.isArray(raw.pages)
+			? raw.pages
+			: Array.isArray(raw.dashboards)
+				? raw.dashboards
+				: [];
+		const pages = candidates
+			.filter(isPage)
+			.map((page) => ({
+				id: page.id,
+				name: typeof page.name === "string" ? page.name : "Page 1",
+				components: page.components.filter(isComponent),
+			}));
+		const source = pages.length > 0 ? pages : createDefaultStore().pages;
 		const queries = Array.isArray(raw.queries)
 			? raw.queries.filter(isQuery)
 			: [];
+		const requestedId =
+			typeof raw.activePageId === "string"
+				? raw.activePageId
+				: typeof raw.activeDashboardId === "string"
+					? raw.activeDashboardId
+					: undefined;
 		const activeId =
-			typeof raw.activeDashboardId === "string" &&
-			source.some((item) => item.id === raw.activeDashboardId)
-				? raw.activeDashboardId
+			requestedId && source.some((item) => item.id === requestedId)
+				? requestedId
 				: source[0]?.id;
 		const store: DashboardStoreData = {
 			schemaVersion: DASHBOARD_SCHEMA_VERSION,
-			dashboards: source,
+			pages: source,
 			queries: queries as DashboardStoreData["queries"],
 		};
-		if (activeId) store.activeDashboardId = activeId;
+		if (activeId) store.activePageId = activeId;
 		return store;
 	}
 
@@ -125,27 +128,23 @@ export class DashboardRepository {
 	}
 
 	async addComponent(
-		dashboardId: string,
+		pageId: string,
 		component: DashboardComponentConfig,
 	): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
-			const dashboard = store.dashboards.find(
-				(item) => item.id === dashboardId,
-			);
-			if (dashboard) dashboard.components.push(component);
+			const page = store.pages.find((item) => item.id === pageId);
+			if (page) page.components.push(component);
 		});
 	}
 
 	async updateComponent(
-		dashboardId: string,
+		pageId: string,
 		componentId: string,
 		patch: Partial<DashboardComponentConfig>,
 	): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
-			const dashboard = store.dashboards.find(
-				(item) => item.id === dashboardId,
-			);
-			const component = dashboard?.components.find(
+			const page = store.pages.find((item) => item.id === pageId);
+			const component = page?.components.find(
 				(item) => item.id === componentId,
 			);
 			if (component) Object.assign(component, patch);
@@ -153,25 +152,52 @@ export class DashboardRepository {
 	}
 
 	async removeComponent(
-		dashboardId: string,
+		pageId: string,
 		componentId: string,
 	): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
-			const dashboard = store.dashboards.find(
-				(item) => item.id === dashboardId,
-			);
-			if (!dashboard) return;
-			dashboard.components = dashboard.components.filter(
+			const page = store.pages.find((item) => item.id === pageId);
+			if (!page) return;
+			page.components = page.components.filter(
 				(item) => item.id !== componentId,
 			);
 		});
 	}
 
+	async addPage(page: DashboardPage): Promise<DashboardStoreData> {
+		return this.mutate((store) => {
+			if (store.pages.some((item) => item.id === page.id)) return;
+			store.pages.push(page);
+		});
+	}
+
+	async renamePage(pageId: string, name: string): Promise<DashboardStoreData> {
+		const trimmed = name.trim();
+		return this.mutate((store) => {
+			if (!trimmed) return;
+			const page = store.pages.find((item) => item.id === pageId);
+			if (page) page.name = trimmed;
+		});
+	}
+
+	async removePage(pageId: string): Promise<DashboardStoreData> {
+		return this.mutate((store) => {
+			// The last page is never removed: the view needs a canvas.
+			if (store.pages.length <= 1) return;
+			const remaining = store.pages.filter((page) => page.id !== pageId);
+			if (remaining.length === store.pages.length) return;
+			store.pages = remaining;
+			if (store.activePageId === pageId) {
+				store.activePageId = remaining[0]?.id;
+			}
+		});
+	}
+
 	referenceCount(store: DashboardStoreData, queryId: string): number {
-		return store.dashboards.reduce(
-			(total, dashboard) =>
+		return store.pages.reduce(
+			(total, page) =>
 				total +
-				dashboard.components.filter(
+				page.components.filter(
 					(component) => component.queryId === queryId,
 				).length,
 			0,
@@ -201,10 +227,10 @@ export class DashboardRepository {
 		});
 	}
 
-	async setActiveDashboard(dashboardId: string): Promise<DashboardStoreData> {
+	async setActivePage(pageId: string): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
-			if (store.dashboards.some((item) => item.id === dashboardId)) {
-				store.activeDashboardId = dashboardId;
+			if (store.pages.some((item) => item.id === pageId)) {
+				store.activePageId = pageId;
 			}
 		});
 	}
@@ -224,6 +250,6 @@ export class DashboardRepository {
 	}
 
 	current(store: DashboardStoreData) {
-		return activeDashboard(store);
+		return activePage(store);
 	}
 }

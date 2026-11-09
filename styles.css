@@ -385,6 +385,80 @@
     font-size: 0.9em;
 }
 
+.ioto-custom-dashboard-view .ioto-dashboard-pages {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-page-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    max-width: 220px;
+    padding: 4px 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-page-tab:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-page-tab.is-active {
+    background: var(--background-secondary);
+    border-color: var(--background-modifier-border);
+    color: var(--text-normal);
+    font-weight: 600;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-page-tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-page-close,
+.ioto-custom-dashboard-view .ioto-dashboard-page-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    padding: 0 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.9em;
+    line-height: 1;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-page-close:hover,
+.ioto-custom-dashboard-view .ioto-dashboard-page-add:hover {
+    color: var(--text-normal);
+}
+
+.ioto-page-name-modal .ioto-page-name-input {
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.ioto-page-name-modal .ioto-page-name-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
 .ioto-custom-dashboard-view .ioto-dashboard-grid {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -666,6 +740,14 @@
     overflow: auto;
 }
 
+/* 核心 .setting-item-heading 左右各 16px 内边距，而弹窗内的
+   .setting-item 横向内边距为 0，会让章节标题比正文右移 16px。 */
+.ioto-dashboard-modal .ioto-modal-body > .setting-item-heading {
+    padding-inline: 0;
+    margin-block-start: 0;
+}
+
+/* 与设置行 16px 的底部内边距对齐，使筛选网格到下一个标题的间距一致。 */
 .ioto-dashboard-modal .ioto-modal-footer {
     flex: 0 0 auto;
     padding-top: 8px;
@@ -681,7 +763,12 @@
     display: grid;
     gap: 12px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin-bottom: 8px;
+    margin-bottom: var(--size-4-4, 16px);
+}
+
+.ioto-dashboard-modal [data-id].is-newly-copied {
+    background: var(--background-modifier-success-hover, var(--background-modifier-hover));
+    transition: background 1.4s ease-out;
 }
 
 .ioto-modal-filter {

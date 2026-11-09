@@ -42,6 +42,7 @@ function renderList(el: HTMLElement, items: CollectionItem[]): void {
 		const setting = new Setting(el)
 			.setName(item.title)
 			.setDesc(descriptionOf(item));
+		setting.settingEl.dataset.id = item.id;
 
 		if (item.primaryLabel && item.onPrimary) {
 			setting.addButton((button) =>
@@ -68,6 +69,7 @@ function renderCards(el: HTMLElement, items: CollectionItem[]): void {
 
 	for (const item of items) {
 		const card = grid.createDiv({ cls: "ioto-modal-card" });
+		card.dataset.id = item.id;
 
 		const header = card.createDiv({ cls: "ioto-modal-card__header" });
 		if (item.icon) {
