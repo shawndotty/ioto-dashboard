@@ -76,7 +76,7 @@ function renderCards(el: HTMLElement, items: CollectionItem[]): void {
 			const iconEl = header.createDiv({ cls: "ioto-modal-card__icon" });
 			setIcon(iconEl, item.icon);
 		}
-		header.createEl("strong", {
+		header.createEl("span", {
 			cls: "ioto-modal-card__title",
 			text: item.title,
 		});

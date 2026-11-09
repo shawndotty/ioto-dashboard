@@ -2,7 +2,12 @@ import { App, ButtonComponent, Modal, Notice, Setting } from "obsidian";
 import { t } from "../lang/helpers";
 import { createDefaultFilterState } from "../data/saved-query-adapter";
 import type { FilterState } from "../data/types";
-import type { QueryDefinition, QueryTarget } from "../query/types";
+import {
+	groupByTarget,
+	querySourceOf,
+	type QuerySource,
+} from "../query/manager";
+import { QUERY_TARGETS, type QueryDefinition, type QueryTarget } from "../query/types";
 import {
 	type CollectionAction,
 	type CollectionItem,
@@ -18,7 +23,7 @@ export interface DuplicatedQuery {
 }
 
 export interface QueryManagerActions {
-	onNew(): void;
+	onNew(target: QueryTarget): void;
 	onEdit(query: QueryDefinition): void;
 	/** Persists a copy and returns the fresh list; null means the write failed. */
 	onDuplicate(query: QueryDefinition): Promise<DuplicatedQuery | null>;
@@ -30,15 +35,48 @@ export interface QueryManagerPreferences {
 	onLayoutChange(layout: CollectionLayout): void;
 }
 
+type LocaleKey = Parameters<typeof t>[0];
+
+const TARGET_LABEL_KEYS: Record<QueryTarget, LocaleKey> = {
+	task: "QUERY_TARGET_TASK",
+	note: "QUERY_TARGET_NOTE",
+	file: "QUERY_TARGET_FILE",
+	folder: "QUERY_TARGET_FOLDER",
+};
+
+const SOURCE_LABEL_KEYS: Record<QuerySource, LocaleKey> = {
+	builtin: "QUERY_SOURCE_BUILTIN",
+	saved: "QUERY_SOURCE_SAVED",
+	user: "QUERY_SOURCE_USER",
+};
+
+/** Survives modal reopen within the plugin instance; deliberately not persisted. */
+let rememberedTarget: QueryTarget | null = null;
+
 function displayName(query: QueryDefinition): string {
 	return query.nameKey
 		? t(query.nameKey as Parameters<typeof t>[0])
 		: query.name;
 }
 
+function targetLabel(target: QueryTarget): string {
+	return t(TARGET_LABEL_KEYS[target]);
+}
+
+function metaLabel(query: QueryDefinition, references: number): string {
+	const source = querySourceOf(query.id);
+	const citation = `${t("QUERY_MANAGER_REFERENCES")} ${references}`;
+	return source
+		? `${t(SOURCE_LABEL_KEYS[source])} · ${citation}`
+		: citation;
+}
+
 export class QueryManagerModal extends Modal {
 	private layout: CollectionLayout;
+	private activeTarget: QueryTarget;
 	private collectionEl: HTMLElement | null = null;
+	private tabbarEl: HTMLElement | null = null;
+	private references = new Map<string, number>();
 	private duplicating = false;
 
 	constructor(
@@ -50,6 +88,12 @@ export class QueryManagerModal extends Modal {
 	) {
 		super(app);
 		this.layout = preferences?.layout ?? "list";
+		const groups = groupByTarget(queries);
+		this.activeTarget =
+			rememberedTarget ??
+			QUERY_TARGETS.find((target) => groups[target].length > 0) ??
+			"task";
+		this.rebuildReferences();
 	}
 
 	onOpen(): void {
@@ -60,18 +104,29 @@ export class QueryManagerModal extends Modal {
 			title: t("QUERY_MANAGER_TITLE"),
 		});
 
-		new Setting(contentEl).addButton((button) =>
-			button
-				.setButtonText(t("QUERY_MANAGER_NEW"))
-				.setCta()
-				.onClick(() => {
-					this.close();
-					this.actions.onNew();
-				}),
+		const toolbar = contentEl.createDiv({ cls: "ioto-query-toolbar" });
+		this.tabbarEl = toolbar.createDiv({
+			cls: "ioto-query-tabs",
+			attr: { role: "tablist" },
+		});
+		this.tabbarEl.addEventListener("keydown", (event) =>
+			this.handleTabKeydown(event),
 		);
+		new ButtonComponent(toolbar)
+			.setButtonText(t("QUERY_MANAGER_NEW"))
+			.setCta()
+			.onClick(() => {
+				const target = this.activeTarget;
+				this.close();
+				this.actions.onNew(target);
+			});
 
 		const body = contentEl.createDiv({ cls: "ioto-modal-body" });
-		this.collectionEl = body.createDiv({ cls: "ioto-modal-collection" });
+		this.collectionEl = body.createDiv({
+			cls: "ioto-modal-collection",
+			attr: { role: "tabpanel" },
+		});
+		this.renderTabs();
 		this.renderItems();
 
 		if (this.preferences) {
@@ -83,17 +138,100 @@ export class QueryManagerModal extends Modal {
 		}
 	}
 
+	private rebuildReferences(): void {
+		this.references.clear();
+		for (const query of this.queries) {
+			this.references.set(query.id, this.referenceCount(query.id));
+		}
+	}
+
+	private selectTarget(target: QueryTarget, focus = false): void {
+		if (target !== this.activeTarget) {
+			this.activeTarget = target;
+			rememberedTarget = target;
+			this.renderTabs();
+			this.renderItems();
+		}
+		if (focus) {
+			this.tabbarEl
+				?.querySelector<HTMLElement>(`#ioto-query-tab-${target}`)
+				?.focus();
+		}
+	}
+
+	private handleTabKeydown(event: KeyboardEvent): void {
+		const index = QUERY_TARGETS.indexOf(this.activeTarget);
+		let next: number;
+		switch (event.key) {
+			case "ArrowRight":
+				next = (index + 1) % QUERY_TARGETS.length;
+				break;
+			case "ArrowLeft":
+				next = (index - 1 + QUERY_TARGETS.length) % QUERY_TARGETS.length;
+				break;
+			case "Home":
+				next = 0;
+				break;
+			case "End":
+				next = QUERY_TARGETS.length - 1;
+				break;
+			default:
+				return;
+		}
+		const target = QUERY_TARGETS[next];
+		if (!target) return;
+		event.preventDefault();
+		this.selectTarget(target, true);
+	}
+
+	private renderTabs(): void {
+		if (!this.tabbarEl) return;
+
+		const groups = groupByTarget(this.queries);
+		this.tabbarEl.empty();
+
+		for (const target of QUERY_TARGETS) {
+			const active = target === this.activeTarget;
+			const label = targetLabel(target);
+			const count = groups[target].length;
+			const tab = this.tabbarEl.createEl("button", {
+				cls: "ioto-query-tab",
+				attr: {
+					type: "button",
+					role: "tab",
+					id: `ioto-query-tab-${target}`,
+					tabindex: active ? "0" : "-1",
+					"aria-selected": active ? "true" : "false",
+					"aria-label": `${label} (${count})`,
+				},
+			});
+			if (active) tab.addClass("is-active");
+			tab.createSpan({ cls: "ioto-query-tab__label", text: label });
+			tab.createSpan({
+				cls: "ioto-query-tab__count",
+				text: String(count),
+			});
+			tab.addEventListener("click", () => this.selectTarget(target));
+		}
+
+		this.collectionEl?.setAttribute(
+			"aria-labelledby",
+			`ioto-query-tab-${this.activeTarget}`,
+		);
+	}
+
 	private renderItems(): void {
 		if (!this.collectionEl) return;
 
-		const items: CollectionItem[] = this.queries.map((query) => {
+		const queries = groupByTarget(this.queries)[this.activeTarget];
+		if (queries.length === 0) {
+			this.renderEmptyState();
+			return;
+		}
+
+		const items: CollectionItem[] = queries.map((query) => {
 			const isUser = query.id.startsWith("user:");
-			const references = this.referenceCount(query.id);
-			const meta = `${
-				query.target === "task"
-					? t("QUERY_TARGET_TASK")
-					: t("QUERY_TARGET_NOTE")
-			} · ${t("QUERY_MANAGER_REFERENCES")} ${references}`;
+			const references = this.references.get(query.id) ?? 0;
 
 			const actions: CollectionAction[] = [
 				{
@@ -127,14 +265,39 @@ export class QueryManagerModal extends Modal {
 
 			return {
 				id: query.id,
-				icon: "filter",
 				title: displayName(query),
-				meta,
+				meta: metaLabel(query, references),
 				actions,
 			};
 		});
 
 		renderCollection(this.collectionEl, items, this.layout);
+	}
+
+	private renderEmptyState(): void {
+		if (!this.collectionEl) return;
+
+		const label = targetLabel(this.activeTarget);
+		this.collectionEl.empty();
+		const empty = this.collectionEl.createDiv({ cls: "ioto-query-empty" });
+		empty.createDiv({
+			cls: "ioto-query-empty__hint",
+			text: t("QUERY_MANAGER_EMPTY_TARGET", [label]),
+		});
+		if (this.activeTarget === "file" || this.activeTarget === "folder") {
+			empty.createDiv({
+				cls: "ioto-query-empty__hint",
+				text: t("QUERY_MANAGER_TABLE_ONLY_HINT"),
+			});
+		}
+		empty
+			.createEl("button", {
+				text: t("QUERY_MANAGER_NEW_TARGET", [label]),
+			})
+			.addEventListener("click", () => {
+				this.close();
+				this.actions.onNew(this.activeTarget);
+			});
 	}
 
 	private async duplicate(query: QueryDefinition): Promise<void> {
@@ -147,6 +310,8 @@ export class QueryManagerModal extends Modal {
 				return;
 			}
 			this.queries = result.queries;
+			this.rebuildReferences();
+			this.renderTabs();
 			this.renderItems();
 			this.revealItem(result.created.id);
 			new Notice(t("QUERY_DUPLICATED", [result.created.name]));
@@ -178,6 +343,7 @@ export class QueryEditModal extends Modal {
 		app: App,
 		initial: QueryDefinition | null,
 		private onSave: (query: QueryDefinition) => void,
+		initialTarget?: QueryTarget,
 	) {
 		super(app);
 		this.draft = initial
@@ -185,7 +351,7 @@ export class QueryEditModal extends Modal {
 			: {
 					id: `user:${Date.now()}`,
 					name: "",
-					target: "task",
+					target: initialTarget ?? "task",
 					scope: { folders: [], includeSubfolders: true },
 					filters: createDefaultFilterState(),
 				};
@@ -232,19 +398,18 @@ export class QueryEditModal extends Modal {
 
 		new Setting(body)
 			.setName(t("QUERY_TARGET"))
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("task", t("QUERY_TARGET_TASK"))
-					.addOption("note", t("QUERY_TARGET_NOTE"))
-					.addOption("file", t("QUERY_TARGET_FILE"))
-					.addOption("folder", t("QUERY_TARGET_FOLDER"))
+			.addDropdown((dropdown) => {
+				for (const target of QUERY_TARGETS) {
+					dropdown.addOption(target, targetLabel(target));
+				}
+				return dropdown
 					.setValue(this.draft.target)
 					.onChange((value) => {
 						this.draft.target = value as QueryTarget;
 						this.contentEl.empty();
 						this.onOpen();
-					}),
-			);
+					});
+			});
 
 		body.createEl("h3", {
 			cls: "setting-item-heading",

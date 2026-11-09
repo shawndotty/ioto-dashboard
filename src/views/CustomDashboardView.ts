@@ -46,7 +46,7 @@ import {
 } from "../dashboard/types";
 import { metricKey, type MetricRequest, type MetricResult, type ProjectProgressGroup } from "../metrics/types";
 import { QueryRepository } from "../query/repository";
-import type { QueryDefinition } from "../query/types";
+import type { QueryDefinition, QueryTarget } from "../query/types";
 import { ComponentPickerModal } from "../ui/component-picker";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { DashboardManagerModal } from "../ui/dashboard-manager";
@@ -1933,7 +1933,7 @@ export class CustomDashboardView extends ItemView {
 						)
 					: 0,
 			{
-				onNew: () => this.openQueryEditor(null),
+				onNew: (target) => this.openQueryEditor(null, target),
 				onEdit: (query) => this.openQueryEditor(query),
 				onDuplicate: async (query) => {
 					const all = this.queryRepository().list();
@@ -1990,19 +1990,27 @@ export class CustomDashboardView extends ItemView {
 		).open();
 	}
 
-	private openQueryEditor(initial: QueryDefinition | null): void {
-		new QueryEditModal(this.app, initial, (query) => {
-			void (async () => {
-				const exists = this.store?.queries.some(
-					(item) => item.id === query.id,
-				);
-				this.store = exists
-					? await this.plugin.dashboardRepository.updateQuery(query)
-					: await this.plugin.dashboardRepository.addQuery(query);
-				this.queriesVersion += 1;
-				this.render();
-			})();
-		}).open();
+	private openQueryEditor(
+		initial: QueryDefinition | null,
+		initialTarget?: QueryTarget,
+	): void {
+		new QueryEditModal(
+			this.app,
+			initial,
+			(query) => {
+				void (async () => {
+					const exists = this.store?.queries.some(
+						(item) => item.id === query.id,
+					);
+					this.store = exists
+						? await this.plugin.dashboardRepository.updateQuery(query)
+						: await this.plugin.dashboardRepository.addQuery(query);
+					this.queriesVersion += 1;
+					this.render();
+				})();
+			},
+			initialTarget,
+		).open();
 	}
 
 	private async openNote(path: string, line?: number): Promise<void> {

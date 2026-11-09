@@ -8,7 +8,10 @@ import type {
 	TaskRecord,
 } from "../data/types";
 
-export type QueryTarget = "note" | "task" | "file" | "folder";
+/** Display order shared by the manager tabs and the editor target dropdown. */
+export const QUERY_TARGETS = ["task", "note", "file", "folder"] as const;
+
+export type QueryTarget = (typeof QUERY_TARGETS)[number];
 
 /**
  * "What to query". Sorting / grouping / paging belong to the presentation
