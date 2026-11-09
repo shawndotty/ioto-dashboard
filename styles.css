@@ -460,6 +460,7 @@
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-grid {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     grid-auto-rows: 72px;
@@ -963,11 +964,74 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     outline: 1px dashed var(--interactive-accent);
 }
 
+/* The dragged card stays in the flow as a slot; the ghost carries the motion. */
+.ioto-custom-dashboard-view .ioto-dashboard-card.is-placeholder {
+    opacity: 0.35;
+    outline: 1px dashed var(--interactive-accent);
+    background: transparent;
+}
+
 .ioto-custom-dashboard-view.is-dragging {
     user-select: none;
+}
+
+.ioto-custom-dashboard-view .ioto-card-resize-ghost,
+.ioto-custom-dashboard-view .ioto-card-resize-snap {
+    position: absolute;
+    left: 0;
+    top: 0;
+    box-sizing: border-box;
+    border-radius: 10px;
+    pointer-events: none;
+}
+
+.ioto-custom-dashboard-view .ioto-card-resize-ghost {
+    border: 1px dashed var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+    z-index: 3;
+}
+
+.ioto-custom-dashboard-view .ioto-card-resize-ghost::after {
+    content: attr(data-size);
+    position: absolute;
+    right: 6px;
+    bottom: 4px;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: var(--background-secondary);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-custom-dashboard-view .ioto-card-resize-snap {
+    border: 2px solid var(--interactive-accent);
+    background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+    z-index: 2;
 }
 
 .ioto-custom-dashboard-view.is-narrow .ioto-card-drag-handle,
 .ioto-custom-dashboard-view.is-narrow .ioto-card-resize-handle {
     display: none;
+}
+
+/* The drag ghost is attached to <body>; it also carries the view class so the
+   card's inner layout rules apply. Keep this block last so the overrides win. */
+.ioto-drag-ghost {
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 10px;
+    background: var(--background-secondary);
+    box-shadow: var(--shadow-l);
+    opacity: 0.95;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1000;
+    will-change: transform;
 }

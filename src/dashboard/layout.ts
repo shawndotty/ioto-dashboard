@@ -16,6 +16,8 @@ export interface GridMetrics {
 	stepX: number;
 	/** Row height + gap. */
 	stepY: number;
+	/** Gap between columns/rows in px. */
+	gap: number;
 }
 
 /**
@@ -107,6 +109,27 @@ export function resizeByDelta(
 	return { w: next.w, h: next.h, dw, dh };
 }
 
+/**
+ * Pixel size → snapped whole-cell size. `gap` takes part in the conversion so a
+ * card spanning `n` columns is `n * columnWidth + (n - 1) * gap` wide.
+ * Invalid input falls back to the smallest allowed size.
+ */
+export function snapSize(
+	pxWidth: number,
+	pxHeight: number,
+	metrics: GridMetrics,
+): { w: number; h: number } {
+	const gap = Number.isFinite(metrics.gap) ? Math.max(0, metrics.gap) : 0;
+	const stepX = metrics.stepX > 0 ? metrics.stepX : 1;
+	const stepY = metrics.stepY > 0 ? metrics.stepY : 1;
+	const width = Number.isFinite(pxWidth) ? Math.max(0, pxWidth) : 0;
+	const height = Number.isFinite(pxHeight) ? Math.max(0, pxHeight) : 0;
+	return clampSize(
+		Math.round((width + gap) / stepX),
+		Math.round((height + gap) / stepY),
+	);
+}
+
 export function gridMetrics(
 	gridWidth: number,
 	columns: number,
@@ -127,5 +150,6 @@ export function gridMetrics(
 		columnWidth,
 		stepX: columnWidth + safeGap,
 		stepY: safeRowHeight + safeGap,
+		gap: safeGap,
 	};
 }

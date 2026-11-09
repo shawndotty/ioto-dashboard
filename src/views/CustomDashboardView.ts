@@ -13,7 +13,7 @@ import { DataHub } from "../dashboard/data-hub";
 import {
 	dropIndex,
 	gridMetrics,
-	resizeByDelta,
+	snapSize,
 	stepSize,
 	type CardRect,
 	type GridMetrics,
@@ -26,7 +26,8 @@ import {
 	MIN_COMPONENT_W,
 	type ComponentDefinition,
 	type ComponentStatus,
-} from "../dashboard/registry";import {
+} from "../dashboard/registry";
+import {
 	type DashboardComponentConfig,
 	type DashboardPage,
 	type DashboardStoreData,
@@ -52,6 +53,20 @@ export class CustomDashboardView extends ItemView {
 	private isNarrow = false;
 	private resizeObserver: ResizeObserver | null = null;
 	private pendingFocus: { componentId: string; action: string } | null = null;
+	private dataVersion = 0;
+	private queriesVersion = 0;
+	private toolbarEl: HTMLElement | null = null;
+	private bannerEl: HTMLElement | null = null;
+	private pagesEl: HTMLElement | null = null;
+	private emptyEl: HTMLElement | null = null;
+	private gridEl: HTMLElement | null = null;
+	private toolbarSignature = "";
+	private pagesSignature = "";
+	private dragGhost: HTMLElement | null = null;
+	private resizeOverlays: {
+		ghost: HTMLElement;
+		snap: HTMLElement;
+	} | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -75,6 +90,7 @@ export class CustomDashboardView extends ItemView {
 	async onOpen(): Promise<void> {
 		this.contentEl.empty();
 		this.contentEl.addClass("ioto-custom-dashboard-view");
+		this.resetShell();
 		await this.loadStore();
 
 		const fallback =
@@ -93,7 +109,12 @@ export class CustomDashboardView extends ItemView {
 			getCustomFilters: () => this.plugin.settings.customFilters,
 			snapshotStore: this.plugin.snapshotStore,
 		});
-		this.unsubscribers.push(this.hub.subscribe(() => this.requestRender()));
+		this.unsubscribers.push(
+			this.hub.subscribe(() => {
+				this.dataVersion += 1;
+				this.requestRender();
+			}),
+		);
 		this.unsubscribers.push(
 			this.plugin.index.subscribe(() => this.hub?.scheduleRefresh()),
 		);
@@ -113,6 +134,8 @@ export class CustomDashboardView extends ItemView {
 		this.unsubscribers = [];
 		this.resizeObserver?.disconnect();
 		this.resizeObserver = null;
+		this.removeDragGhost();
+		this.removeResizeOverlays();
 		this.hub?.destroy();
 		this.hub = null;
 	}
@@ -173,12 +196,59 @@ export class CustomDashboardView extends ItemView {
 		);
 	}
 
+	private resetShell(): void {
+		this.toolbarEl = null;
+		this.bannerEl = null;
+		this.pagesEl = null;
+		this.emptyEl = null;
+		this.gridEl = null;
+		this.toolbarSignature = "";
+		this.pagesSignature = "";
+	}
+
 	private render(): void {
 		const scrollTop = this.contentEl.scrollTop;
-		this.contentEl.empty();
 		this.contentEl.addClass("ioto-custom-dashboard-view");
+		this.ensureShell();
+		this.syncToolbar();
+		this.syncBanner();
+		this.syncPagesBar();
 
-		const toolbar = this.contentEl.createDiv({ cls: "ioto-dashboard-toolbar" });
+		const page = this.activePage;
+		if (!page || page.components.length === 0) {
+			this.setEmptyVisible(true);
+			this.publishRequests();
+		} else {
+			this.setEmptyVisible(false);
+			const grid = this.ensureGrid();
+			this.syncCards(grid, page.components);
+			this.publishRequests();
+		}
+
+		this.contentEl.scrollTop = scrollTop;
+		this.restoreFocus();
+	}
+
+	private ensureShell(): void {
+		if (!this.toolbarEl) {
+			this.toolbarEl = this.contentEl.createDiv({
+				cls: "ioto-dashboard-toolbar",
+			});
+		}
+		if (!this.pagesEl) {
+			this.pagesEl = this.contentEl.createDiv({
+				cls: "ioto-dashboard-pages",
+			});
+		}
+	}
+
+	private syncToolbar(): void {
+		const signature = this.editMode ? "edit" : "view";
+		if (signature === this.toolbarSignature) return;
+		this.toolbarSignature = signature;
+		const toolbar = this.toolbarEl;
+		if (!toolbar) return;
+		toolbar.empty();
 		toolbar.createEl("h2", { text: t("CUSTOM_DASHBOARD_TITLE") });
 		const actions = toolbar.createDiv({ cls: "ioto-dashboard-actions" });
 		this.addToolbarButton(actions, "edit", t("DASHBOARD_MANAGE_QUERIES"), () =>
@@ -201,35 +271,62 @@ export class CustomDashboardView extends ItemView {
 				this.render();
 			},
 		);
-
-		if (this.damaged) {
-			this.contentEl.createDiv({
-				cls: "ioto-dashboard-banner",
-				text: t("DASHBOARD_STORE_DAMAGED"),
-			});
-		}
-
-		this.renderPagesBar();
-
-		if (!this.activePage || this.activePage.components.length === 0) {
-			this.renderEmptyState();
-			this.publishRequests();
-		} else {
-			const grid = this.contentEl.createDiv({ cls: "ioto-dashboard-grid" });
-			const queries = this.queryRepository();
-			for (const config of this.activePage.components) {
-				this.renderComponent(grid, config, queries);
-			}
-			this.publishRequests();
-		}
-
-		this.contentEl.scrollTop = scrollTop;
-		this.restoreFocus();
 	}
 
-	private renderPagesBar(): void {
-		const pagesBar = this.contentEl.createDiv({ cls: "ioto-dashboard-pages" });
-		for (const page of this.store?.pages ?? []) {
+	private syncBanner(): void {
+		if (!this.damaged) {
+			this.bannerEl?.remove();
+			this.bannerEl = null;
+			return;
+		}
+		if (this.bannerEl) return;
+		this.bannerEl = this.contentEl.createDiv({
+			cls: "ioto-dashboard-banner",
+			text: t("DASHBOARD_STORE_DAMAGED"),
+		});
+		this.toolbarEl?.insertAdjacentElement("afterend", this.bannerEl);
+	}
+
+	private setEmptyVisible(visible: boolean): void {
+		if (!visible) {
+			this.emptyEl?.remove();
+			this.emptyEl = null;
+			return;
+		}
+		this.gridEl?.remove();
+		this.gridEl = null;
+		if (this.emptyEl) return;
+		const empty = this.contentEl.createDiv({ cls: "ioto-dashboard-empty" });
+		this.emptyEl = empty;
+		empty.createEl("h3", { text: t("DASHBOARD_EMPTY_TITLE") });
+		empty.createEl("p", { text: t("DASHBOARD_EMPTY_DESC") });
+		const button = empty.createEl("button", {
+			text: t("DASHBOARD_ADD_COMPONENT"),
+			cls: "mod-cta",
+		});
+		button.onClickEvent(() => this.openComponentPicker());
+	}
+
+	private ensureGrid(): HTMLElement {
+		if (!this.gridEl) {
+			this.gridEl = this.contentEl.createDiv({ cls: "ioto-dashboard-grid" });
+		}
+		return this.gridEl;
+	}
+
+	private syncPagesBar(): void {
+		const pages = this.store?.pages ?? [];
+		const signature = [
+			this.editMode ? "edit" : "view",
+			this.activePage?.id ?? "",
+			pages.map((page) => `${page.id}:${page.name}`).join("|"),
+		].join("#");
+		if (signature === this.pagesSignature) return;
+		this.pagesSignature = signature;
+		const pagesBar = this.pagesEl;
+		if (!pagesBar) return;
+		pagesBar.empty();
+		for (const page of pages) {
 			const active = page.id === this.activePage?.id;
 			const tab = pagesBar.createEl("button", {
 				cls: `ioto-dashboard-page-tab${active ? " is-active" : ""}`,
@@ -351,26 +448,82 @@ export class CustomDashboardView extends ItemView {
 		button.onClickEvent(onClick);
 	}
 
-	private renderEmptyState(): void {
-		const empty = this.contentEl.createDiv({ cls: "ioto-dashboard-empty" });
-		empty.createEl("h3", { text: t("DASHBOARD_EMPTY_TITLE") });
-		empty.createEl("p", { text: t("DASHBOARD_EMPTY_DESC") });
-		const button = empty.createEl("button", {
-			text: t("DASHBOARD_ADD_COMPONENT"),
-			cls: "mod-cta",
-		});
-		button.onClickEvent(() => this.openComponentPicker());
+	/**
+	 * Reconciles the grid with the store: unchanged cards keep their DOM node,
+	 * only changed or missing ones are rebuilt; order changes are minimal moves.
+	 */
+	private syncCards(
+		grid: HTMLElement,
+		components: readonly DashboardComponentConfig[],
+	): void {
+		for (const overlay of Array.from(
+			grid.querySelectorAll(".ioto-card-resize-ghost, .ioto-card-resize-snap"),
+		)) {
+			overlay.remove();
+		}
+		const queries = this.queryRepository();
+		const existing = new Map<string, HTMLElement>();
+		for (const child of Array.from(grid.children)) {
+			const element = child as HTMLElement;
+			const id = element.dataset.componentId;
+			if (id) existing.set(id, element);
+		}
+		const wanted = new Set(components.map((config) => config.id));
+		for (const [id, element] of existing) {
+			if (wanted.has(id)) continue;
+			element.remove();
+			existing.delete(id);
+		}
+		const nodes: HTMLElement[] = [];
+		for (const config of components) {
+			const signature = this.cardSignature(config);
+			let element = existing.get(config.id);
+			if (!element || element.dataset.cardSignature !== signature) {
+				const next = this.createCard(grid, config, queries);
+				next.dataset.cardSignature = signature;
+				if (element) element.replaceWith(next);
+				else grid.appendChild(next);
+				element = next;
+				existing.set(config.id, element);
+			}
+			nodes.push(element);
+		}
+		for (let index = 0; index < nodes.length; index += 1) {
+			const node = nodes[index];
+			const current = grid.children[index] as HTMLElement | undefined;
+			if (node && current !== node) {
+				grid.insertBefore(node, current ?? null);
+			}
+		}
 	}
 
-	private renderComponent(
+	/** Rebuild triggers: config, edit state, data refresh and query edits. */
+	private cardSignature(config: DashboardComponentConfig): string {
+		const size = clampSize(config.w, config.h);
+		return [
+			config.type,
+			config.queryId,
+			config.basis ?? "",
+			String(config.limit ?? ""),
+			config.title ?? "",
+			String(size.w),
+			String(size.h),
+			this.editMode ? "edit" : "view",
+			String(this.dataVersion),
+			String(this.queriesVersion),
+		].join("|");
+	}
+
+	private createCard(
 		grid: HTMLElement,
 		config: DashboardComponentConfig,
 		queries: QueryRepository,
-	): void {
+	): HTMLElement {
 		const definition = this.registry.get(config.type);
 		const query = queries.get(config.queryId);
 		const result = this.hub?.getResults().get(this.metricKeyOf(config));
-		const card = grid.createDiv({ cls: "ioto-dashboard-card" });
+		const card = grid.ownerDocument.createElement("div");
+		card.addClass("ioto-dashboard-card");
 		card.setAttr("data-component-id", config.id);
 		const size = clampSize(config.w, config.h);
 		card.style.gridColumn = `span ${size.w}`;
@@ -406,13 +559,13 @@ export class CustomDashboardView extends ItemView {
 		}
 		if (!definition) {
 			this.registry.placeholder(body, config.type);
-			return;
+			return card;
 		}
 
 		const { status, messageKey } = this.statusOf(definition, query, result);
 		if (status === "loading") {
 			body.createDiv({ cls: "ioto-loading", text: t("DASHBOARD_LOADING") });
-			return;
+			return card;
 		}
 		if (status === "error") {
 			body.createDiv({
@@ -421,7 +574,7 @@ export class CustomDashboardView extends ItemView {
 					(messageKey ?? "DASHBOARD_ERROR_CONFIG") as Parameters<typeof t>[0],
 				),
 			});
-			return;
+			return card;
 		}
 		definition.render(body, {
 			config,
@@ -433,6 +586,7 @@ export class CustomDashboardView extends ItemView {
 			openNote: (path, line) => void this.openNote(path, line),
 			openProject: (group) => void this.openProject(group),
 		});
+		return card;
 	}
 
 	private statusOf(
@@ -899,38 +1053,71 @@ export class CustomDashboardView extends ItemView {
 		startEvent.preventDefault();
 		this.beginInteraction();
 		this.contentEl.addClass("is-dragging");
-		card.addClass("is-dragging");
 		try {
 			handle.setPointerCapture(startEvent.pointerId);
 		} catch {
 			// Capture is best-effort; document listeners still receive moves.
 		}
 
-		const pointer = { x: startEvent.clientX, y: startEvent.clientY };
+		const startX = startEvent.clientX;
+		const startY = startEvent.clientY;
+		const reduceMotion =
+			typeof win.matchMedia === "function" &&
+			win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		const ghost = this.createDragGhost(card);
+		this.dragGhost = ghost;
+		card.addClass("is-dragging");
+		card.addClass("is-placeholder");
+
+		const pointer = { x: startX, y: startY };
+		let rects = this.measureCards(grid);
 		let frame: number | null = null;
+		let dirty = true;
+
 		const tick = (): void => {
-			this.autoScroll(pointer.y);
-			frame = win.requestAnimationFrame(tick);
+			frame = null;
+			const scrolled = this.applyAutoScroll(pointer.y);
+			if (scrolled !== 0) {
+				// Cached rects stay valid: only the viewport moved.
+				for (const rect of rects.values()) rect.top -= scrolled;
+				dirty = true;
+			}
+			if (dirty) {
+				dirty = false;
+				const moved = this.reorderPreview(
+					grid,
+					card,
+					componentId,
+					pointer.x,
+					pointer.y,
+					rects,
+					reduceMotion,
+				);
+				if (moved) rects = this.measureCards(grid);
+			}
+			// Keep the loop alive only while the pointer keeps the page scrolling.
+			if (scrolled !== 0) frame = win.requestAnimationFrame(tick);
 		};
-		frame = win.requestAnimationFrame(tick);
+		const schedule = (): void => {
+			if (frame === null) frame = win.requestAnimationFrame(tick);
+		};
+		schedule();
 
 		this.bindPointerSession(handle, startEvent.pointerId, {
 			onMove: (moveEvent) => {
 				pointer.x = moveEvent.clientX;
 				pointer.y = moveEvent.clientY;
-				this.reorderPreview(
-					grid,
-					card,
-					componentId,
-					moveEvent.clientX,
-					moveEvent.clientY,
-				);
+				ghost.style.transform = `translate3d(${pointer.x - startX}px, ${pointer.y - startY}px, 0)`;
+				dirty = true;
+				schedule();
 			},
 			onFinish: (cancelled) => {
 				if (frame !== null) win.cancelAnimationFrame(frame);
 				frame = null;
+				this.removeDragGhost();
 				this.contentEl.removeClass("is-dragging");
 				card.removeClass("is-dragging");
+				card.removeClass("is-placeholder");
 				if (cancelled) {
 					this.abortInteraction();
 					return;
@@ -938,6 +1125,27 @@ export class CustomDashboardView extends ItemView {
 				void this.commitDragOrder(grid, componentId);
 			},
 		});
+	}
+
+	/** Detached visual clone that follows the pointer; the card stays as a slot. */
+	private createDragGhost(card: HTMLElement): HTMLElement {
+		const rect = card.getBoundingClientRect();
+		const ghost = card.cloneNode(true) as HTMLElement;
+		ghost.removeAttribute("data-component-id");
+		ghost.removeAttribute("data-card-signature");
+		ghost.addClass("ioto-custom-dashboard-view");
+		ghost.addClass("ioto-drag-ghost");
+		ghost.style.left = `${rect.left}px`;
+		ghost.style.top = `${rect.top}px`;
+		ghost.style.width = `${rect.width}px`;
+		ghost.style.height = `${rect.height}px`;
+		card.ownerDocument.body.appendChild(ghost);
+		return ghost;
+	}
+
+	private removeDragGhost(): void {
+		this.dragGhost?.remove();
+		this.dragGhost = null;
 	}
 
 	private bindPointerSession(
@@ -991,40 +1199,86 @@ export class CustomDashboardView extends ItemView {
 		componentId: string,
 		x: number,
 		y: number,
-	): void {
+		rects: Map<string, CardRect>,
+		reduceMotion: boolean,
+	): boolean {
 		const cards: HTMLElement[] = [];
 		for (const child of Array.from(grid.children)) {
 			if (child.classList.contains("ioto-dashboard-card")) {
 				cards.push(child as HTMLElement);
 			}
 		}
-		const rects: CardRect[] = cards.map((element) => {
+		const others = cards.filter((element) => element !== card);
+		const reference =
+			others[dropIndex([...rects.values()], x, y, componentId)] ?? null;
+		if (card.nextElementSibling === reference) return false;
+		if (reduceMotion) {
+			grid.insertBefore(card, reference);
+			return true;
+		}
+		this.flip(others, () => grid.insertBefore(card, reference));
+		return true;
+	}
+
+	/** Measures every card once; callers reuse the cache until a reorder. */
+	private measureCards(grid: HTMLElement): Map<string, CardRect> {
+		const rects = new Map<string, CardRect>();
+		for (const child of Array.from(grid.children)) {
+			const element = child as HTMLElement;
+			const id = element.dataset.componentId;
+			if (!id) continue;
 			const rect = element.getBoundingClientRect();
-			return {
-				id: element.dataset.componentId ?? "",
+			rects.set(id, {
+				id,
 				top: rect.top,
 				left: rect.left,
 				width: rect.width,
 				height: rect.height,
-			};
-		});
-		const others = cards.filter((element) => element !== card);
-		const reference = others[dropIndex(rects, x, y, componentId)] ?? null;
-		if (card.nextElementSibling !== reference) {
-			grid.insertBefore(card, reference);
+			});
+		}
+		return rects;
+	}
+
+	/** FLIP: measure → mutate → animate the visual delta away. */
+	private flip(elements: HTMLElement[], mutate: () => void): void {
+		const first = new Map<HTMLElement, DOMRect>();
+		for (const element of elements) {
+			first.set(element, element.getBoundingClientRect());
+		}
+		mutate();
+		for (const element of elements) {
+			const before = first.get(element);
+			if (!before) continue;
+			const after = element.getBoundingClientRect();
+			const dx = before.left - after.left;
+			const dy = before.top - after.top;
+			if (dx === 0 && dy === 0) continue;
+			element.animate(
+				[
+					{ transform: `translate(${dx}px, ${dy}px)` },
+					{ transform: "none" },
+				],
+				{ duration: 160, easing: "cubic-bezier(.2,.8,.2,1)" },
+			);
 		}
 	}
 
-	private autoScroll(pointerY: number): void {
+	/** Edge auto-scroll; returns the applied delta so callers can shift caches. */
+	private applyAutoScroll(pointerY: number): number {
 		const scroller = this.contentEl;
-		if (scroller.scrollHeight <= scroller.clientHeight + 1) return;
+		if (scroller.scrollHeight <= scroller.clientHeight + 1) return 0;
 		const rect = scroller.getBoundingClientRect();
 		const edge = 40;
+		let delta = 0;
 		if (pointerY < rect.top + edge) {
-			scroller.scrollTop -= Math.ceil((rect.top + edge - pointerY) / 2);
+			delta = -Math.ceil((rect.top + edge - pointerY) / 2);
 		} else if (pointerY > rect.bottom - edge) {
-			scroller.scrollTop += Math.ceil((pointerY - (rect.bottom - edge)) / 2);
+			delta = Math.ceil((pointerY - (rect.bottom - edge)) / 2);
 		}
+		if (delta === 0) return 0;
+		const before = scroller.scrollTop;
+		scroller.scrollTop = before + delta;
+		return scroller.scrollTop - before;
 	}
 
 	private async commitDragOrder(
@@ -1088,11 +1342,49 @@ export class CustomDashboardView extends ItemView {
 		event.preventDefault();
 		event.stopPropagation();
 		this.beginInteraction();
+		const win = card.ownerDocument.defaultView ?? window;
 		const startX = event.clientX;
 		const startY = event.clientY;
 		const metrics = this.readGridMetrics(grid);
 		const startSize = clampSize(config.w, config.h);
-		let current = { ...startSize };
+		const startRect = card.getBoundingClientRect();
+		const overlays = this.createResizeOverlays(grid);
+		const pointer = { x: startX, y: startY };
+		let snapped = { ...startSize };
+		let frame: number | null = null;
+		let dirty = true;
+
+		const tick = (): void => {
+			frame = null;
+			if (!dirty) return;
+			dirty = false;
+			const gridRect = grid.getBoundingClientRect();
+			const left = startRect.left - gridRect.left;
+			const top = startRect.top - gridRect.top;
+			const maxWidth = Math.max(60, gridRect.width - left);
+			const width = Math.min(
+				maxWidth,
+				Math.max(60, startRect.width + (pointer.x - startX)),
+			);
+			const height = Math.max(40, startRect.height + (pointer.y - startY));
+			overlays.ghost.style.left = `${left}px`;
+			overlays.ghost.style.top = `${top}px`;
+			overlays.ghost.style.width = `${width}px`;
+			overlays.ghost.style.height = `${height}px`;
+			overlays.ghost.dataset.size = `${Math.round(width)}×${Math.round(height)}`;
+
+			snapped = snapSize(width, height, metrics);
+			const rowHeight = Math.max(1, metrics.stepY - metrics.gap);
+			overlays.snap.style.left = `${left}px`;
+			overlays.snap.style.top = `${top}px`;
+			overlays.snap.style.width = `${snapped.w * metrics.columnWidth + (snapped.w - 1) * metrics.gap}px`;
+			overlays.snap.style.height = `${snapped.h * rowHeight + (snapped.h - 1) * metrics.gap}px`;
+		};
+		const schedule = (): void => {
+			if (frame === null) frame = win.requestAnimationFrame(tick);
+		};
+		schedule();
+
 		try {
 			handle.setPointerCapture(event.pointerId);
 		} catch {
@@ -1100,26 +1392,48 @@ export class CustomDashboardView extends ItemView {
 		}
 		this.bindPointerSession(handle, event.pointerId, {
 			onMove: (moveEvent) => {
-				const next = resizeByDelta(
-					startSize.w,
-					startSize.h,
-					moveEvent.clientX - startX,
-					moveEvent.clientY - startY,
-					metrics,
-				);
-				if (next.w === current.w && next.h === current.h) return;
-				current = { w: next.w, h: next.h };
-				card.style.gridColumn = `span ${current.w}`;
-				card.style.gridRow = `span ${current.h}`;
+				pointer.x = moveEvent.clientX;
+				pointer.y = moveEvent.clientY;
+				dirty = true;
+				schedule();
 			},
 			onFinish: (cancelled) => {
+				if (frame !== null) win.cancelAnimationFrame(frame);
+				frame = null;
+				this.removeResizeOverlays();
 				if (cancelled) {
 					this.abortInteraction();
 					return;
 				}
-				void this.commitResize(config.id, current, startSize);
+				if (snapped.w === startSize.w && snapped.h === startSize.h) {
+					this.endInteraction();
+					return;
+				}
+				void this.commitResize(config.id, snapped, startSize);
 			},
 		});
+	}
+
+	private createResizeOverlays(grid: HTMLElement): {
+		ghost: HTMLElement;
+		snap: HTMLElement;
+	} {
+		const doc = grid.ownerDocument;
+		const ghost = doc.createElement("div");
+		ghost.addClass("ioto-card-resize-ghost");
+		const snap = doc.createElement("div");
+		snap.addClass("ioto-card-resize-snap");
+		grid.appendChild(ghost);
+		grid.appendChild(snap);
+		const overlays = { ghost, snap };
+		this.resizeOverlays = overlays;
+		return overlays;
+	}
+
+	private removeResizeOverlays(): void {
+		this.resizeOverlays?.ghost.remove();
+		this.resizeOverlays?.snap.remove();
+		this.resizeOverlays = null;
 	}
 
 	private async commitResize(
@@ -1236,6 +1550,7 @@ export class CustomDashboardView extends ItemView {
 					};
 					delete copy.nameKey;
 					this.store = await this.plugin.dashboardRepository.addQuery(copy);
+					this.queriesVersion += 1;
 					this.render();
 					const created = this.store?.queries.find(
 						(item) => item.id === copy.id,
@@ -1259,6 +1574,7 @@ export class CustomDashboardView extends ItemView {
 							void (async () => {
 								this.store =
 									await this.plugin.dashboardRepository.deleteQuery(query.id);
+								this.queriesVersion += 1;
 								this.render();
 							})();
 						},
@@ -1284,6 +1600,7 @@ export class CustomDashboardView extends ItemView {
 				this.store = exists
 					? await this.plugin.dashboardRepository.updateQuery(query)
 					: await this.plugin.dashboardRepository.addQuery(query);
+				this.queriesVersion += 1;
 				this.render();
 			})();
 		}).open();

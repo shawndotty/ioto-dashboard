@@ -8,6 +8,7 @@ const {
 	moveById,
 	stepSize,
 	resizeByDelta,
+	snapSize,
 	gridMetrics,
 } = await load('../../src/dashboard/layout.ts');
 
@@ -119,11 +120,58 @@ test('gridMetrics keeps a usable step for degenerate input', () => {
 
 	const negativeGap = gridMetrics(600, 12, -5, 72);
 	assert.equal(negativeGap.stepX, negativeGap.columnWidth);
+	assert.equal(negativeGap.gap, 0);
 	assert.ok(negativeGap.stepX > 0);
 
 	const garbage = gridMetrics(Number.NaN, 0, Number.NaN, Number.NaN);
 	assert.ok(garbage.stepX > 0);
 	assert.ok(garbage.stepY > 0);
+});
+
+test('snapSize rounds pixel sizes to whole grid cells', () => {
+	const metrics = gridMetrics(1200, 12, 12, 72); // columnWidth = 89, stepX = 101
+	const cardwidth = (w) => w * metrics.columnWidth + (w - 1) * metrics.gap;
+	const cardHeight = (h) => h * 72 + (h - 1) * metrics.gap;
+
+	// Exactly two columns / two rows.
+	assert.deepEqual(snapSize(cardwidth(2), cardHeight(2), metrics), {
+		w: 2,
+		h: 2,
+	});
+
+	// Crossing half a step snaps up.
+	assert.deepEqual(snapSize(cardwidth(2) + metrics.stepX * 0.6, cardHeight(2) + 42, metrics), {
+		w: 3,
+		h: 3,
+	});
+
+	// Just below half a step stays.
+	assert.deepEqual(snapSize(cardwidth(3) + metrics.stepX * 0.4, cardHeight(3) - 40, metrics), {
+		w: 3,
+		h: 3,
+	});
+});
+
+test('snapSize clamps out-of-range and degenerate input', () => {
+	const metrics = gridMetrics(1200, 12, 12, 72);
+
+	assert.deepEqual(snapSize(-500, -500, metrics), {
+		w: MIN_COMPONENT_W,
+		h: MIN_COMPONENT_H,
+	});
+	assert.deepEqual(snapSize(1e6, 1e6, metrics), {
+		w: MAX_COMPONENT_W,
+		h: MAX_COMPONENT_H,
+	});
+	assert.deepEqual(snapSize(Number.NaN, Number.NaN, metrics), {
+		w: MIN_COMPONENT_W,
+		h: MIN_COMPONENT_H,
+	});
+
+	const broken = { columnWidth: 0, stepX: 0, stepY: 0, gap: Number.NaN };
+	const snapped = snapSize(400, 200, broken);
+	assert.ok(Number.isFinite(snapped.w));
+	assert.ok(Number.isFinite(snapped.h));
 });
 
 test('dropIndex maps the pointer to a reading-order insertion point', () => {
