@@ -178,6 +178,16 @@ export default {
 	DASHBOARD_STORE_DAMAGED:
 		"Dashboard configuration is damaged. The raw data was kept; the panel fell back to an empty dashboard.",
 	DASHBOARD_CONFIG_REMOVE: "Remove component",
+	DASHBOARD_DRAG_HANDLE: "Drag to reorder",
+	DASHBOARD_RESIZE_HANDLE: "Drag to resize",
+	DASHBOARD_MOVE_UP: "Move up",
+	DASHBOARD_MOVE_DOWN: "Move down",
+	DASHBOARD_WIDTH: "Width",
+	DASHBOARD_HEIGHT: "Height",
+	DASHBOARD_DECREASE: "Decrease",
+	DASHBOARD_INCREASE: "Increase",
+	DASHBOARD_RENAME_COMPONENT: "Rename component",
+	DASHBOARD_RENAME_PLACEHOLDER: "Component title",
 
 	// Pages
 	PAGE_TABS_ADD: "Add page",

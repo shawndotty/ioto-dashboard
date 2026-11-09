@@ -151,6 +151,28 @@ export class DashboardRepository {
 		});
 	}
 
+	async moveComponent(
+		pageId: string,
+		componentId: string,
+		toIndex: number,
+	): Promise<DashboardStoreData> {
+		return this.mutate((store) => {
+			const page = store.pages.find((item) => item.id === pageId);
+			if (!page) return;
+			const from = page.components.findIndex(
+				(item) => item.id === componentId,
+			);
+			if (from < 0) return;
+			const to = Math.min(
+				page.components.length - 1,
+				Math.max(0, Math.trunc(toIndex)),
+			);
+			if (to === from) return;
+			const [moved] = page.components.splice(from, 1);
+			if (moved) page.components.splice(to, 0, moved);
+		});
+	}
+
 	async removeComponent(
 		pageId: string,
 		componentId: string,

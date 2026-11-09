@@ -10,8 +10,23 @@ import type IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { createComponentRegistry } from "../dashboard/components";
 import { DataHub } from "../dashboard/data-hub";
-import { clampSize, type ComponentDefinition, type ComponentStatus } from "../dashboard/registry";
 import {
+	dropIndex,
+	gridMetrics,
+	resizeByDelta,
+	stepSize,
+	type CardRect,
+	type GridMetrics,
+} from "../dashboard/layout";
+import {
+	clampSize,
+	MAX_COMPONENT_H,
+	MAX_COMPONENT_W,
+	MIN_COMPONENT_H,
+	MIN_COMPONENT_W,
+	type ComponentDefinition,
+	type ComponentStatus,
+} from "../dashboard/registry";import {
 	type DashboardComponentConfig,
 	type DashboardPage,
 	type DashboardStoreData,
@@ -32,6 +47,11 @@ export class CustomDashboardView extends ItemView {
 	private editMode = false;
 	private damaged = false;
 	private unsubscribers: Array<() => void> = [];
+	private interacting = false;
+	private renderDeferred = false;
+	private isNarrow = false;
+	private resizeObserver: ResizeObserver | null = null;
+	private pendingFocus: { componentId: string; action: string } | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -73,7 +93,7 @@ export class CustomDashboardView extends ItemView {
 			getCustomFilters: () => this.plugin.settings.customFilters,
 			snapshotStore: this.plugin.snapshotStore,
 		});
-		this.unsubscribers.push(this.hub.subscribe(() => this.render()));
+		this.unsubscribers.push(this.hub.subscribe(() => this.requestRender()));
 		this.unsubscribers.push(
 			this.plugin.index.subscribe(() => this.hub?.scheduleRefresh()),
 		);
@@ -83,6 +103,7 @@ export class CustomDashboardView extends ItemView {
 		this.registerDomEvent(document, "visibilitychange", () =>
 			this.updateVisibility(),
 		);
+		this.observeContainerWidth();
 		this.render();
 		this.updateVisibility();
 	}
@@ -90,6 +111,8 @@ export class CustomDashboardView extends ItemView {
 	async onClose(): Promise<void> {
 		for (const unsubscribe of this.unsubscribers) unsubscribe();
 		this.unsubscribers = [];
+		this.resizeObserver?.disconnect();
+		this.resizeObserver = null;
 		this.hub?.destroy();
 		this.hub = null;
 	}
@@ -151,6 +174,7 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private render(): void {
+		const scrollTop = this.contentEl.scrollTop;
 		this.contentEl.empty();
 		this.contentEl.addClass("ioto-custom-dashboard-view");
 
@@ -190,15 +214,17 @@ export class CustomDashboardView extends ItemView {
 		if (!this.activePage || this.activePage.components.length === 0) {
 			this.renderEmptyState();
 			this.publishRequests();
-			return;
+		} else {
+			const grid = this.contentEl.createDiv({ cls: "ioto-dashboard-grid" });
+			const queries = this.queryRepository();
+			for (const config of this.activePage.components) {
+				this.renderComponent(grid, config, queries);
+			}
+			this.publishRequests();
 		}
 
-		const grid = this.contentEl.createDiv({ cls: "ioto-dashboard-grid" });
-		const queries = this.queryRepository();
-		for (const config of this.activePage.components) {
-			this.renderComponent(grid, config, queries);
-		}
-		this.publishRequests();
+		this.contentEl.scrollTop = scrollTop;
+		this.restoreFocus();
 	}
 
 	private renderPagesBar(): void {
@@ -345,11 +371,15 @@ export class CustomDashboardView extends ItemView {
 		const query = queries.get(config.queryId);
 		const result = this.hub?.getResults().get(this.metricKeyOf(config));
 		const card = grid.createDiv({ cls: "ioto-dashboard-card" });
+		card.setAttr("data-component-id", config.id);
 		const size = clampSize(config.w, config.h);
 		card.style.gridColumn = `span ${size.w}`;
 		card.style.gridRow = `span ${size.h}`;
 
 		const header = card.createDiv({ cls: "ioto-dashboard-card-header" });
+		if (this.editMode) {
+			this.renderDragHandle(header, grid, card, config);
+		}
 		header.createDiv({
 			cls: "ioto-dashboard-card-title",
 			text:
@@ -359,10 +389,21 @@ export class CustomDashboardView extends ItemView {
 					: config.type),
 		});
 		if (this.editMode) {
-			this.renderCardControls(header, config, queries);
+			this.renderRenameButton(header, config);
+			this.renderRemoveButton(header, config);
+		}
+
+		if (this.editMode) {
+			const toolbar = card.createDiv({
+				cls: "ioto-dashboard-card-toolbar",
+			});
+			this.renderCardToolbar(toolbar, config, queries);
 		}
 
 		const body = card.createDiv({ cls: "ioto-dashboard-card-body" });
+		if (this.editMode) {
+			this.renderResizeHandle(card, grid, config);
+		}
 		if (!definition) {
 			this.registry.placeholder(body, config.type);
 			return;
@@ -406,12 +447,75 @@ export class CustomDashboardView extends ItemView {
 		return { status: "ready" };
 	}
 
-	private renderCardControls(
+	private renderDragHandle(
 		header: HTMLElement,
+		grid: HTMLElement,
+		card: HTMLElement,
+		config: DashboardComponentConfig,
+	): void {
+		const handle = header.createEl("button", {
+			cls: "clickable-icon ioto-card-drag-handle",
+			attr: {
+				type: "button",
+				"aria-label": t("DASHBOARD_DRAG_HANDLE"),
+				title: t("DASHBOARD_DRAG_HANDLE"),
+				"data-action": "drag",
+			},
+			text: "⋮⋮",
+		});
+		handle.addEventListener("pointerdown", (event) =>
+			this.armDragSort(grid, card, config.id, event),
+		);
+	}
+
+	private renderRenameButton(
+		header: HTMLElement,
+		config: DashboardComponentConfig,
+	): void {
+		const rename = header.createEl("button", {
+			cls: "clickable-icon ioto-card-rename",
+			attr: {
+				type: "button",
+				"aria-label": t("DASHBOARD_RENAME_COMPONENT"),
+				title: t("DASHBOARD_RENAME_COMPONENT"),
+				"data-action": "rename",
+			},
+			text: "✎",
+		});
+		rename.onClickEvent(() => this.openRenameComponent(config));
+	}
+
+	private renderRemoveButton(
+		header: HTMLElement,
+		config: DashboardComponentConfig,
+	): void {
+		const remove = header.createEl("button", {
+			cls: "clickable-icon",
+			attr: {
+				type: "button",
+				"aria-label": t("DASHBOARD_CONFIG_REMOVE"),
+				title: t("DASHBOARD_CONFIG_REMOVE"),
+				"data-action": "remove",
+			},
+			text: "×",
+		});
+		remove.onClickEvent(async () => {
+			const pageId = this.activePage?.id;
+			if (!pageId) return;
+			this.store = await this.plugin.dashboardRepository.removeComponent(
+				pageId,
+				config.id,
+			);
+			this.render();
+		});
+	}
+
+	private renderCardToolbar(
+		toolbar: HTMLElement,
 		config: DashboardComponentConfig,
 		queries: QueryRepository,
 	): void {
-		const select = header.createEl("select", {
+		const select = toolbar.createEl("select", {
 			cls: "dropdown ioto-card-query",
 		});
 		for (const query of queries.list()) {
@@ -428,7 +532,9 @@ export class CustomDashboardView extends ItemView {
 			void this.updateComponent(config.id, { queryId: target.value });
 		});
 
-		const basis = header.createEl("select", { cls: "dropdown ioto-card-basis" });
+		const basis = toolbar.createEl("select", {
+			cls: "dropdown ioto-card-basis",
+		});
 		for (const value of ["file", "section"]) {
 			const option = basis.createEl("option", {
 				text: t(value === "file" ? "KPI_BASIS_FILE" : "KPI_BASIS_SECTION"),
@@ -443,22 +549,212 @@ export class CustomDashboardView extends ItemView {
 			});
 		});
 
-		const remove = header.createEl("button", {
-			cls: "clickable-icon",
-			attr: {
-				"aria-label": t("DASHBOARD_CONFIG_REMOVE"),
-				title: t("DASHBOARD_CONFIG_REMOVE"),
-			},
-			text: "×",
+		this.renderSizeControls(toolbar, config);
+		this.renderOrderControls(toolbar, config);
+	}
+
+	private renderSizeControls(
+		toolbar: HTMLElement,
+		config: DashboardComponentConfig,
+	): void {
+		const size = clampSize(config.w, config.h);
+		const group = toolbar.createDiv({ cls: "ioto-card-size-controls" });
+
+		group.createSpan({
+			cls: "ioto-card-control-label",
+			text: t("DASHBOARD_WIDTH"),
 		});
-		remove.onClickEvent(async () => {
-			const pageId = this.activePage?.id;
-			if (!pageId) return;
-			this.store = await this.plugin.dashboardRepository.removeComponent(
-				pageId,
-				config.id,
-			);
-			this.render();
+		this.renderStepButton(
+			group,
+			"width-dec",
+			"−",
+			`${t("DASHBOARD_DECREASE")} ${t("DASHBOARD_WIDTH")} ${size.w}`,
+			size.w <= MIN_COMPONENT_W,
+			config.id,
+			() => void this.stepComponentSize(config.id, "w", -1),
+		);
+		group.createSpan({
+			cls: "ioto-card-control-value",
+			text: String(size.w),
+		});
+		this.renderStepButton(
+			group,
+			"width-inc",
+			"+",
+			`${t("DASHBOARD_INCREASE")} ${t("DASHBOARD_WIDTH")} ${size.w}`,
+			size.w >= MAX_COMPONENT_W,
+			config.id,
+			() => void this.stepComponentSize(config.id, "w", 1),
+		);
+
+		group.createSpan({
+			cls: "ioto-card-control-label",
+			text: t("DASHBOARD_HEIGHT"),
+		});
+		this.renderStepButton(
+			group,
+			"height-dec",
+			"−",
+			`${t("DASHBOARD_DECREASE")} ${t("DASHBOARD_HEIGHT")} ${size.h}`,
+			size.h <= MIN_COMPONENT_H,
+			config.id,
+			() => void this.stepComponentSize(config.id, "h", -1),
+		);
+		group.createSpan({
+			cls: "ioto-card-control-value",
+			text: String(size.h),
+		});
+		this.renderStepButton(
+			group,
+			"height-inc",
+			"+",
+			`${t("DASHBOARD_INCREASE")} ${t("DASHBOARD_HEIGHT")} ${size.h}`,
+			size.h >= MAX_COMPONENT_H,
+			config.id,
+			() => void this.stepComponentSize(config.id, "h", 1),
+		);
+	}
+
+	private renderOrderControls(
+		toolbar: HTMLElement,
+		config: DashboardComponentConfig,
+	): void {
+		const page = this.activePage;
+		const index =
+			page?.components.findIndex((item) => item.id === config.id) ?? -1;
+		const last = (page?.components.length ?? 0) - 1;
+		const group = toolbar.createDiv({ cls: "ioto-card-order-controls" });
+		this.renderStepButton(
+			group,
+			"move-up",
+			"↑",
+			t("DASHBOARD_MOVE_UP"),
+			index <= 0,
+			config.id,
+			() => void this.nudgeComponent(config.id, -1),
+		);
+		this.renderStepButton(
+			group,
+			"move-down",
+			"↓",
+			t("DASHBOARD_MOVE_DOWN"),
+			index < 0 || index >= last,
+			config.id,
+			() => void this.nudgeComponent(config.id, 1),
+		);
+	}
+
+	private renderStepButton(
+		container: HTMLElement,
+		action: string,
+		label: string,
+		ariaLabel: string,
+		disabled: boolean,
+		componentId: string,
+		onStep: () => void,
+	): void {
+		const button = container.createEl("button", {
+			cls: "clickable-icon ioto-card-step",
+			attr: {
+				type: "button",
+				"aria-label": ariaLabel,
+				title: ariaLabel,
+				"data-action": action,
+			},
+			text: label,
+		});
+		button.disabled = disabled;
+		button.onClickEvent(() => {
+			this.pendingFocus = { componentId, action };
+			onStep();
+		});
+	}
+
+	private async stepComponentSize(
+		componentId: string,
+		axis: "w" | "h",
+		direction: -1 | 1,
+	): Promise<void> {
+		const page = this.activePage;
+		const config = page?.components.find((item) => item.id === componentId);
+		if (!page || !config) return;
+		const current = clampSize(config.w, config.h);
+		const next = stepSize(config.w, config.h, axis, direction);
+		if (next.w === current.w && next.h === current.h) return;
+		this.pendingFocus = {
+			componentId,
+			action: `${axis === "w" ? "width" : "height"}-${direction < 0 ? "dec" : "inc"}`,
+		};
+		this.store = await this.plugin.dashboardRepository.updateComponent(
+			page.id,
+			componentId,
+			next,
+		);
+		this.render();
+	}
+
+	private async nudgeComponent(
+		componentId: string,
+		offset: -1 | 1,
+	): Promise<void> {
+		const page = this.activePage;
+		if (!page) return;
+		const from = page.components.findIndex((item) => item.id === componentId);
+		const to = from + offset;
+		if (from < 0 || to < 0 || to >= page.components.length) return;
+		this.pendingFocus = {
+			componentId,
+			action: offset < 0 ? "move-up" : "move-down",
+		};
+		this.store = await this.plugin.dashboardRepository.moveComponent(
+			page.id,
+			componentId,
+			to,
+		);
+		this.render();
+	}
+
+	private openRenameComponent(config: DashboardComponentConfig): void {
+		new PageNameModal(
+			this.app,
+			config.title ?? "",
+			(name) => {
+				void (async () => {
+					const pageId = this.activePage?.id;
+					if (!pageId) return;
+					this.pendingFocus = {
+						componentId: config.id,
+						action: "rename",
+					};
+					this.store =
+						await this.plugin.dashboardRepository.updateComponent(
+							pageId,
+							config.id,
+							{ title: name || undefined },
+						);
+					this.render();
+				})();
+			},
+			{
+				titleKey: "DASHBOARD_RENAME_COMPONENT",
+				placeholderKey: "DASHBOARD_RENAME_PLACEHOLDER",
+				allowEmpty: true,
+			},
+		).open();
+	}
+
+	private renderResizeHandle(
+		card: HTMLElement,
+		grid: HTMLElement,
+		config: DashboardComponentConfig,
+	): void {
+		const handle = card.createDiv({ cls: "ioto-card-resize-handle" });
+		handle.setAttr("role", "button");
+		handle.setAttr("aria-label", t("DASHBOARD_RESIZE_HANDLE"));
+		handle.setAttr("title", t("DASHBOARD_RESIZE_HANDLE"));
+		handle.addEventListener("pointerdown", (event) => {
+			if (this.isNarrow) return;
+			this.startResize(grid, card, config, event);
 		});
 	}
 
@@ -474,6 +770,378 @@ export class CustomDashboardView extends ItemView {
 			patch,
 		);
 		this.render();
+	}
+
+	private requestRender(): void {
+		if (this.interacting) {
+			this.renderDeferred = true;
+			return;
+		}
+		this.render();
+	}
+
+	private beginInteraction(): void {
+		this.interacting = true;
+	}
+
+	/** Flushes a deferred render; returns `true` when one happened. */
+	private endInteraction(): boolean {
+		this.interacting = false;
+		if (!this.renderDeferred) return false;
+		this.renderDeferred = false;
+		this.render();
+		return true;
+	}
+
+	/** Drops the preview and redraws from the untouched store. */
+	private abortInteraction(): void {
+		this.interacting = false;
+		this.renderDeferred = false;
+		this.render();
+	}
+
+	private restoreFocus(): void {
+		const target = this.pendingFocus;
+		if (!target) return;
+		this.pendingFocus = null;
+		const card = this.contentEl.querySelector(
+			`.ioto-dashboard-card[data-component-id="${target.componentId}"]`,
+		);
+		const button = card?.querySelector<HTMLElement>(
+			`[data-action="${target.action}"]`,
+		);
+		if (button && !button.hasAttribute("disabled")) button.focus();
+	}
+
+	private observeContainerWidth(): void {
+		if (typeof ResizeObserver === "undefined") return;
+		this.resizeObserver = new ResizeObserver((entries) => {
+			const width =
+				entries[0]?.contentRect.width ?? this.contentEl.clientWidth;
+			this.setNarrow(width < 700);
+		});
+		this.resizeObserver.observe(this.contentEl);
+	}
+
+	private setNarrow(narrow: boolean): void {
+		if (this.isNarrow === narrow) return;
+		this.isNarrow = narrow;
+		this.contentEl.toggleClass("is-narrow", narrow);
+	}
+
+	private armDragSort(
+		grid: HTMLElement,
+		card: HTMLElement,
+		componentId: string,
+		event: PointerEvent,
+	): void {
+		if (event.button !== 0) return;
+		const handle = event.currentTarget as HTMLElement | null;
+		if (!handle) return;
+		const doc = card.ownerDocument;
+		const win = doc.defaultView ?? window;
+		const startX = event.clientX;
+		const startY = event.clientY;
+		const touch = event.pointerType === "touch";
+		let armed = true;
+		let timer: number | null = null;
+
+		const cleanup = (): void => {
+			armed = false;
+			if (timer !== null) win.clearTimeout(timer);
+			timer = null;
+			doc.removeEventListener("pointermove", onMove);
+			doc.removeEventListener("pointerup", onUp);
+			doc.removeEventListener("pointercancel", onUp);
+		};
+
+		const activate = (): void => {
+			if (!armed) return;
+			cleanup();
+			this.startDragSession(grid, card, componentId, handle, event, win);
+		};
+
+		const onMove = (moveEvent: PointerEvent): void => {
+			if (moveEvent.pointerId !== event.pointerId) return;
+			const distance = Math.hypot(
+				moveEvent.clientX - startX,
+				moveEvent.clientY - startY,
+			);
+			if (touch) {
+				// Any scroll intent cancels the long-press before it activates.
+				if (distance > 8) cleanup();
+				return;
+			}
+			if (distance > 6) activate();
+		};
+
+		const onUp = (upEvent: PointerEvent): void => {
+			if (upEvent.pointerId === event.pointerId) cleanup();
+		};
+
+		doc.addEventListener("pointermove", onMove);
+		doc.addEventListener("pointerup", onUp);
+		doc.addEventListener("pointercancel", onUp);
+
+		if (touch) {
+			timer = win.setTimeout(activate, 350);
+		}
+	}
+
+	private startDragSession(
+		grid: HTMLElement,
+		card: HTMLElement,
+		componentId: string,
+		handle: HTMLElement,
+		startEvent: PointerEvent,
+		win: Window,
+	): void {
+		startEvent.preventDefault();
+		this.beginInteraction();
+		this.contentEl.addClass("is-dragging");
+		card.addClass("is-dragging");
+		try {
+			handle.setPointerCapture(startEvent.pointerId);
+		} catch {
+			// Capture is best-effort; document listeners still receive moves.
+		}
+
+		const pointer = { x: startEvent.clientX, y: startEvent.clientY };
+		let frame: number | null = null;
+		const tick = (): void => {
+			this.autoScroll(pointer.y);
+			frame = win.requestAnimationFrame(tick);
+		};
+		frame = win.requestAnimationFrame(tick);
+
+		this.bindPointerSession(handle, startEvent.pointerId, {
+			onMove: (moveEvent) => {
+				pointer.x = moveEvent.clientX;
+				pointer.y = moveEvent.clientY;
+				this.reorderPreview(
+					grid,
+					card,
+					componentId,
+					moveEvent.clientX,
+					moveEvent.clientY,
+				);
+			},
+			onFinish: (cancelled) => {
+				if (frame !== null) win.cancelAnimationFrame(frame);
+				frame = null;
+				this.contentEl.removeClass("is-dragging");
+				card.removeClass("is-dragging");
+				if (cancelled) {
+					this.abortInteraction();
+					return;
+				}
+				void this.commitDragOrder(grid, componentId);
+			},
+		});
+	}
+
+	private bindPointerSession(
+		handle: HTMLElement,
+		pointerId: number,
+		handlers: {
+			onMove(event: PointerEvent): void;
+			onFinish(cancelled: boolean): void;
+		},
+	): void {
+		const doc = handle.ownerDocument;
+		const cleanup = (): void => {
+			doc.removeEventListener("pointermove", onMove);
+			doc.removeEventListener("pointerup", onUp);
+			doc.removeEventListener("pointercancel", onCancel);
+			doc.removeEventListener("keydown", onKey);
+			try {
+				handle.releasePointerCapture(pointerId);
+			} catch {
+				// Already released by the browser.
+			}
+		};
+		const onMove = (event: PointerEvent): void => {
+			if (event.pointerId === pointerId) handlers.onMove(event);
+		};
+		const onUp = (event: PointerEvent): void => {
+			if (event.pointerId !== pointerId) return;
+			cleanup();
+			handlers.onFinish(false);
+		};
+		const onCancel = (event: PointerEvent): void => {
+			if (event.pointerId !== pointerId) return;
+			cleanup();
+			handlers.onFinish(true);
+		};
+		const onKey = (event: KeyboardEvent): void => {
+			if (event.key !== "Escape") return;
+			event.preventDefault();
+			cleanup();
+			handlers.onFinish(true);
+		};
+		doc.addEventListener("pointermove", onMove);
+		doc.addEventListener("pointerup", onUp);
+		doc.addEventListener("pointercancel", onCancel);
+		doc.addEventListener("keydown", onKey);
+	}
+
+	private reorderPreview(
+		grid: HTMLElement,
+		card: HTMLElement,
+		componentId: string,
+		x: number,
+		y: number,
+	): void {
+		const cards: HTMLElement[] = [];
+		for (const child of Array.from(grid.children)) {
+			if (child.classList.contains("ioto-dashboard-card")) {
+				cards.push(child as HTMLElement);
+			}
+		}
+		const rects: CardRect[] = cards.map((element) => {
+			const rect = element.getBoundingClientRect();
+			return {
+				id: element.dataset.componentId ?? "",
+				top: rect.top,
+				left: rect.left,
+				width: rect.width,
+				height: rect.height,
+			};
+		});
+		const others = cards.filter((element) => element !== card);
+		const reference = others[dropIndex(rects, x, y, componentId)] ?? null;
+		if (card.nextElementSibling !== reference) {
+			grid.insertBefore(card, reference);
+		}
+	}
+
+	private autoScroll(pointerY: number): void {
+		const scroller = this.contentEl;
+		if (scroller.scrollHeight <= scroller.clientHeight + 1) return;
+		const rect = scroller.getBoundingClientRect();
+		const edge = 40;
+		if (pointerY < rect.top + edge) {
+			scroller.scrollTop -= Math.ceil((rect.top + edge - pointerY) / 2);
+		} else if (pointerY > rect.bottom - edge) {
+			scroller.scrollTop += Math.ceil((pointerY - (rect.bottom - edge)) / 2);
+		}
+	}
+
+	private async commitDragOrder(
+		grid: HTMLElement,
+		componentId: string,
+	): Promise<void> {
+		const page = this.activePage;
+		const pageId = page?.id;
+		if (!page || !pageId) {
+			this.abortInteraction();
+			return;
+		}
+		const order: string[] = [];
+		for (const child of Array.from(grid.children)) {
+			const id = (child as HTMLElement).dataset?.componentId;
+			if (id) order.push(id);
+		}
+		const toIndex = order.indexOf(componentId);
+		const fromIndex = page.components.findIndex(
+			(item) => item.id === componentId,
+		);
+		const changed =
+			toIndex >= 0 && fromIndex >= 0 && toIndex !== fromIndex;
+		if (changed) {
+			this.store = await this.plugin.dashboardRepository.moveComponent(
+				pageId,
+				componentId,
+				toIndex,
+			);
+		}
+		const rendered = this.endInteraction();
+		if (changed && !rendered) this.render();
+	}
+
+	private readGridMetrics(grid: HTMLElement): GridMetrics {
+		let gap = 12;
+		let rowHeight = 72;
+		const style = grid.ownerDocument.defaultView?.getComputedStyle(grid);
+		if (style) {
+			const parsedGap = Number.parseFloat(
+				style.getPropertyValue("column-gap"),
+			);
+			if (Number.isFinite(parsedGap)) gap = parsedGap;
+			const parsedRow = Number.parseFloat(
+				style.getPropertyValue("grid-auto-rows"),
+			);
+			if (Number.isFinite(parsedRow) && parsedRow > 0) rowHeight = parsedRow;
+		}
+		return gridMetrics(grid.clientWidth, 12, gap, rowHeight);
+	}
+
+	private startResize(
+		grid: HTMLElement,
+		card: HTMLElement,
+		config: DashboardComponentConfig,
+		event: PointerEvent,
+	): void {
+		if (event.button !== 0) return;
+		const handle = event.currentTarget as HTMLElement | null;
+		if (!handle) return;
+		event.preventDefault();
+		event.stopPropagation();
+		this.beginInteraction();
+		const startX = event.clientX;
+		const startY = event.clientY;
+		const metrics = this.readGridMetrics(grid);
+		const startSize = clampSize(config.w, config.h);
+		let current = { ...startSize };
+		try {
+			handle.setPointerCapture(event.pointerId);
+		} catch {
+			// Capture is best-effort; document listeners still receive moves.
+		}
+		this.bindPointerSession(handle, event.pointerId, {
+			onMove: (moveEvent) => {
+				const next = resizeByDelta(
+					startSize.w,
+					startSize.h,
+					moveEvent.clientX - startX,
+					moveEvent.clientY - startY,
+					metrics,
+				);
+				if (next.w === current.w && next.h === current.h) return;
+				current = { w: next.w, h: next.h };
+				card.style.gridColumn = `span ${current.w}`;
+				card.style.gridRow = `span ${current.h}`;
+			},
+			onFinish: (cancelled) => {
+				if (cancelled) {
+					this.abortInteraction();
+					return;
+				}
+				void this.commitResize(config.id, current, startSize);
+			},
+		});
+	}
+
+	private async commitResize(
+		componentId: string,
+		size: { w: number; h: number },
+		start: { w: number; h: number },
+	): Promise<void> {
+		const pageId = this.activePage?.id;
+		if (!pageId) {
+			this.abortInteraction();
+			return;
+		}
+		const changed = size.w !== start.w || size.h !== start.h;
+		if (changed) {
+			this.store = await this.plugin.dashboardRepository.updateComponent(
+				pageId,
+				componentId,
+				{ w: size.w, h: size.h },
+			);
+		}
+		const rendered = this.endInteraction();
+		if (changed && !rendered) this.render();
 	}
 
 	private publishRequests(): void {

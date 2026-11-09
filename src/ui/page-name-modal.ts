@@ -1,11 +1,21 @@
 import { App, ButtonComponent, Modal, TextComponent } from "obsidian";
 import { t } from "../lang/helpers";
 
+export interface PageNameModalConfig {
+	/** Locale key for the modal title. Defaults to the page rename title. */
+	titleKey?: string;
+	/** Locale key for the input placeholder. Defaults to the page name one. */
+	placeholderKey?: string;
+	/** When `true`, an empty value is submitted instead of being rejected. */
+	allowEmpty?: boolean;
+}
+
 export class PageNameModal extends Modal {
 	constructor(
 		app: App,
 		private initial: string,
 		private onSubmit: (name: string) => void,
+		private config: PageNameModalConfig = {},
 	) {
 		super(app);
 	}
@@ -14,10 +24,20 @@ export class PageNameModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass("ioto-page-name-modal");
-		contentEl.createEl("h2", { text: t("PAGE_RENAME") });
+		contentEl.createEl("h2", {
+			text: t(
+				(this.config.titleKey ??
+					"PAGE_RENAME") as Parameters<typeof t>[0],
+			),
+		});
 
 		const input = new TextComponent(contentEl)
-			.setPlaceholder(t("PAGE_NAME_PLACEHOLDER"))
+			.setPlaceholder(
+				t(
+					(this.config.placeholderKey ??
+						"PAGE_NAME_PLACEHOLDER") as Parameters<typeof t>[0],
+				),
+			)
 			.setValue(this.initial);
 		input.inputEl.addClass("ioto-page-name-input");
 		input.inputEl.focus();
@@ -25,7 +45,7 @@ export class PageNameModal extends Modal {
 
 		const submit = (): void => {
 			const name = input.getValue().trim();
-			if (!name) {
+			if (!name && !this.config.allowEmpty) {
 				input.inputEl.focus();
 				return;
 			}

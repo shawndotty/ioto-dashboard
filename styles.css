@@ -468,6 +468,7 @@
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -865,4 +866,108 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     .ioto-dashboard-modal.is-fullscreen:not(.is-frame-buttons-hidden)
     .modal-title {
     padding-inline-start: var(--frame-left-space);
+}
+
+/* ==========================================================================
+   Custom Dashboard layout editing (drag / resize)
+   ========================================================================== */
+
+.ioto-custom-dashboard-view .ioto-dashboard-card-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ioto-custom-dashboard-view .ioto-card-drag-handle {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    color: var(--text-faint);
+    font-size: 0.9em;
+    letter-spacing: -2px;
+}
+
+.ioto-custom-dashboard-view .ioto-card-drag-handle:active {
+    cursor: grabbing;
+}
+
+.ioto-custom-dashboard-view .ioto-card-size-controls,
+.ioto-custom-dashboard-view .ioto-card-order-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.ioto-custom-dashboard-view .ioto-card-control-label {
+    margin-inline-start: 6px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-custom-dashboard-view .ioto-card-control-value {
+    min-width: 1.2em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-custom-dashboard-view .ioto-card-step {
+    padding: 0 4px;
+}
+
+.ioto-custom-dashboard-view .ioto-card-step:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.ioto-custom-dashboard-view .ioto-card-resize-handle {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 14px;
+    height: 14px;
+    cursor: nwse-resize;
+    touch-action: none;
+    opacity: 0.45;
+}
+
+.ioto-custom-dashboard-view .ioto-card-resize-handle::before,
+.ioto-custom-dashboard-view .ioto-card-resize-handle::after {
+    content: "";
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    width: 8px;
+    height: 1px;
+    background: var(--text-faint);
+    transform: rotate(-45deg);
+    transform-origin: right bottom;
+}
+
+.ioto-custom-dashboard-view .ioto-card-resize-handle::after {
+    right: 3px;
+    bottom: 6px;
+    width: 4px;
+}
+
+.ioto-custom-dashboard-view .ioto-card-resize-handle:hover {
+    opacity: 1;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-card.is-dragging {
+    opacity: 0.65;
+    box-shadow: var(--shadow-s);
+    outline: 1px dashed var(--interactive-accent);
+}
+
+.ioto-custom-dashboard-view.is-dragging {
+    user-select: none;
+}
+
+.ioto-custom-dashboard-view.is-narrow .ioto-card-drag-handle,
+.ioto-custom-dashboard-view.is-narrow .ioto-card-resize-handle {
+    display: none;
 }

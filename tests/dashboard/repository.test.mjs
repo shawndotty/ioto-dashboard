@@ -435,3 +435,84 @@ test('importing v2 JSON upgrades it to the v3 shape', async () => {
 	assert.equal(imported.activePageId, 'dashboard:default');
 	assert.deepEqual(imported.queries, [query()]);
 });
+
+test('moveComponent reorders within a page and clamps the target index', async () => {
+	const host = makeHost({
+		dashboardStore: {
+			schemaVersion: 3,
+			pages: [
+				{
+					id: DEFAULT_PAGE_ID,
+					name: 'Page 1',
+					components: ['a', 'b', 'c'].map((id) =>
+						component({ id: `component:${id}` }),
+					),
+				},
+			],
+			activePageId: DEFAULT_PAGE_ID,
+			queries: [],
+		},
+	});
+	const repository = new DashboardRepository(host);
+
+	const ids = async () =>
+		(await repository.load()).store.pages[0].components.map((item) => item.id);
+
+	await repository.moveComponent(DEFAULT_PAGE_ID, 'component:a', 2);
+	assert.deepEqual(await ids(), [
+		'component:b',
+		'component:c',
+		'component:a',
+	]);
+
+	await repository.moveComponent(DEFAULT_PAGE_ID, 'component:a', 0);
+	assert.deepEqual(await ids(), [
+		'component:a',
+		'component:b',
+		'component:c',
+	]);
+
+	await repository.moveComponent(DEFAULT_PAGE_ID, 'component:a', 99);
+	assert.deepEqual(await ids(), [
+		'component:b',
+		'component:c',
+		'component:a',
+	]);
+
+	await repository.moveComponent(DEFAULT_PAGE_ID, 'component:b', -5);
+	assert.deepEqual(await ids(), [
+		'component:b',
+		'component:c',
+		'component:a',
+	]);
+});
+
+test('moveComponent keeps the store intact for unknown ids but still writes once', async () => {
+	const host = makeHost({
+		dashboardStore: {
+			schemaVersion: 3,
+			pages: [
+				{
+					id: DEFAULT_PAGE_ID,
+					name: 'Page 1',
+					components: [component({ id: 'component:a' })],
+				},
+			],
+			activePageId: DEFAULT_PAGE_ID,
+			queries: [],
+		},
+	});
+	const repository = new DashboardRepository(host);
+	const writesBefore = host.writes;
+
+	await repository.moveComponent(DEFAULT_PAGE_ID, 'component:missing', 0);
+	await repository.moveComponent('page:missing', 'component:a', 0);
+
+	const { store } = await repository.load();
+	assert.deepEqual(
+		store.pages[0].components.map((item) => item.id),
+		['component:a'],
+	);
+	assert.equal(host.writes, writesBefore + 2);
+});
+
