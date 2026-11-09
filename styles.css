@@ -371,6 +371,24 @@
     background: var(--background-modifier-hover);
 }
 
+.ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon.mod-cta {
+    background: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    font-weight: 600;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon.mod-cta:hover {
+    background: var(--interactive-accent-hover, var(--interactive-accent));
+    border-color: var(--interactive-accent-hover, var(--interactive-accent));
+    color: var(--text-on-accent);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon.mod-cta:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 2px;
+}
+
 .ioto-custom-dashboard-view .ioto-button-label {
     font-size: 0.9em;
 }

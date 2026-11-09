@@ -355,17 +355,18 @@ export class CustomDashboardView extends ItemView {
 			text: dashboard?.name ?? t("CUSTOM_DASHBOARD_TITLE"),
 		});
 		const actions = toolbar.createDiv({ cls: "ioto-dashboard-actions" });
-		this.addToolbarButton(actions, "edit", t("DASHBOARD_MANAGE_QUERIES"), () =>
-			this.openQueryManager(),
-		);
 		if (this.editMode) {
 			this.addToolbarButton(
 				actions,
 				"plus",
 				t("DASHBOARD_ADD_COMPONENT"),
 				() => this.openComponentPicker(),
+				"mod-cta",
 			);
 		}
+		this.addToolbarButton(actions, "edit", t("DASHBOARD_MANAGE_QUERIES"), () =>
+			this.openQueryManager(),
+		);
 		this.addToolbarButton(
 			actions,
 			"settings-2",
@@ -718,9 +719,10 @@ export class CustomDashboardView extends ItemView {
 		icon: string,
 		label: string,
 		onClick: () => void,
+		extraClass?: string,
 	): void {
 		const button = container.createEl("button", {
-			cls: "clickable-icon",
+			cls: extraClass ? `clickable-icon ${extraClass}` : "clickable-icon",
 			attr: { "aria-label": label, title: label },
 		});
 		button.createSpan({ cls: "ioto-button-label", text: label });
