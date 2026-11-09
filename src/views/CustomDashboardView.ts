@@ -232,7 +232,12 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private get activePage(): DashboardPage | undefined {
-		return activePageOf(this.activeDashboard);
+		const dashboard = this.activeDashboard;
+		if (!dashboard) return undefined;
+		const leafPage = this.leafPageId
+			? dashboard.pages.find((page) => page.id === this.leafPageId)
+			: undefined;
+		return leafPage ?? activePageOf(dashboard);
 	}
 
 	/**
@@ -584,10 +589,13 @@ export class CustomDashboardView extends ItemView {
 		this.leafPageId = pageId;
 		this.render();
 		this.app.workspace.requestSaveLayout();
-		void this.plugin.dashboardRepository.setLastPage(
-			dashboard.id,
-			pageId,
-		);
+		void this.plugin.dashboardRepository
+			.setLastPage(dashboard.id, pageId)
+			.then((store) => {
+				// Do not advance storeSignature here: the broadcast may carry
+				// changes this leaf has not rendered yet.
+				this.store = store;
+			});
 	}
 
 	private async createPage(): Promise<void> {
