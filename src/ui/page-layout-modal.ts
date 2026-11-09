@@ -1,4 +1,4 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, ButtonComponent, Modal, Setting } from "obsidian";
 import { t } from "../lang/helpers";
 import { applyModalShell } from "./modal-shell";
 
@@ -52,21 +52,19 @@ export class PageLayoutModal extends Modal {
 			);
 
 		const footer = this.contentEl.createDiv({ cls: "ioto-modal-footer" });
-		new Setting(footer)
-			.addButton((button) =>
-				button
-					.setButtonText(t("BTN_CANCEL"))
-					.onClick(() => this.close()),
-			)
-			.addButton((button) =>
-				button
-					.setButtonText(t("QUERY_SAVE"))
-					.setCta()
-					.onClick(() => {
-						this.onSave(this.columns, this.rowHeight);
-						this.close();
-					}),
-			);
+		const actions = footer.createDiv({
+			cls: "ioto-modal-footer__actions",
+		});
+		new ButtonComponent(actions)
+			.setButtonText(t("BTN_CANCEL"))
+			.onClick(() => this.close());
+		new ButtonComponent(actions)
+			.setButtonText(t("QUERY_SAVE"))
+			.setCta()
+			.onClick(() => {
+				this.onSave(this.columns, this.rowHeight);
+				this.close();
+			});
 	}
 
 	onClose(): void {

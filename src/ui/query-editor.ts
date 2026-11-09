@@ -1,7 +1,20 @@
-import { App, ButtonComponent, Modal, Notice, Setting } from "obsidian";
+import {
+	App,
+	ButtonComponent,
+	Modal,
+	Notice,
+	Setting,
+	TextComponent,
+} from "obsidian";
 import { t } from "../lang/helpers";
 import { createDefaultFilterState } from "../data/saved-query-adapter";
-import type { FilterState } from "../data/types";
+import {
+	DATE_PRESETS,
+	DATE_PRESET_LABEL_KEYS,
+	defaultCustomRange,
+	isDateRangeValid,
+	normalizeDatePreset,
+} from "../data/date-presets";
 import {
 	groupByTarget,
 	querySourceOf,
@@ -338,6 +351,17 @@ export class QueryManagerModal extends Modal {
 /** Query editor for `user:*` definitions; builtins/saved are duplicated first. */
 export class QueryEditModal extends Modal {
 	private draft: QueryDefinition;
+	private targetsEl: HTMLElement | null = null;
+	private dynamicEl: HTMLElement | null = null;
+	private saveButton: ButtonComponent | null = null;
+	private nameInputEl: HTMLInputElement | null = null;
+	private nameHintEl: HTMLElement | null = null;
+	private nameTouched = false;
+	private rangeEl: HTMLElement | null = null;
+	private dateStartInputEl: HTMLInputElement | null = null;
+	private dateEndInputEl: HTMLInputElement | null = null;
+	private rangeErrorEl: HTMLElement | null = null;
+	private foldersInput: TextComponent | null = null;
 
 	constructor(
 		app: App,
@@ -355,6 +379,9 @@ export class QueryEditModal extends Modal {
 					scope: { folders: [], includeSubfolders: true },
 					filters: createDefaultFilterState(),
 				};
+		this.draft.filters.datePreset = normalizeDatePreset(
+			this.draft.filters.datePreset,
+		);
 	}
 
 	onOpen(): void {
@@ -362,54 +389,110 @@ export class QueryEditModal extends Modal {
 		applyModalShell(this, {
 			kind: "query-editor",
 			restore: true,
-			title: t(
-				this.draft.name
-					? "QUERY_EDITOR_TITLE_EDIT"
-					: "QUERY_EDITOR_TITLE_NEW",
-			),
+			title: this.editorTitle(),
 		});
 
 		const body = contentEl.createDiv({ cls: "ioto-modal-body" });
-		let saveButton: ButtonComponent | null = null;
 
 		body.createEl("h3", {
 			cls: "setting-item-heading",
 			text: t("QUERY_SECTION_BASIC"),
 		});
 
-		new Setting(body)
-			.setName(t("QUERY_NAME"))
-			.addText((text) =>
-				text
-					.setValue(this.draft.name)
-					.onChange((value) => {
-						this.draft.name = value;
-						const empty = value.trim().length === 0;
-						saveButton?.setDisabled(empty);
-						nameHint.hidden = !empty;
-					}),
-			);
+		this.targetsEl = body.createDiv({
+			cls: "ioto-query-editor__targets",
+			attr: { role: "group", "aria-label": t("QUERY_TARGET") },
+		});
+		this.renderTargets();
 
-		const nameHint = body.createDiv({
+		new Setting(body).setName(t("QUERY_NAME")).addText((text) => {
+			this.nameInputEl = text.inputEl;
+			text.setValue(this.draft.name).onChange((value) => {
+				this.draft.name = value;
+				this.nameTouched = true;
+				this.updateSaveState();
+			});
+			text.inputEl.addEventListener("blur", () => {
+				this.nameTouched = true;
+				this.updateSaveState();
+			});
+			text.inputEl.addEventListener("keydown", (event) => {
+				if (event.key === "Enter" && !event.isComposing) {
+					event.preventDefault();
+					this.trySave();
+				}
+			});
+		});
+
+		this.nameHintEl = body.createDiv({
 			cls: "ioto-modal-hint",
 			text: t("QUERY_NAME_REQUIRED"),
 		});
-		nameHint.hidden = true;
+		this.nameHintEl.hidden = true;
 
-		new Setting(body)
-			.setName(t("QUERY_TARGET"))
-			.addDropdown((dropdown) => {
-				for (const target of QUERY_TARGETS) {
-					dropdown.addOption(target, targetLabel(target));
-				}
-				return dropdown
-					.setValue(this.draft.target)
-					.onChange((value) => {
-						this.draft.target = value as QueryTarget;
-						this.contentEl.empty();
-						this.onOpen();
-					});
+		this.dynamicEl = body.createDiv({ cls: "ioto-query-editor__dynamic" });
+		this.renderDynamic();
+
+		const footer = contentEl.createDiv({ cls: "ioto-modal-footer" });
+		const actions = footer.createDiv({
+			cls: "ioto-modal-footer__actions",
+		});
+		new ButtonComponent(actions)
+			.setButtonText(t("BTN_CANCEL"))
+			.onClick(() => this.close());
+		this.saveButton = new ButtonComponent(actions)
+			.setButtonText(t("QUERY_SAVE"))
+			.setCta()
+			.onClick(() => this.trySave());
+		this.updateSaveState();
+
+		window.setTimeout(() => this.nameInputEl?.focus(), 0);
+	}
+
+	private editorTitle(): string {
+		const key =
+			this.draft.name.trim().length === 0
+				? "QUERY_EDITOR_TITLE_NEW_TARGET"
+				: "QUERY_EDITOR_TITLE_EDIT_TARGET";
+		return t(key, [targetLabel(this.draft.target)]);
+	}
+
+	private renderTargets(): void {
+		if (!this.targetsEl) return;
+		this.targetsEl.empty();
+		for (const target of QUERY_TARGETS) {
+			const active = target === this.draft.target;
+			const button = this.targetsEl.createEl("button", {
+				cls: "ioto-query-editor__target",
+				text: targetLabel(target),
+				attr: {
+					type: "button",
+					"aria-pressed": active ? "true" : "false",
+				},
 			});
+			button.toggleClass("is-active", active);
+			button.addEventListener("click", () => this.selectTarget(target));
+		}
+	}
+
+	private selectTarget(target: QueryTarget): void {
+		if (target === this.draft.target) return;
+		this.draft.target = target;
+		this.setTitle(this.editorTitle());
+		this.renderTargets();
+		this.renderDynamic();
+		this.updateSaveState();
+	}
+
+	private renderDynamic(): void {
+		if (!this.dynamicEl) return;
+		const body = this.dynamicEl;
+		body.empty();
+		this.foldersInput = null;
+		this.rangeEl = null;
+		this.dateStartInputEl = null;
+		this.dateEndInputEl = null;
+		this.rangeErrorEl = null;
 
 		body.createEl("h3", {
 			cls: "setting-item-heading",
@@ -419,17 +502,17 @@ export class QueryEditModal extends Modal {
 		const foldersSetting = new Setting(body)
 			.setName(t("QUERY_FOLDERS"))
 			.setDesc(t("QUERY_FOLDERS_DESC"));
-		foldersSetting.addText((text) =>
-			text
-				.setPlaceholder(t("QUERY_FOLDERS_PLACEHOLDER"))
+		foldersSetting.addText((text) => {
+			this.foldersInput = text;
+			text.setPlaceholder(t("QUERY_FOLDERS_PLACEHOLDER"))
 				.setValue(this.draft.scope.folders.join(", "))
 				.onChange((value) => {
 					this.draft.scope.folders = value
 						.split(",")
 						.map((item) => item.trim())
 						.filter((item) => item.length > 0);
-				}),
-		);
+				});
+		});
 		foldersSetting.addButton((button) =>
 			button
 				.setIcon("folder")
@@ -439,8 +522,10 @@ export class QueryEditModal extends Modal {
 						if (!this.draft.scope.folders.includes(folder.path)) {
 							this.draft.scope.folders.push(folder.path);
 						}
-						this.contentEl.empty();
-						this.onOpen();
+						this.foldersInput?.setValue(
+							this.draft.scope.folders.join(", "),
+						);
+						this.foldersInput?.inputEl.focus();
 					}).open();
 				}),
 		);
@@ -455,76 +540,166 @@ export class QueryEditModal extends Modal {
 					}),
 			);
 
-		if (this.draft.target === "task" || this.draft.target === "note") {
-			body.createEl("h3", {
-				cls: "setting-item-heading",
-				text: t("QUERY_SECTION_FILTERS"),
+		if (this.draft.target === "file" || this.draft.target === "folder") {
+			body.createDiv({
+				cls: "ioto-modal-note",
+				text: t("QUERY_FILES_NAME_ONLY"),
 			});
-
-			const filters = body.createDiv({ cls: "ioto-modal-filters" });
-			this.addFilterInput(
-				filters,
-				t("QUERY_FILTER_NAME"),
-				"name",
-				this.draft.filters.name,
-			);
-			this.addFilterInput(
-				filters,
-				t("QUERY_FILTER_PROJECT"),
-				"project",
-				this.draft.filters.project,
-			);
-			this.addFilterInput(
-				filters,
-				t("QUERY_FILTER_SUBJECT"),
-				"subject",
-				this.draft.filters.subject,
-			);
-
-			new Setting(body)
-				.setName(t("QUERY_FILTER_DATE_PRESET"))
-				.addDropdown((dropdown) => {
-					const options: Array<[FilterState["datePreset"], string]> = [
-						["all", t("FILTER_DATE_PRESET_ALL")],
-						["last1day", t("FILTER_DATE_PRESET_LAST_1_DAY")],
-						["last7days", t("FILTER_DATE_PRESET_LAST_7_DAYS")],
-						["last30days", t("FILTER_DATE_PRESET_LAST_30_DAYS")],
-						["custom", t("FILTER_DATE_PRESET_CUSTOM")],
-					];
-					for (const [value, label] of options)
-						dropdown.addOption(value, label);
-					dropdown
-						.setValue(this.draft.filters.datePreset)
-						.onChange((value) => {
-							this.draft.filters.datePreset =
-								value as FilterState["datePreset"];
-						});
-				});
+			return;
 		}
 
-		const footer = contentEl.createDiv({ cls: "ioto-modal-footer" });
-		new Setting(footer)
-			.addButton((button) =>
-				button
-					.setButtonText(t("BTN_CANCEL"))
-					.onClick(() => this.close()),
-			)
-			.addButton((button) => {
-				saveButton = button;
-				button
-					.setButtonText(t("QUERY_SAVE"))
-					.setCta()
-					.setDisabled(this.draft.name.trim().length === 0)
-					.onClick(() => {
-						if (!this.draft.name.trim()) {
-							nameHint.hidden = false;
-							return;
-						}
-						this.onSave(this.draft);
-						this.close();
+		this.renderFilters(body);
+	}
+
+	private renderFilters(body: HTMLElement): void {
+		body.createEl("h3", {
+			cls: "setting-item-heading",
+			text: t("QUERY_SECTION_FILTERS"),
+		});
+
+		const filters = body.createDiv({ cls: "ioto-modal-filters" });
+		this.addFilterInput(
+			filters,
+			t("QUERY_FILTER_NAME"),
+			"name",
+			this.draft.filters.name,
+		);
+		this.addFilterInput(
+			filters,
+			t("QUERY_FILTER_PROJECT"),
+			"project",
+			this.draft.filters.project,
+		);
+		this.addFilterInput(
+			filters,
+			t("QUERY_FILTER_SUBJECT"),
+			"subject",
+			this.draft.filters.subject,
+		);
+
+		new Setting(body)
+			.setName(t("QUERY_FILTER_DATE_PRESET"))
+			.addDropdown((dropdown) => {
+				for (const preset of DATE_PRESETS) {
+					dropdown.addOption(
+						preset,
+						t(DATE_PRESET_LABEL_KEYS[preset]),
+					);
+				}
+				dropdown
+					.setValue(this.draft.filters.datePreset)
+					.onChange((value) => {
+						this.draft.filters.datePreset =
+							normalizeDatePreset(value);
+						this.syncDateRange();
 					});
-				return button;
 			});
+
+		this.renderDateRange(body);
+	}
+
+	private renderDateRange(body: HTMLElement): void {
+		const wrap = body.createDiv({ cls: "ioto-modal-date-range-wrap" });
+
+		const range = wrap.createDiv({ cls: "ioto-modal-date-range" });
+		const startField = range.createDiv({ cls: "ioto-modal-filter" });
+		startField.createEl("label", {
+			text: t("FILTER_DATE_START_LABEL"),
+		});
+		this.dateStartInputEl = startField.createEl("input", {
+			attr: { type: "date" },
+		});
+		this.dateStartInputEl.addEventListener("change", () => {
+			this.draft.filters.dateStart = this.dateStartInputEl?.value ?? "";
+			this.syncDateRange();
+		});
+
+		const endField = range.createDiv({ cls: "ioto-modal-filter" });
+		endField.createEl("label", { text: t("FILTER_DATE_END_LABEL") });
+		this.dateEndInputEl = endField.createEl("input", {
+			attr: { type: "date" },
+		});
+		this.dateEndInputEl.addEventListener("change", () => {
+			this.draft.filters.dateEnd = this.dateEndInputEl?.value ?? "";
+			this.syncDateRange();
+		});
+
+		wrap.createDiv({
+			cls: "ioto-modal-note",
+			text: t("QUERY_DATE_RANGE_HINT"),
+		});
+		this.rangeErrorEl = wrap.createDiv({
+			cls: "ioto-modal-error",
+			text: t("QUERY_DATE_RANGE_INVALID"),
+		});
+		this.rangeErrorEl.hidden = true;
+
+		this.rangeEl = wrap;
+		this.syncDateRange();
+	}
+
+	private syncDateRange(): void {
+		if (!this.rangeEl) {
+			this.updateSaveState();
+			return;
+		}
+		const custom = this.draft.filters.datePreset === "custom";
+		if (
+			custom &&
+			!this.draft.filters.dateStart &&
+			!this.draft.filters.dateEnd
+		) {
+			const range = defaultCustomRange();
+			this.draft.filters.dateStart = range.dateStart;
+			this.draft.filters.dateEnd = range.dateEnd;
+		}
+		if (this.dateStartInputEl) {
+			this.dateStartInputEl.value = this.draft.filters.dateStart;
+		}
+		if (this.dateEndInputEl) {
+			this.dateEndInputEl.value = this.draft.filters.dateEnd;
+		}
+		this.rangeEl.hidden = !custom;
+		this.updateSaveState();
+	}
+
+	private rangeApplies(): boolean {
+		return (
+			(this.draft.target === "task" || this.draft.target === "note") &&
+			this.draft.filters.datePreset === "custom"
+		);
+	}
+
+	private isRangeValid(): boolean {
+		return isDateRangeValid(
+			this.draft.filters.dateStart,
+			this.draft.filters.dateEnd,
+		);
+	}
+
+	private updateSaveState(): void {
+		const named = this.draft.name.trim().length > 0;
+		const rangeOk = !this.rangeApplies() || this.isRangeValid();
+
+		this.saveButton?.setDisabled(!named || !rangeOk);
+		if (this.nameHintEl) {
+			this.nameHintEl.hidden = !(this.nameTouched && !named);
+		}
+		if (this.rangeErrorEl) {
+			this.rangeErrorEl.hidden = !this.rangeApplies() || rangeOk;
+		}
+	}
+
+	private trySave(): void {
+		const named = this.draft.name.trim().length > 0;
+		const rangeOk = !this.rangeApplies() || this.isRangeValid();
+		if (!named || !rangeOk) {
+			this.nameTouched = true;
+			this.updateSaveState();
+			return;
+		}
+		this.onSave(this.draft);
+		this.close();
 	}
 
 	private addFilterInput(

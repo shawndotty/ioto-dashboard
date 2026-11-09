@@ -8,6 +8,8 @@
  *   services). Only `import type` from "obsidian" is allowed.
  */
 
+import type { DatePreset } from "./date-presets";
+
 export type IoType = "Input" | "Output" | "Outcome" | "Task" | "Unknown";
 
 export type SectionRole =
@@ -123,14 +125,7 @@ export interface FilterState {
 	dateType: "created" | "modified";
 	dateStart: string;
 	dateEnd: string;
-	datePreset:
-		| "all"
-		| "last1day"
-		| "last3days"
-		| "last7days"
-		| "last14days"
-		| "last30days"
-		| "custom";
+	datePreset: DatePreset;
 	status: "all" | "completed" | "incomplete";
 	fileStatus: string;
 	taskType?: string[];

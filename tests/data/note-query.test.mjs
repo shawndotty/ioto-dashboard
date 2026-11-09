@@ -156,6 +156,36 @@ test('date presets and custom ranges read the chosen timestamp', () => {
 	);
 });
 
+test('custom range supports single-sided bounds and an empty range', () => {
+	const custom = (dateStart, dateEnd) => ({
+		dateType: 'created',
+		datePreset: 'custom',
+		dateStart,
+		dateEnd,
+	});
+	const value = Date.parse('2026-01-15T12:00:00Z');
+
+	assert.equal(matchesDate(value, 0, custom('2026-01-10', '')), true);
+	assert.equal(matchesDate(Date.parse('2026-01-05T12:00:00Z'), 0, custom('2026-01-10', '')), false);
+
+	assert.equal(matchesDate(value, 0, custom('', '2026-01-20')), true);
+	assert.equal(matchesDate(Date.parse('2026-01-25T12:00:00Z'), 0, custom('', '2026-01-20')), false);
+
+	assert.equal(matchesDate(value, 0, custom('', '')), true);
+});
+
+test('an inverted custom range rejects every date at the data layer', () => {
+	assert.equal(
+		matchesDate(Date.parse('2026-01-15T12:00:00Z'), 0, {
+			dateType: 'created',
+			datePreset: 'custom',
+			dateStart: '2026-02-01',
+			dateEnd: '2026-01-01',
+		}),
+		false,
+	);
+});
+
 test('paths scope restricts folders and honours includeSubfolders', () => {
 	const nested = note({
 		path: '1-输入/sub/n.md',

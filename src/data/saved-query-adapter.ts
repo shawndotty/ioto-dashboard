@@ -1,4 +1,5 @@
 import type { FilterState, SavedQueryLike } from "./types";
+import { normalizeDatePreset } from "./date-presets";
 
 export function createDefaultFilterState(
 	overrides: Partial<FilterState> = {},
@@ -11,12 +12,12 @@ export function createDefaultFilterState(
 		dateType: "created",
 		dateStart: "",
 		dateEnd: "",
-		datePreset: "all",
 		status: "all",
 		fileStatus: "",
 		taskType: [],
 		noteType: [],
 		...rest,
+		datePreset: normalizeDatePreset(rest.datePreset),
 		custom: { ...(custom ?? {}) },
 	};
 }

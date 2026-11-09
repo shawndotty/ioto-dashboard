@@ -6,6 +6,11 @@ import {
 	Notice,
 } from "obsidian";
 import { t } from "../../lang/helpers";
+import {
+	DATE_PRESETS,
+	DATE_PRESET_LABEL_KEYS,
+	normalizeDatePreset,
+} from "../../data/date-presets";
 import { FilterState } from "../../models/types";
 import { CustomFilter } from "../../settings";
 
@@ -249,30 +254,19 @@ export class RightSidebar {
 		datePresetDiv.createEl("label", {
 			text: t("FILTER_DATE_PRESET_LABEL"),
 		});
-		new DropdownComponent(datePresetDiv)
-			.addOption("all", t("FILTER_DATE_PRESET_ALL"))
-			.addOption("last1day", t("FILTER_DATE_PRESET_LAST_1_DAY"))
-			.addOption("last3days", t("FILTER_DATE_PRESET_LAST_3_DAYS"))
-			.addOption("last7days", t("FILTER_DATE_PRESET_LAST_7_DAYS"))
-			.addOption("last14days", t("FILTER_DATE_PRESET_LAST_14_DAYS"))
-			.addOption("last30days", t("FILTER_DATE_PRESET_LAST_30_DAYS"))
-			.addOption("custom", t("FILTER_DATE_PRESET_CUSTOM"))
-			.setValue(this.filters.datePreset)
-			.onChange(
-				(
-					val:
-						| "all"
-						| "last1day"
-						| "last3days"
-						| "last7days"
-						| "last14days"
-						| "last30days"
-						| "custom",
-				) => {
-					this.filters.datePreset = val;
-					this.onFilterChange(this.filters, true);
-				},
+		const datePresetDropdown = new DropdownComponent(datePresetDiv);
+		for (const preset of DATE_PRESETS) {
+			datePresetDropdown.addOption(
+				preset,
+				t(DATE_PRESET_LABEL_KEYS[preset]),
 			);
+		}
+		datePresetDropdown
+			.setValue(this.filters.datePreset)
+			.onChange((val: string) => {
+				this.filters.datePreset = normalizeDatePreset(val);
+				this.onFilterChange(this.filters, true);
+			});
 
 		// Date Start & End (Only if Custom)
 		if (this.filters.datePreset === "custom") {

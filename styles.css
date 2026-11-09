@@ -967,13 +967,120 @@
 /* 与设置行 16px 的底部内边距对齐，使筛选网格到下一个标题的间距一致。 */
 .ioto-dashboard-modal .ioto-modal-footer {
     flex: 0 0 auto;
-    padding-top: 8px;
+    padding: 12px 0 4px;
+    border-top: 1px solid var(--background-modifier-border);
+    background: var(--modal-background);
+}
+
+.ioto-dashboard-modal .ioto-modal-footer__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* ---- Query editor: fixed footer + one quiet row rhythm ---- */
+.ioto-dashboard-modal--query-editor .modal-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.ioto-dashboard-modal--query-editor:not(.is-fullscreen) .modal-content {
+    max-height: calc(100vh - 8em);
+    overflow: hidden;
+}
+
+.ioto-dashboard-modal--query-editor .ioto-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.ioto-dashboard-modal--query-editor .ioto-modal-body .setting-item {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 8px 0;
+    margin-bottom: 0;
+    box-shadow: none;
+}
+
+.ioto-dashboard-modal--query-editor .ioto-modal-body .setting-item + .setting-item {
     border-top: 1px solid var(--background-modifier-border);
 }
 
-.ioto-dashboard-modal .ioto-modal-footer .setting-item {
-    border: none;
-    padding-block: 8px 0;
+.ioto-dashboard-modal--query-editor .ioto-modal-body .setting-item-heading {
+    margin: 20px 0 8px;
+    padding-inline: 0;
+}
+
+.ioto-dashboard-modal--query-editor .ioto-modal-body > .setting-item-heading:first-child {
+    margin-top: 0;
+}
+
+.ioto-query-editor__targets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 12px;
+}
+
+.ioto-query-editor__target {
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-primary);
+    box-shadow: none;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    cursor: pointer;
+}
+
+.ioto-query-editor__target:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.ioto-query-editor__target.is-active {
+    border-color: var(--interactive-accent);
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.ioto-modal-date-range-wrap[hidden] {
+    display: none;
+}
+
+.ioto-modal-date-range {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 8px 0;
+}
+
+.ioto-modal-date-range label {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+}
+
+.ioto-modal-date-range input {
+    width: 100%;
+}
+
+.ioto-modal-error {
+    color: var(--text-error);
+    font-size: var(--font-ui-small);
+}
+
+.ioto-modal-error[hidden] {
+    display: none;
+}
+
+.ioto-modal-note {
+    margin: 4px 0 8px;
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
 }
 
 .ioto-dashboard-modal .ioto-modal-filters {
@@ -1135,6 +1242,10 @@
 
 @media (max-width: 640px) {
     .ioto-dashboard-modal .ioto-modal-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .ioto-modal-date-range {
         grid-template-columns: 1fr;
     }
 

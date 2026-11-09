@@ -289,6 +289,8 @@ export default {
 	QUERY_DUPLICATE_FAILED: "Could not copy the query.",
 	QUERY_EDITOR_TITLE_NEW: "New query",
 	QUERY_EDITOR_TITLE_EDIT: "Edit query",
+	QUERY_EDITOR_TITLE_NEW_TARGET: "New query · {0}",
+	QUERY_EDITOR_TITLE_EDIT_TARGET: "Edit query · {0}",
 	QUERY_NAME: "Name",
 	QUERY_TARGET: "Target",
 	QUERY_TARGET_TASK: "Tasks",
@@ -305,6 +307,10 @@ export default {
 	QUERY_FILTER_PROJECT: "Project contains",
 	QUERY_FILTER_SUBJECT: "Subject contains",
 	QUERY_FILTER_DATE_PRESET: "Date preset",
+	QUERY_DATE_RANGE_HINT: "Leave blank for no limit.",
+	QUERY_DATE_RANGE_INVALID: "Start date must not be after the end date.",
+	QUERY_FILES_NAME_ONLY:
+		"File and folder queries filter by name only.",
 	QUERY_SAVE: "Save",
 	QUERY_DELETE_CONFIRM_TITLE: "Delete query",
 	QUERY_DELETE_CONFIRM_MSG:
