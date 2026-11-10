@@ -1090,9 +1090,38 @@
     margin-bottom: var(--size-4-4, 16px);
 }
 
-.ioto-dashboard-modal [data-id].is-newly-copied {
-    background: var(--background-modifier-success-hover, var(--background-modifier-hover));
-    transition: background 1.4s ease-out;
+/* 新建条目的“落位”提示：主题强调色的短暂呼吸，不改变条目本底 */
+.ioto-dashboard-modal [data-id].is-newly-created {
+    position: relative;
+}
+
+.ioto-dashboard-modal [data-id].is-newly-created::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+    box-shadow: inset 2px 0 0 var(--interactive-accent);
+    pointer-events: none;
+    animation: ioto-query-settle 900ms ease-out forwards;
+}
+
+@keyframes ioto-query-settle {
+    0%,
+    55% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ioto-dashboard-modal [data-id].is-newly-created::after {
+        animation: none;
+        background: transparent;
+        opacity: 1;
+    }
 }
 
 .ioto-modal-filter {
@@ -1238,6 +1267,28 @@
 .ioto-dashboard-modal .ioto-modal-collection .setting-item:not(.setting-item-heading):hover {
     border-radius: 6px;
     background: var(--background-modifier-hover);
+}
+
+/* 危险操作：常驻与普通图标同权重，只有在“准备点它”时才提示错误色 */
+.ioto-dashboard-modal .ioto-collection-action--danger {
+    color: var(--text-faint);
+    opacity: 0.8;
+    transition:
+        color 120ms ease,
+        background-color 120ms ease,
+        opacity 120ms ease;
+}
+
+.ioto-dashboard-modal [data-id]:hover .ioto-collection-action--danger,
+.ioto-dashboard-modal .ioto-collection-action--danger:focus-visible {
+    color: var(--text-muted);
+    opacity: 1;
+}
+
+/* 行悬停规则含 [data-id]:hover 共 4 个类级选择器，图标态必须再叠一层才压得住 */
+.ioto-dashboard-modal [data-id]:hover .ioto-collection-action--danger:hover {
+    color: var(--text-error);
+    background-color: color-mix(in srgb, var(--text-error) 10%, transparent);
 }
 
 @media (max-width: 640px) {
@@ -1494,6 +1545,31 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 .ioto-inspector-field select,
 .ioto-inspector-field input {
     width: 100%;
+}
+
+.ioto-inspector-query-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.ioto-inspector-query-row .ioto-inspector-query-type {
+    flex: 0 1 8.5em;
+    min-width: 6.5em;
+}
+
+.ioto-inspector-query-row .ioto-inspector-query-value {
+    flex: 1 1 9em;
+    min-width: 0;
+}
+
+.ioto-inspector-query-row select {
+    width: 100%;
+}
+
+.ioto-inspector-query-hint {
+    color: var(--text-warning);
 }
 
 .ioto-inspector-row {

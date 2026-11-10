@@ -8,6 +8,7 @@ export const kpiComponent: ComponentDefinition = {
 	descriptionKey: "COMPONENT_KPI_DESC",
 	category: "overview",
 	objects: ["task", "note"],
+	queryTargets: ["task", "note"],
 	views: ["scalar"],
 	viewDefault: "scalar",
 	measureDefault: "count",

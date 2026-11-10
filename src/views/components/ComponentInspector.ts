@@ -4,9 +4,20 @@ import type { InspectorState } from "../../dashboard/inspector-service";
 import {
 	clampSize,
 	coerceSettingValue,
+	queryTargetsFor,
 	type ComponentSetting,
 } from "../../dashboard/registry";
 import type { DashboardComponentConfig } from "../../dashboard/types";
+import {
+	firstQueryOfTarget,
+	groupByTarget,
+	resolveQueryPicker,
+} from "../../query/manager";
+import type { QueryDefinition, QueryTarget } from "../../query/types";
+import {
+	queryDisplayName,
+	queryTargetLabel,
+} from "../../ui/query-labels";
 
 export interface ComponentInspectorDeps {
 	patch(patch: Partial<DashboardComponentConfig>): void;
@@ -30,6 +41,12 @@ export class ComponentInspector {
 	private menuButtonEl: HTMLButtonElement | null = null;
 	private breadcrumbEl: HTMLElement | null = null;
 	private querySelect: HTMLSelectElement | null = null;
+	private queryTypeSelect: HTMLSelectElement | null = null;
+	private activeQueryTarget: QueryTarget | null = null;
+	private queryHintEl: HTMLElement | null = null;
+	/** Session-only type memory, never persisted. */
+	private lastQueryByTarget = new Map<QueryTarget, string>();
+	private lastComponentId: string | null = null;
 	private basisSelect: HTMLSelectElement | null = null;
 	private basisFallback: "file" | "section" = "file";
 	private limitInput: HTMLInputElement | null = null;
@@ -57,6 +74,10 @@ export class ComponentInspector {
 		if (!state) {
 			this.renderEmpty();
 			return;
+		}
+		if (state.target.config.id !== this.lastComponentId) {
+			this.lastComponentId = state.target.config.id;
+			this.lastQueryByTarget.clear();
 		}
 		const signature = this.signatureOf(state);
 		if (signature !== this.signature) {
@@ -182,32 +203,7 @@ export class ComponentInspector {
 		const field = section.createDiv({ cls: "ioto-inspector-field" });
 		switch (setting.kind) {
 			case "query": {
-				field.createEl("label", { text: t("INSPECTOR_QUERY_LABEL") });
-				const select = field.createEl("select", { cls: "dropdown" });
-				const queryIds = new Set(state.queries.map((query) => query.id));
-				const current = state.target.config.queryId;
-				if (!queryIds.has(current)) {
-					select.createEl("option", { value: current, text: current });
-				}
-				for (const query of state.queries) {
-					select.createEl("option", {
-						value: query.id,
-						text: query.nameKey
-							? t(query.nameKey as LabelKey)
-							: query.name,
-					});
-				}
-				select.value = current;
-				select.disabled = !state.editable;
-				select.addEventListener("change", () => {
-					const patch = coerceSettingValue(
-						setting,
-						select.value,
-						queryIds,
-					);
-					if (Object.keys(patch).length > 0) this.deps.patch(patch);
-				});
-				this.querySelect = select;
+				this.buildQuerySetting(field, setting, state);
 				return;
 			}
 			case "basis": {
@@ -391,6 +387,152 @@ export class ComponentInspector {
 		}
 	}
 
+	private buildQuerySetting(
+		field: HTMLElement,
+		setting: ComponentSetting,
+		state: InspectorState,
+	): void {
+		const definition = state.target.definition;
+		const allowed = definition ? queryTargetsFor(definition) : [];
+		const model = resolveQueryPicker(
+			allowed,
+			state.queries,
+			state.target.config.queryId,
+			this.activeQueryTarget,
+		);
+		const { groups } = model;
+		const queryIds = new Set(state.queries.map((query) => query.id));
+		let activeTarget = model.activeTarget;
+		this.activeQueryTarget = activeTarget;
+
+		field.createEl("label", { text: t("INSPECTOR_QUERY_LABEL") });
+		const row = field.createDiv({ cls: "ioto-inspector-query-row" });
+
+		let typeSelect: HTMLSelectElement | null = null;
+		if (model.needsTypeSelect) {
+			typeSelect = row.createEl("select", {
+				cls: "dropdown ioto-inspector-query-type",
+				attr: { "aria-label": t("INSPECTOR_QUERY_TYPE_LABEL") },
+			});
+			for (const target of model.targets) {
+				const option = typeSelect.createEl("option", {
+					value: target,
+					text: `${queryTargetLabel(target)} (${groups[target].length})`,
+				});
+				option.selected = target === activeTarget;
+				if (
+					groups[target].length === 0 ||
+					(model.legacy &&
+						target !== activeTarget &&
+						!allowed.includes(target))
+				) {
+					option.disabled = true;
+				}
+			}
+			typeSelect.value = activeTarget;
+			typeSelect.disabled = !state.editable;
+		}
+
+		const select = row.createEl("select", {
+			cls: "dropdown ioto-inspector-query-value",
+		});
+		this.populateQueryOptions(
+			select,
+			activeTarget,
+			groups,
+			state,
+			model.missing ? state.target.config.queryId : null,
+		);
+		select.disabled = !state.editable;
+
+		typeSelect?.addEventListener("change", () => {
+			const nextTarget = typeSelect.value as QueryTarget;
+			const previousTarget = this.activeQueryTarget ?? activeTarget;
+			if (groups[nextTarget].length === 0) {
+				typeSelect.value = previousTarget;
+				return;
+			}
+			const rememberedId = this.lastQueryByTarget.get(nextTarget);
+			const next =
+				groups[nextTarget].find((query) => query.id === rememberedId) ??
+				firstQueryOfTarget(state.queries, nextTarget);
+			if (!next) {
+				typeSelect.value = previousTarget;
+				return;
+			}
+			const patch = coerceSettingValue(setting, next.id, queryIds);
+			if (Object.keys(patch).length === 0) {
+				typeSelect.value = previousTarget;
+				return;
+			}
+			activeTarget = nextTarget;
+			this.activeQueryTarget = nextTarget;
+			this.populateQueryOptions(select, nextTarget, groups, state, null);
+			select.value = next.id;
+			this.deps.patch(patch);
+		});
+
+		select.addEventListener("change", () => {
+			const patch = coerceSettingValue(setting, select.value, queryIds);
+			if (Object.keys(patch).length === 0) return;
+			this.lastQueryByTarget.set(
+				this.activeQueryTarget ?? activeTarget,
+				select.value,
+			);
+			this.deps.patch(patch);
+		});
+
+		this.querySelect = select;
+		this.queryTypeSelect = typeSelect;
+
+		const hintKey = model.legacy
+			? "INSPECTOR_QUERY_INCOMPATIBLE"
+			: model.missing
+				? "INSPECTOR_QUERY_MISSING"
+				: null;
+		if (hintKey) {
+			const hint = field.createDiv({
+				cls: "ioto-inspector-hint ioto-inspector-query-hint",
+				attr: { role: "status" },
+			});
+			hint.setText(
+				model.legacy
+					? t("INSPECTOR_QUERY_INCOMPATIBLE", [
+							queryTargetLabel(
+								model.current?.target ?? activeTarget,
+							),
+						])
+					: t("INSPECTOR_QUERY_MISSING"),
+			);
+			this.queryHintEl = hint;
+		}
+	}
+
+	private populateQueryOptions(
+		select: HTMLSelectElement,
+		target: QueryTarget,
+		groups: Record<QueryTarget, QueryDefinition[]>,
+		state: InspectorState,
+		missingId: string | null,
+	): void {
+		select.empty();
+		if (missingId) {
+			select.createEl("option", { value: missingId, text: missingId });
+		}
+		for (const query of groups[target]) {
+			const label = queryDisplayName(query);
+			select.createEl("option", {
+				value: query.id,
+				text: label,
+				attr: { title: label },
+			});
+		}
+		const desired = missingId ?? state.target.config.queryId;
+		if (Array.from(select.options).some((option) => option.value === desired)) {
+			select.value = desired;
+		}
+	}
+
 	private buildLayoutSection(state: InspectorState): void {
 		const section = this.createSection("INSPECTOR_SECTION_LAYOUT", (head) => {
 			const reset = head.createEl("button", {
@@ -540,8 +682,39 @@ export class ComponentInspector {
 		const { config, bounds, defaults } = state.target;
 		this.breadcrumbEl?.setText(this.breadcrumbText(state));
 		if (this.querySelect) {
+			const current = state.queries.find(
+				(query) => query.id === config.queryId,
+			);
+			const nextTarget = current?.target ?? this.activeQueryTarget;
+			if (nextTarget && nextTarget !== this.activeQueryTarget) {
+				this.activeQueryTarget = nextTarget;
+				this.populateQueryOptions(
+					this.querySelect,
+					nextTarget,
+					groupByTarget(state.queries),
+					state,
+					current ? null : config.queryId,
+				);
+			}
 			this.querySelect.value = config.queryId;
 			this.querySelect.disabled = !state.editable;
+		}
+		if (this.queryTypeSelect) {
+			const target = this.activeQueryTarget;
+			if (
+				target &&
+				!Array.from(this.queryTypeSelect.options).some(
+					(option) => option.value === target,
+				)
+			) {
+				const option = this.queryTypeSelect.createEl("option", {
+					value: target,
+					text: `${queryTargetLabel(target)} (${groupByTarget(state.queries)[target].length})`,
+				});
+				option.disabled = true;
+			}
+			this.queryTypeSelect.value = target ?? "";
+			this.queryTypeSelect.disabled = !state.editable;
 		}
 		if (this.basisSelect) {
 			this.basisSelect.value = config.basis ?? this.basisFallback;
@@ -648,6 +821,10 @@ export class ComponentInspector {
 			this.titleInput.select();
 			return;
 		}
+		if (this.querySelect) {
+			this.querySelect.focus();
+			return;
+		}
 		const first = this.root.querySelector<HTMLElement>(
 			"select, input",
 		);
@@ -667,6 +844,9 @@ export class ComponentInspector {
 		this.menuButtonEl = null;
 		this.breadcrumbEl = null;
 		this.querySelect = null;
+		this.queryTypeSelect = null;
+		this.activeQueryTarget = null;
+		this.queryHintEl = null;
 		this.basisSelect = null;
 		this.limitInput = null;
 		this.titleInput = null;

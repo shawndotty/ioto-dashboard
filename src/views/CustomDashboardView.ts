@@ -31,6 +31,7 @@ import {
 import {
 	boundsForType,
 	clampSize,
+	queryTargetsFor,
 	type ComponentDefinition,
 	type ComponentStatus,
 	type SizeBounds,
@@ -52,7 +53,11 @@ import { ConfirmModal } from "../ui/ConfirmModal";
 import { DashboardManagerModal } from "../ui/dashboard-manager";
 import { PageLayoutModal } from "../ui/page-layout-modal";
 import { PageNameModal } from "../ui/page-name-modal";
-import { QueryEditModal, QueryManagerModal } from "../ui/query-editor";
+import {
+	QueryEditModal,
+	QueryManagerModal,
+	type QueryMutationResult,
+} from "../ui/query-editor";
 import { ComponentInspector } from "./components/ComponentInspector";
 
 export class CustomDashboardView extends ItemView {
@@ -1875,11 +1880,8 @@ export class CustomDashboardView extends ItemView {
 				void (async () => {
 					const queries = this.queryRepository();
 					const preferred = queries.get(definition.defaultQueryId);
-					const object = definition.objects?.[0];
-					const target: "task" | "note" | "file" | "folder" =
-						object === "note" || object === "file" || object === "folder"
-							? object
-							: "task";
+					const targets = queryTargetsFor(definition);
+					const target = targets[0] ?? "task";
 					const objectQuery = queries.defaultFor(target);
 					const queryId =
 						preferred?.id ??
@@ -1889,7 +1891,7 @@ export class CustomDashboardView extends ItemView {
 					if (
 						!preferred &&
 						!objectQuery &&
-						(object === "file" || object === "folder")
+						(target === "file" || target === "folder")
 					) {
 						new Notice(t("DASHBOARD_NEED_QUERY"));
 						return;
@@ -1935,8 +1937,10 @@ export class CustomDashboardView extends ItemView {
 						)
 					: 0,
 			{
-				onNew: (target) => this.openQueryEditor(null, target),
-				onEdit: (query) => this.openQueryEditor(query),
+				onNew: (target, onAdopted) =>
+					this.openQueryEditor(null, target, onAdopted),
+				onEdit: (query, onAdopted) =>
+					this.openQueryEditor(query, undefined, onAdopted),
 				onDuplicate: async (query) => {
 					const all = this.queryRepository().list();
 					const takenIds = new Set(all.map((item) => item.id));
@@ -1960,7 +1964,7 @@ export class CustomDashboardView extends ItemView {
 						? { queries: this.queryRepository().list(), created }
 						: null;
 				},
-				onDelete: (query) => {
+				onDelete: (query, onDeleted) => {
 					const references = this.store
 						? this.plugin.dashboardRepository.referenceCount(
 								this.store,
@@ -1977,6 +1981,7 @@ export class CustomDashboardView extends ItemView {
 									await this.plugin.dashboardRepository.deleteQuery(query.id);
 								this.queriesVersion += 1;
 								this.render();
+								onDeleted(this.queryRepository().list());
 							})();
 						},
 					).open();
@@ -1995,6 +2000,7 @@ export class CustomDashboardView extends ItemView {
 	private openQueryEditor(
 		initial: QueryDefinition | null,
 		initialTarget?: QueryTarget,
+		onAdopted?: (result: QueryMutationResult) => void,
 	): void {
 		new QueryEditModal(
 			this.app,
@@ -2004,11 +2010,29 @@ export class CustomDashboardView extends ItemView {
 					const exists = this.store?.queries.some(
 						(item) => item.id === query.id,
 					);
-					this.store = exists
-						? await this.plugin.dashboardRepository.updateQuery(query)
-						: await this.plugin.dashboardRepository.addQuery(query);
+					try {
+						this.store = exists
+							? await this.plugin.dashboardRepository.updateQuery(query)
+							: await this.plugin.dashboardRepository.addQuery(query);
+					} catch (error) {
+						console.warn(
+							"IOTO Dashboard: query save failed",
+							error,
+						);
+						new Notice(t("QUERY_SAVE_FAILED"));
+						return;
+					}
 					this.queriesVersion += 1;
 					this.render();
+					const created = this.store?.queries.find(
+						(item) => item.id === query.id,
+					);
+					if (created && onAdopted) {
+						onAdopted({
+							queries: this.queryRepository().list(),
+							created,
+						});
+					}
 				})();
 			},
 			initialTarget,

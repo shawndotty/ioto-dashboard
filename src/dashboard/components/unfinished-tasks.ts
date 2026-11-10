@@ -7,6 +7,7 @@ export const unfinishedTasksComponent: ComponentDefinition = {
 	descriptionKey: "COMPONENT_UNFINISHED_DESC",
 	category: "overview",
 	objects: ["task"],
+	queryTargets: ["task"],
 	views: ["list"],
 	viewDefault: "list",
 	measureDefault: "open",

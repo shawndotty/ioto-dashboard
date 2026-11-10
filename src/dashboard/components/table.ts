@@ -8,6 +8,7 @@ export const tableComponent: ComponentDefinition = {
 	descriptionKey: "COMPONENT_TABLE_DESC",
 	category: "analysis",
 	objects: ["task", "note", "file", "folder"],
+	queryTargets: ["task", "note", "file", "folder"],
 	views: ["table"],
 	viewDefault: "table",
 	measureDefault: "count",

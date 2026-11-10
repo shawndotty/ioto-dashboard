@@ -4,7 +4,7 @@ import type {
 	MetricResult,
 	ProjectProgressGroup,
 } from "../metrics/types";
-import type { QueryDefinition } from "../query/types";
+import { QUERY_TARGETS, type QueryDefinition, type QueryTarget } from "../query/types";
 import type {
 	Dataset,
 	DatasetRequest,
@@ -113,6 +113,8 @@ export interface ComponentDefinition {
 	category?: ComponentCategory;
 	/** Query targets this component understands (picker hints). */
 	objects?: DataObject[];
+	/** Query types this component can consume; derived from `objects` when absent. */
+	queryTargets?: QueryTarget[];
 	views?: ViewId[];
 	viewDefault?: ViewId;
 	measureDefault?: MeasureId;
@@ -136,6 +138,28 @@ export interface ComponentDefinition {
 	size?: Partial<SizeBounds>;
 	/** Declarative settings rendered by the inspector panel, in display order. */
 	settings?: ComponentSetting[];
+}
+
+const OBJECT_TO_TARGETS: Record<DataObject, QueryTarget[]> = {
+	task: ["task"],
+	note: ["note"],
+	file: ["file"],
+	folder: ["folder"],
+	project: ["task", "note"],
+};
+
+/** Query types a component accepts; explicit `queryTargets` wins over `objects`. */
+export function queryTargetsFor(definition: ComponentDefinition): QueryTarget[] {
+	const explicit = definition.queryTargets;
+	if (explicit && explicit.length > 0) {
+		const declared = new Set(explicit);
+		return QUERY_TARGETS.filter((target) => declared.has(target));
+	}
+	const targets = new Set<QueryTarget>();
+	for (const object of definition.objects ?? []) {
+		for (const target of OBJECT_TO_TARGETS[object]) targets.add(target);
+	}
+	return QUERY_TARGETS.filter((target) => targets.has(target));
 }
 
 /**

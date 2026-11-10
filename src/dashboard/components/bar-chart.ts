@@ -7,6 +7,7 @@ export const barChartComponent: ComponentDefinition = {
 	descriptionKey: "COMPONENT_BAR_DESC",
 	category: "analysis",
 	objects: ["project"],
+	queryTargets: ["task", "note"],
 	views: ["bar"],
 	viewDefault: "bar",
 	measureDefault: "count",

@@ -54,12 +54,15 @@ function renderList(el: HTMLElement, items: CollectionItem[]): void {
 		}
 
 		for (const action of item.actions) {
-			setting.addExtraButton((button) =>
+			setting.addExtraButton((button) => {
 				button
 					.setIcon(action.icon)
 					.setTooltip(action.label)
-					.onClick(() => action.onClick()),
-			);
+					.onClick(() => action.onClick());
+				if (action.danger) {
+					button.extraSettingsEl.addClass("ioto-collection-action--danger");
+				}
+			});
 		}
 	}
 }
@@ -113,7 +116,7 @@ function renderCards(el: HTMLElement, items: CollectionItem[]): void {
 					title: action.label,
 				},
 			});
-			if (action.danger) button.addClass("mod-warning");
+			if (action.danger) button.addClass("ioto-collection-action--danger");
 			setIcon(button, action.icon);
 			button.addEventListener("click", () => action.onClick());
 		}

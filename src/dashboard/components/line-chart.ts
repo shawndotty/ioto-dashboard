@@ -11,6 +11,7 @@ export const lineChartComponent: ComponentDefinition = {
 	descriptionKey: "COMPONENT_LINE_DESC",
 	category: "analysis",
 	objects: ["task"],
+	queryTargets: ["task"],
 	views: ["line"],
 	viewDefault: "line",
 	measureDefault: "series",

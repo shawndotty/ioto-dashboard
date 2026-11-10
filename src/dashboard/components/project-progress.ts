@@ -14,6 +14,7 @@ export const projectProgressComponent: ComponentDefinition = {
 	descriptionKey: "COMPONENT_PROJECT_PROGRESS_DESC",
 	category: "overview",
 	objects: ["project"],
+	queryTargets: ["task", "note"],
 	views: ["progress"],
 	viewDefault: "progress",
 	measureDefault: "ratio",

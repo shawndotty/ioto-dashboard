@@ -20,6 +20,7 @@ import {
 	querySourceOf,
 	type QuerySource,
 } from "../query/manager";
+import { queryDisplayName, queryTargetLabel } from "./query-labels";
 import { QUERY_TARGETS, type QueryDefinition, type QueryTarget } from "../query/types";
 import {
 	type CollectionAction,
@@ -30,17 +31,26 @@ import {
 import { applyModalShell, createLayoutToggle } from "./modal-shell";
 import { FolderPickerModal } from "./pickers/folder-picker";
 
-export interface DuplicatedQuery {
+export interface QueryMutationResult {
 	queries: QueryDefinition[];
 	created: QueryDefinition;
 }
 
 export interface QueryManagerActions {
-	onNew(target: QueryTarget): void;
-	onEdit(query: QueryDefinition): void;
+	onNew(
+		target: QueryTarget,
+		onAdopted: (result: QueryMutationResult) => void,
+	): void;
+	onEdit(
+		query: QueryDefinition,
+		onAdopted: (result: QueryMutationResult) => void,
+	): void;
 	/** Persists a copy and returns the fresh list; null means the write failed. */
-	onDuplicate(query: QueryDefinition): Promise<DuplicatedQuery | null>;
-	onDelete(query: QueryDefinition): void;
+	onDuplicate(query: QueryDefinition): Promise<QueryMutationResult | null>;
+	onDelete(
+		query: QueryDefinition,
+		onDeleted: (queries: QueryDefinition[]) => void,
+	): void;
 }
 
 export interface QueryManagerPreferences {
@@ -50,12 +60,8 @@ export interface QueryManagerPreferences {
 
 type LocaleKey = Parameters<typeof t>[0];
 
-const TARGET_LABEL_KEYS: Record<QueryTarget, LocaleKey> = {
-	task: "QUERY_TARGET_TASK",
-	note: "QUERY_TARGET_NOTE",
-	file: "QUERY_TARGET_FILE",
-	folder: "QUERY_TARGET_FOLDER",
-};
+/** Must match the `.is-newly-created::after` animation length in styles.css. */
+const REVEAL_HIGHLIGHT_MS = 900;
 
 const SOURCE_LABEL_KEYS: Record<QuerySource, LocaleKey> = {
 	builtin: "QUERY_SOURCE_BUILTIN",
@@ -66,15 +72,9 @@ const SOURCE_LABEL_KEYS: Record<QuerySource, LocaleKey> = {
 /** Survives modal reopen within the plugin instance; deliberately not persisted. */
 let rememberedTarget: QueryTarget | null = null;
 
-function displayName(query: QueryDefinition): string {
-	return query.nameKey
-		? t(query.nameKey as Parameters<typeof t>[0])
-		: query.name;
-}
+const displayName = queryDisplayName;
 
-function targetLabel(target: QueryTarget): string {
-	return t(TARGET_LABEL_KEYS[target]);
-}
+const targetLabel = queryTargetLabel;
 
 function metaLabel(query: QueryDefinition, references: number): string {
 	const source = querySourceOf(query.id);
@@ -128,11 +128,11 @@ export class QueryManagerModal extends Modal {
 		new ButtonComponent(toolbar)
 			.setButtonText(t("QUERY_MANAGER_NEW"))
 			.setCta()
-			.onClick(() => {
-				const target = this.activeTarget;
-				this.close();
-				this.actions.onNew(target);
-			});
+			.onClick(() =>
+				this.actions.onNew(this.activeTarget, (result) =>
+					this.adopt(result),
+				),
+			);
 
 		const body = contentEl.createDiv({ cls: "ioto-modal-body" });
 		this.collectionEl = body.createDiv({
@@ -259,19 +259,19 @@ export class QueryManagerModal extends Modal {
 					{
 						icon: "pencil",
 						label: t("QUERY_MANAGER_EDIT"),
-						onClick: () => {
-							this.close();
-							this.actions.onEdit(query);
-						},
+						onClick: () =>
+							this.actions.onEdit(query, (result) =>
+								this.adopt(result, false),
+							),
 					},
 					{
 						icon: "trash",
 						label: t("QUERY_MANAGER_DELETE"),
 						danger: true,
-						onClick: () => {
-							this.close();
-							this.actions.onDelete(query);
-						},
+						onClick: () =>
+							this.actions.onDelete(query, (queries) =>
+								this.adoptList(queries),
+							),
 					},
 				);
 			}
@@ -308,8 +308,9 @@ export class QueryManagerModal extends Modal {
 				text: t("QUERY_MANAGER_NEW_TARGET", [label]),
 			})
 			.addEventListener("click", () => {
-				this.close();
-				this.actions.onNew(this.activeTarget);
+				this.actions.onNew(this.activeTarget, (result) =>
+					this.adopt(result),
+				);
 			});
 	}
 
@@ -333,14 +334,40 @@ export class QueryManagerModal extends Modal {
 		}
 	}
 
+	private adopt(result: QueryMutationResult, announce = true): void {
+		if (!this.collectionEl?.isConnected) return;
+		this.queries = result.queries;
+		this.rebuildReferences();
+		if (result.created.target !== this.activeTarget) {
+			this.activeTarget = result.created.target;
+			rememberedTarget = result.created.target;
+		}
+		this.renderTabs();
+		this.renderItems();
+		this.revealItem(result.created.id);
+		if (announce) {
+			new Notice(t("QUERY_CREATED", [displayName(result.created)]));
+		}
+	}
+
+	private adoptList(queries: QueryDefinition[]): void {
+		if (!this.collectionEl?.isConnected) return;
+		this.queries = queries;
+		this.rebuildReferences();
+		this.renderTabs();
+		this.renderItems();
+	}
+
 	private revealItem(id: string): void {
 		const el = this.collectionEl?.querySelector<HTMLElement>(
-			`[data-id="${id}"]`,
+			`[data-id="${CSS.escape(id)}"]`,
 		);
 		if (!el) return;
 		el.scrollIntoView({ block: "nearest" });
-		el.addClass("is-newly-copied");
-		window.setTimeout(() => el.removeClass("is-newly-copied"), 1600);
+		el.addClass("is-newly-created");
+		el.setAttribute("tabindex", "-1");
+		el.focus({ preventScroll: true });
+		window.setTimeout(() => el.removeClass("is-newly-created"), REVEAL_HIGHLIGHT_MS);
 	}
 
 	onClose(): void {
@@ -362,6 +389,7 @@ export class QueryEditModal extends Modal {
 	private dateEndInputEl: HTMLInputElement | null = null;
 	private rangeErrorEl: HTMLElement | null = null;
 	private foldersInput: TextComponent | null = null;
+	private saving = false;
 
 	constructor(
 		app: App,
@@ -691,6 +719,7 @@ export class QueryEditModal extends Modal {
 	}
 
 	private trySave(): void {
+		if (this.saving) return;
 		const named = this.draft.name.trim().length > 0;
 		const rangeOk = !this.rangeApplies() || this.isRangeValid();
 		if (!named || !rangeOk) {
@@ -698,8 +727,9 @@ export class QueryEditModal extends Modal {
 			this.updateSaveState();
 			return;
 		}
-		this.onSave(this.draft);
+		this.saving = true;
 		this.close();
+		this.onSave(this.draft);
 	}
 
 	private addFilterInput(
