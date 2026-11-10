@@ -213,7 +213,7 @@ export default {
 	COMMAND_OPEN_NAMED_DASHBOARD: "開啟儀表板：{0}",
 
 	// Component inspector
-	INSPECTOR_TITLE: "元件設定",
+	INSPECTOR_TITLE: "面板設定",
 	INSPECTOR_EMPTY_TITLE: "未選取元件",
 	INSPECTOR_EMPTY_DESC: "在編輯模式下點擊卡片即可編輯設定。",
 	INSPECTOR_VIEW_MODE_HINT: "切換到編輯模式後可修改設定。",
@@ -238,6 +238,20 @@ export default {
 	INSPECTOR_HOST_AUTO: "自動",
 	INSPECTOR_HOST_SIDEBAR: "右側欄",
 	INSPECTOR_HOST_INLINE: "Dashboard 內嵌",
+	INSPECTOR_OPEN_PAGE_SETTINGS: "開啟頁面設定",
+
+	// Page settings panel
+	PAGE_SETTINGS_TITLE: "頁面設定",
+	PAGE_SETTINGS_SECTION_BASIC: "基礎",
+	PAGE_SETTINGS_SECTION_LAYOUT: "版面",
+	PAGE_SETTINGS_NAME_LABEL: "頁面名稱",
+	PAGE_SETTINGS_NAME_DESC: "顯示在頁面分頁上。",
+	PAGE_SETTINGS_POSITION: "第 {0} / 共 {1} 頁",
+	PAGE_SETTINGS_COMPONENTS: "{0} 個元件",
+	PAGE_SETTINGS_COLUMNS_HINT:
+		"切換到 24 欄只會讓卡片顯示變窄，不會改寫元件寬度。",
+	PAGE_SETTINGS_DELETE: "刪除頁面",
+	PAGE_SETTINGS_DELETE_DESC: "不會影響筆記內容。",
 
 	// Pages
 	PAGE_TABS_ADD: "新增頁面",

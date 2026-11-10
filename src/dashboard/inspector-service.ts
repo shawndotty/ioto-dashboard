@@ -7,16 +7,14 @@ import type { DashboardComponentConfig } from "./types";
 
 export type InspectorHost = "auto" | "sidebar" | "inline";
 
-export type InspectorFocus = "title" | "first";
+export type InspectorFocus = "title" | "first" | "name" | "layout";
 
-export interface InspectorSelection {
-	/** The canvas view that made the selection; used to scope `clear()`. */
-	leafId: string;
-	pageId: string;
-	componentId: string;
-}
+export type InspectorSelection =
+	| { kind: "component"; leafId: string; pageId: string; componentId: string }
+	| { kind: "page"; leafId: string; pageId: string };
 
-export interface InspectorTarget {
+export interface ComponentInspectorTarget {
+	kind: "component";
 	pageName: string;
 	index: number;
 	total: number;
@@ -27,10 +25,31 @@ export interface InspectorTarget {
 	defaults: { w: number; h: number };
 }
 
-export interface InspectorController {
+export interface PageInspectorTarget {
+	kind: "page";
+	pageId: string;
+	pageName: string;
+	dashboardName: string;
+	index: number;
+	total: number;
+	componentCount: number;
+	columns: 12 | 24;
+	rowHeight: number;
+	canDelete: boolean;
+}
+
+export type InspectorTarget = ComponentInspectorTarget | PageInspectorTarget;
+
+interface InspectorControllerBase {
+	/** The canvas view that made the selection; used to scope `clear()`. */
 	leafId: string;
 	isEditable(): boolean;
 	getTarget(): InspectorTarget | null;
+}
+
+export interface ComponentInspectorController extends InspectorControllerBase {
+	kind: "component";
+	getTarget(): ComponentInspectorTarget | null;
 	listQueries(): QueryDefinition[];
 	queriesVersion(): number;
 	patch(patch: Partial<DashboardComponentConfig>): void;
@@ -38,15 +57,40 @@ export interface InspectorController {
 	resetSize(): void;
 	move(offset: -1 | 1): void;
 	remove(): void;
+	openPageSettings(): void;
 }
 
+export interface PageInspectorController extends InspectorControllerBase {
+	kind: "page";
+	getTarget(): PageInspectorTarget | null;
+	renamePage(name: string): void;
+	setPageLayout(columns: 12 | 24, rowHeight: number): void;
+	removePage(): void;
+}
+
+export type InspectorController =
+	| ComponentInspectorController
+	| PageInspectorController;
+
 export interface InspectorState {
+	kind: "component";
 	editable: boolean;
-	target: InspectorTarget;
+	target: ComponentInspectorTarget;
 	queries: QueryDefinition[];
 	queriesVersion: number;
 	focus: InspectorFocus | null;
 }
+
+export interface PageInspectorState {
+	kind: "page";
+	editable: boolean;
+	target: PageInspectorTarget;
+	focus: InspectorFocus | null;
+}
+
+export type InspectorSnapshot =
+	| Omit<InspectorState, "focus">
+	| Omit<PageInspectorState, "focus">;
 
 export function resolveInspectorHost(
 	host: InspectorHost,
@@ -112,16 +156,28 @@ export class DashboardInspectorService {
 		return { selection: this.selection, controller: this.controller };
 	}
 
-	snapshot(): Omit<InspectorState, "focus"> | null {
+	snapshot(): InspectorSnapshot | null {
 		if (!this.selection || !this.controller) return null;
-		const target = this.controller.getTarget();
+		const controller = this.controller;
+		const target = controller.getTarget();
 		if (!target) return null;
-		return {
-			editable: this.controller.isEditable(),
-			target,
-			queries: this.controller.listQueries(),
-			queriesVersion: this.controller.queriesVersion(),
-		};
+		if (controller.kind === "component" && target.kind === "component") {
+			return {
+				kind: "component",
+				editable: controller.isEditable(),
+				target,
+				queries: controller.listQueries(),
+				queriesVersion: controller.queriesVersion(),
+			};
+		}
+		if (controller.kind === "page" && target.kind === "page") {
+			return {
+				kind: "page",
+				editable: controller.isEditable(),
+				target,
+			};
+		}
+		return null;
 	}
 
 	subscribe(callback: () => void): () => void {

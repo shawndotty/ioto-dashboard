@@ -1529,14 +1529,105 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 }
 
 .ioto-inspector-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     flex: 1;
     min-width: 0;
     font-size: var(--font-ui-small);
     font-weight: 600;
     color: var(--text-normal);
     overflow: hidden;
+    white-space: nowrap;
+}
+
+.ioto-inspector-crumb {
+    max-width: 50%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    cursor: pointer;
+    box-shadow: none;
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.ioto-inspector-crumb:hover:not(:disabled) {
+    text-decoration: underline;
+}
+
+.ioto-inspector-crumb:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 1px;
+    border-radius: 3px;
+}
+
+.ioto-inspector-crumb:disabled {
+    cursor: default;
+}
+
+.ioto-inspector-crumb-sep {
+    color: var(--text-faint);
+    flex: 0 0 auto;
+}
+
+.ioto-inspector-crumb-plain {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-inspector-crumb-current {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-inspector-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-inspector-range-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ioto-inspector-range-row input[type="range"] {
+    flex: 1;
+    min-width: 0;
+}
+
+.ioto-inspector-range-value {
+    min-width: 3.2em;
+    text-align: right;
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-inspector-danger {
+    border-top: 1px solid var(--background-modifier-error);
+}
+
+.ioto-inspector-danger .mod-warning {
+    width: 100%;
+}
+
+.ioto-inspector-slot.is-hidden {
+    display: none;
 }
 
 .ioto-inspector-empty-title {

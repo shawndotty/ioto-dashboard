@@ -30,6 +30,7 @@ export interface ComponentInspectorDeps {
 	resetSize(): void;
 	move(offset: -1 | 1): void;
 	remove(): void;
+	openPageSettings?(): void;
 }
 
 type LabelKey = Parameters<typeof t>[0];
@@ -44,7 +45,8 @@ export class ComponentInspector {
 	private state: InspectorState | null = null;
 	private headerEl: HTMLElement | null = null;
 	private menuButtonEl: HTMLButtonElement | null = null;
-	private breadcrumbEl: HTMLElement | null = null;
+	private pageCrumbEl: HTMLButtonElement | null = null;
+	private titleCrumbEl: HTMLElement | null = null;
 	private querySelect: HTMLSelectElement | null = null;
 	private queryTypeSelect: HTMLSelectElement | null = null;
 	private activeQueryTarget: QueryTarget | null = null;
@@ -148,10 +150,7 @@ export class ComponentInspector {
 		this.root.toggleClass("is-readonly", !state.editable);
 
 		this.headerEl = this.root.createDiv({ cls: "ioto-inspector-header" });
-		this.breadcrumbEl = this.headerEl.createDiv({
-			cls: "ioto-inspector-breadcrumb",
-		});
-		this.breadcrumbEl.setText(this.breadcrumbText(state));
+		this.buildBreadcrumb(this.headerEl, state);
 
 		const definition = state.target.definition;
 		if (!definition) {
@@ -785,7 +784,11 @@ export class ComponentInspector {
 
 	private syncValues(state: InspectorState): void {
 		const { config, bounds, defaults } = state.target;
-		this.breadcrumbEl?.setText(this.breadcrumbText(state));
+		if (this.pageCrumbEl) {
+			this.pageCrumbEl.setText(state.target.pageName);
+			this.pageCrumbEl.disabled = !state.editable || !this.deps.openPageSettings;
+		}
+		this.titleCrumbEl?.setText(this.titleText(state));
 		if (this.querySelect) {
 			const current = state.queries.find(
 				(query) => query.id === config.queryId,
@@ -904,14 +907,41 @@ export class ComponentInspector {
 			| undefined;
 	}
 
-	private breadcrumbText(state: InspectorState): string {
-		const { config, definition, pageName } = state.target;
-		const title = config.title
+	private buildBreadcrumb(
+		header: HTMLElement,
+		state: InspectorState,
+	): void {
+		const breadcrumb = header.createDiv({
+			cls: "ioto-inspector-breadcrumb",
+		});
+		const page = breadcrumb.createEl("button", {
+			cls: "ioto-inspector-crumb",
+			attr: {
+				type: "button",
+				title: t("INSPECTOR_OPEN_PAGE_SETTINGS"),
+			},
+			text: state.target.pageName,
+		});
+		page.onClickEvent(() => this.deps.openPageSettings?.());
+		breadcrumb.createSpan({
+			cls: "ioto-inspector-crumb-sep",
+			attr: { "aria-hidden": "true" },
+			text: "›",
+		});
+		const title = breadcrumb.createSpan({
+			cls: "ioto-inspector-crumb-current",
+		});
+		this.pageCrumbEl = page;
+		this.titleCrumbEl = title;
+	}
+
+	private titleText(state: InspectorState): string {
+		const { config, definition } = state.target;
+		return config.title
 			? config.title
 			: definition
 				? t(definition.labelKey as LabelKey)
 				: config.type;
-		return `${pageName} › ${title}`;
 	}
 
 	private applyFocus(state: InspectorState): void {
@@ -942,7 +972,8 @@ export class ComponentInspector {
 		this.state = null;
 		this.headerEl = null;
 		this.menuButtonEl = null;
-		this.breadcrumbEl = null;
+		this.pageCrumbEl = null;
+		this.titleCrumbEl = null;
 		this.querySelect = null;
 		this.queryTypeSelect = null;
 		this.activeQueryTarget = null;

@@ -8,6 +8,7 @@ const { DashboardInspectorService, resolveInspectorHost } = await load(
 
 function makeTarget(overrides = {}) {
 	return {
+		kind: 'component',
 		pageName: 'Page 1',
 		index: 0,
 		total: 1,
@@ -19,8 +20,25 @@ function makeTarget(overrides = {}) {
 	};
 }
 
+function makePageTarget(overrides = {}) {
+	return {
+		kind: 'page',
+		pageId: 'page:1',
+		pageName: 'Page 1',
+		dashboardName: 'Dashboard 1',
+		index: 0,
+		total: 2,
+		componentCount: 3,
+		columns: 12,
+		rowHeight: 72,
+		canDelete: true,
+		...overrides,
+	};
+}
+
 function makeController(overrides = {}) {
 	const controller = {
+		kind: 'component',
 		leafId: 'canvas:a',
 		target: makeTarget(),
 		editable: true,
@@ -46,12 +64,45 @@ function makeController(overrides = {}) {
 		resetSize() {},
 		move() {},
 		remove() {},
+		openPageSettings() {},
+	};
+	return Object.assign(controller, overrides);
+}
+
+function makePageController(overrides = {}) {
+	const controller = {
+		kind: 'page',
+		leafId: 'canvas:a',
+		target: makePageTarget(),
+		editable: true,
+		renamed: null,
+		layout: null,
+		removed: false,
+		isEditable() {
+			return controller.editable;
+		},
+		getTarget() {
+			return controller.target;
+		},
+		renamePage(name) {
+			controller.renamed = name;
+		},
+		setPageLayout(columns, rowHeight) {
+			controller.layout = [columns, rowHeight];
+		},
+		removePage() {
+			controller.removed = true;
+		},
 	};
 	return Object.assign(controller, overrides);
 }
 
 function selection(overrides = {}) {
-	return { leafId: 'canvas:a', pageId: 'page:1', componentId: 'component:1', ...overrides };
+	return { kind: 'component', leafId: 'canvas:a', pageId: 'page:1', componentId: 'component:1', ...overrides };
+}
+
+function pageSelection(overrides = {}) {
+	return { kind: 'page', leafId: 'canvas:a', pageId: 'page:1', ...overrides };
 }
 
 test('select stores the selection/controller and notifies listeners', () => {
@@ -173,11 +224,63 @@ test('snapshot builds the inspector state from the controller', () => {
 
 	service.select(selection(), controller);
 	assert.deepEqual(service.snapshot(), {
+		kind: 'component',
 		editable: false,
 		target: makeTarget(),
 		queries,
 		queriesVersion: 7,
 	});
+});
+
+test('snapshot carries the page target without query fields', () => {
+	const service = new DashboardInspectorService();
+	const controller = makePageController({ editable: false });
+	service.select(pageSelection(), controller);
+
+	const snapshot = service.snapshot();
+	assert.deepEqual(snapshot, {
+		kind: 'page',
+		editable: false,
+		target: makePageTarget(),
+	});
+	assert.equal('queries' in snapshot, false);
+	assert.equal('queriesVersion' in snapshot, false);
+});
+
+test('page selections are cleared per leaf and refresh drops stale pages', () => {
+	const service = new DashboardInspectorService();
+	const controller = makePageController();
+	service.select(pageSelection(), controller);
+	let notified = 0;
+	service.subscribe(() => notified++);
+
+	service.clear('canvas:other');
+	assert.ok(service.current());
+
+	service.clear('canvas:a');
+	assert.equal(service.current(), null);
+
+	controller.target = null;
+	service.select(pageSelection(), controller, { focus: 'name' });
+	assert.equal(service.consumeFocus(), 'name');
+	service.refresh();
+	assert.equal(service.current(), null);
+});
+
+test('the last selection wins across component and page kinds', () => {
+	const service = new DashboardInspectorService();
+	const component = makeController();
+	const page = makePageController();
+
+	service.select(selection(), component);
+	service.select(pageSelection(), page, { focus: 'layout' });
+
+	assert.equal(service.current().controller, page);
+	assert.equal(service.current().selection.kind, 'page');
+	assert.equal(service.consumeFocus(), 'layout');
+
+	service.select(selection(), component);
+	assert.equal(service.current().selection.kind, 'component');
 });
 
 test('snapshot is null when the controller no longer resolves a target', () => {

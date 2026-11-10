@@ -4,13 +4,14 @@ import type IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import {
-	ComponentInspector,
-	type ComponentInspectorDeps,
-} from "./components/ComponentInspector";
+	InspectorPanel,
+	type InspectorPanelDeps,
+	type InspectorPanelState,
+} from "./components/InspectorPanel";
 
-/** Right-sidebar host for the component settings panel. */
+/** Right-sidebar host for the component and page settings panels. */
 export class CustomInspectorView extends ItemView {
-	private inspector: ComponentInspector | null = null;
+	private inspector: InspectorPanel | null = null;
 	private unsubscribe: (() => void) | null = null;
 
 	constructor(
@@ -35,7 +36,7 @@ export class CustomInspectorView extends ItemView {
 	async onOpen(): Promise<void> {
 		this.contentEl.empty();
 		this.contentEl.addClass("ioto-inspector-view");
-		this.inspector = new ComponentInspector(this.contentEl, this.deps());
+		this.inspector = new InspectorPanel(this.contentEl, this.deps());
 		this.unsubscribe = this.plugin.inspectorService.subscribe(() =>
 			this.renderInspector(),
 		);
@@ -49,16 +50,32 @@ export class CustomInspectorView extends ItemView {
 		this.inspector = null;
 	}
 
-	private deps(): ComponentInspectorDeps {
-		const controller = () =>
-			this.plugin.inspectorService.current()?.controller;
+	private deps(): InspectorPanelDeps {
+		const controller = () => this.plugin.inspectorService.current()?.controller;
+		const component = () => {
+			const current = controller();
+			return current?.kind === "component" ? current : null;
+		};
+		const page = () => {
+			const current = controller();
+			return current?.kind === "page" ? current : null;
+		};
 		return {
-			patch: (patch) => controller()?.patch(patch),
-			stepSize: (axis, direction) =>
-				controller()?.stepSize(axis, direction),
-			resetSize: () => controller()?.resetSize(),
-			move: (offset) => controller()?.move(offset),
-			remove: () => this.confirmRemove(),
+			component: {
+				patch: (patch) => component()?.patch(patch),
+				stepSize: (axis, direction) =>
+					component()?.stepSize(axis, direction),
+				resetSize: () => component()?.resetSize(),
+				move: (offset) => component()?.move(offset),
+				remove: () => this.confirmRemove(),
+				openPageSettings: () => component()?.openPageSettings(),
+			},
+			page: {
+				rename: (name) => page()?.renamePage(name),
+				setLayout: (columns, rowHeight) =>
+					page()?.setPageLayout(columns, rowHeight),
+				remove: () => page()?.removePage(),
+			},
 		};
 	}
 
@@ -67,13 +84,15 @@ export class CustomInspectorView extends ItemView {
 		const service = this.plugin.inspectorService;
 		const snapshot = service.snapshot();
 		const focus = service.consumeFocus();
-		this.inspector.render(snapshot ? { ...snapshot, focus } : null);
+		const state = (snapshot
+			? { ...snapshot, focus }
+			: null) as InspectorPanelState;
+		this.inspector.render(state);
 	}
 
 	private confirmRemove(): void {
-		const controller =
-			this.plugin.inspectorService.current()?.controller;
-		if (!controller?.getTarget()) return;
+		const controller = this.plugin.inspectorService.current()?.controller;
+		if (controller?.kind !== "component" || !controller.getTarget()) return;
 		new ConfirmModal(
 			this.app,
 			t("INSPECTOR_TITLE"),

@@ -212,7 +212,7 @@ export default {
 	COMMAND_OPEN_NAMED_DASHBOARD: "Open dashboard: {0}",
 
 	// Component inspector
-	INSPECTOR_TITLE: "Component settings",
+	INSPECTOR_TITLE: "Panel settings",
 	INSPECTOR_EMPTY_TITLE: "No component selected",
 	INSPECTOR_EMPTY_DESC:
 		"Click a card in edit mode to edit its settings.",
@@ -238,6 +238,20 @@ export default {
 	INSPECTOR_HOST_AUTO: "Automatic",
 	INSPECTOR_HOST_SIDEBAR: "Right sidebar",
 	INSPECTOR_HOST_INLINE: "Inside dashboard",
+	INSPECTOR_OPEN_PAGE_SETTINGS: "Open page settings",
+
+	// Page settings panel
+	PAGE_SETTINGS_TITLE: "Page settings",
+	PAGE_SETTINGS_SECTION_BASIC: "Basics",
+	PAGE_SETTINGS_SECTION_LAYOUT: "Layout",
+	PAGE_SETTINGS_NAME_LABEL: "Page name",
+	PAGE_SETTINGS_NAME_DESC: "Shown on the page tab.",
+	PAGE_SETTINGS_POSITION: "Page {0} of {1}",
+	PAGE_SETTINGS_COMPONENTS: "{0} component(s)",
+	PAGE_SETTINGS_COLUMNS_HINT:
+		"Switching to 24 columns only narrows card display; component widths are kept.",
+	PAGE_SETTINGS_DELETE: "Delete page",
+	PAGE_SETTINGS_DELETE_DESC: "Notes are not affected.",
 
 	// Pages
 	PAGE_TABS_ADD: "Add page",

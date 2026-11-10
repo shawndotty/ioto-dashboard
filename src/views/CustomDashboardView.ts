@@ -7,6 +7,7 @@ import {
 	TFolder,
 	ViewStateResult,
 	WorkspaceLeaf,
+	setIcon,
 } from "obsidian";
 import { CUSTOM_DASHBOARD_VIEW_TYPE } from "../models/constants";
 import type IotoDashboardPlugin from "../main";
@@ -15,9 +16,12 @@ import { createComponentRegistry } from "../dashboard/components";
 import { DataHub } from "../dashboard/data-hub";
 import { datasetKey, type DatasetRequest } from "../dashboard/dataset/types";
 import type {
-	InspectorController,
+	ComponentInspectorController,
+	ComponentInspectorTarget,
 	InspectorFocus,
-	InspectorTarget,
+	InspectorSelection,
+	PageInspectorController,
+	PageInspectorTarget,
 } from "../dashboard/inspector-service";
 import { resolveInspectorHost } from "../dashboard/inspector-service";
 import {
@@ -58,7 +62,10 @@ import {
 	QueryManagerModal,
 	type QueryMutationResult,
 } from "../ui/query-editor";
-import { ComponentInspector } from "./components/ComponentInspector";
+import {
+	InspectorPanel,
+	type InspectorPanelState,
+} from "./components/InspectorPanel";
 
 export class CustomDashboardView extends ItemView {
 	private store: DashboardStoreData | null = null;
@@ -80,9 +87,9 @@ export class CustomDashboardView extends ItemView {
 		.toString(36)
 		.slice(2, 8)}`;
 	private selectedComponentId: string | null = null;
-	private controller: InspectorController | null = null;
+	private controller: ComponentInspectorController | null = null;
 	private inspectorEl: HTMLElement | null = null;
-	private inspector: ComponentInspector | null = null;
+	private inspector: InspectorPanel | null = null;
 	private inspectorUnsubscribe: (() => void) | null = null;
 	private toolbarEl: HTMLElement | null = null;
 	private bannerEl: HTMLElement | null = null;
@@ -157,7 +164,9 @@ export class CustomDashboardView extends ItemView {
 		this.controller = this.createInspectorController();
 		this.registerDomEvent(this.contentEl, "keydown", (event) => {
 			if (event.key !== "Escape" || this.interacting) return;
-			if (this.selectedComponentId) this.clearSelection();
+			if (this.selectedComponentId || this.localSelection()?.kind === "page") {
+				this.clearSelection();
+			}
 		});
 		this.render();
 		this.updateVisibility();
@@ -570,7 +579,10 @@ export class CustomDashboardView extends ItemView {
 				text: page.name,
 			});
 			tab.onClickEvent(() => this.switchPage(page.id));
-			tab.addEventListener("dblclick", () => this.openRenamePage(page));
+			tab.addEventListener("dblclick", () => {
+				if (!this.editMode) return;
+				this.openPageSettings(page, "name");
+			});
 			if (this.editMode) {
 				this.renderPageTabTools(tab, page);
 			}
@@ -586,27 +598,42 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private renderPageTabTools(tab: HTMLElement, page: DashboardPage): void {
-		const layout = tab.createEl("button", {
-			cls: "ioto-dashboard-page-close",
-			attr: {
-				"aria-label": t("PAGE_LAYOUT_TITLE"),
-				title: t("PAGE_LAYOUT_TITLE"),
-			},
-			text: "▦",
-		});
-		layout.onClickEvent((event) => {
-			event.stopPropagation();
-			this.openPageLayout(page);
-		});
-		const rename = tab.createEl("button", {
-			cls: "ioto-dashboard-page-close",
-			attr: { "aria-label": t("PAGE_RENAME"), title: t("PAGE_RENAME") },
-			text: "✎",
-		});
-		rename.onClickEvent((event) => {
-			event.stopPropagation();
-			this.openRenamePage(page);
-		});
+		if (Platform.isMobile) {
+			const layout = tab.createEl("button", {
+				cls: "ioto-dashboard-page-close",
+				attr: {
+					"aria-label": t("PAGE_LAYOUT_TITLE"),
+					title: t("PAGE_LAYOUT_TITLE"),
+				},
+				text: "▦",
+			});
+			layout.onClickEvent((event) => {
+				event.stopPropagation();
+				this.openPageLayout(page);
+			});
+			const rename = tab.createEl("button", {
+				cls: "ioto-dashboard-page-close",
+				attr: { "aria-label": t("PAGE_RENAME"), title: t("PAGE_RENAME") },
+				text: "✎",
+			});
+			rename.onClickEvent((event) => {
+				event.stopPropagation();
+				this.openRenamePage(page);
+			});
+		} else {
+			const settings = tab.createEl("button", {
+				cls: "ioto-dashboard-page-close",
+				attr: {
+					"aria-label": t("PAGE_SETTINGS_TITLE"),
+					title: t("PAGE_SETTINGS_TITLE"),
+				},
+			});
+			setIcon(settings, "settings-2");
+			settings.onClickEvent((event) => {
+				event.stopPropagation();
+				this.openPageSettings(page);
+			});
+		}
 		const remove = tab.createEl("button", {
 			cls: "ioto-dashboard-page-close",
 			attr: { "aria-label": t("PAGE_DELETE"), title: t("PAGE_DELETE") },
@@ -621,9 +648,19 @@ export class CustomDashboardView extends ItemView {
 	private switchPage(pageId: string): void {
 		const dashboard = this.activeDashboard;
 		if (!dashboard || pageId === this.activePage?.id) return;
+		const wasPageSettings = this.localSelection()?.kind === "page";
 		this.clearSelection();
 		this.leafPageId = pageId;
+		if (wasPageSettings && this.editMode && !Platform.isMobile) {
+			this.plugin.inspectorService.select(
+				{ kind: "page", leafId: this.leafId, pageId },
+				this.createPageInspectorController(pageId),
+			);
+		}
 		this.render();
+		if (wasPageSettings && this.editMode && !Platform.isMobile) {
+			this.ensureInspectorHost();
+		}
 		this.app.workspace.requestSaveLayout();
 		void this.plugin.dashboardRepository
 			.setLastPage(dashboard.id, pageId)
@@ -705,9 +742,15 @@ export class CustomDashboardView extends ItemView {
 			t("PAGE_DELETE_MSG", [page.name, String(page.components.length)]),
 			() => {
 				void (async () => {
-					this.store = await this.plugin.dashboardRepository.removePage(
-						page.id,
-					);
+					this.store =
+						await this.plugin.dashboardRepository.removePage(page.id);
+					const selection = this.localSelection();
+					if (
+						selection?.kind === "page" &&
+						selection.pageId === page.id
+					) {
+						this.plugin.inspectorService.clear(this.leafId);
+					}
 					if (this.leafPageId === page.id) {
 						this.leafPageId =
 							activePageOf(this.activeDashboard)?.id ?? null;
@@ -1115,15 +1158,21 @@ export class CustomDashboardView extends ItemView {
 		this.syncSelectionClasses();
 		if (!this.controller) return;
 		this.plugin.inspectorService.select(
-			{ leafId: this.leafId, pageId, componentId: id },
+			{ kind: "component", leafId: this.leafId, pageId, componentId: id },
 			this.controller,
 			{ focus },
 		);
 		this.ensureInspectorHost();
 	}
 
+	private localSelection(): InspectorSelection | null {
+		const selection = this.plugin.inspectorService.current()?.selection;
+		return selection?.leafId === this.leafId ? selection : null;
+	}
+
 	private clearSelection(): void {
-		if (!this.selectedComponentId) return;
+		const pageSelection = this.localSelection();
+		if (!this.selectedComponentId && pageSelection?.kind !== "page") return;
 		this.selectedComponentId = null;
 		this.syncSelectionClasses();
 		this.inspectorEl?.toggleClass("is-hidden", true);
@@ -1132,9 +1181,16 @@ export class CustomDashboardView extends ItemView {
 
 	private syncSelectionState(): void {
 		const id = this.selectedComponentId;
-		if (!id) return;
-		if (this.activePage?.components.some((item) => item.id === id)) return;
-		this.selectedComponentId = null;
+		if (id) {
+			if (this.activePage?.components.some((item) => item.id === id)) return;
+			this.selectedComponentId = null;
+			this.plugin.inspectorService.clear(this.leafId);
+			return;
+		}
+		const selection = this.localSelection();
+		if (selection?.kind !== "page") return;
+		const pages = this.activeDashboard?.pages ?? [];
+		if (pages.some((page) => page.id === selection.pageId)) return;
 		this.plugin.inspectorService.clear(this.leafId);
 	}
 
@@ -1165,7 +1221,7 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private syncInspector(): void {
-		if (!this.editMode && this.selectedComponentId) this.clearSelection();
+		if (!this.editMode) this.clearSelection();
 		this.contentEl.toggleClass("is-editing", this.editMode);
 		this.syncSelectionState();
 		this.syncSelectionClasses();
@@ -1174,9 +1230,16 @@ export class CustomDashboardView extends ItemView {
 			this.plugin.inspectorService.refresh();
 			return;
 		}
-		if (this.selectedComponentId) this.ensureInlineInspector();
+		if (this.hasLocalSelection()) this.ensureInlineInspector();
 		else this.inspectorEl?.toggleClass("is-hidden", true);
 		this.plugin.inspectorService.refresh();
+	}
+
+	private hasLocalSelection(): boolean {
+		return (
+			this.selectedComponentId !== null ||
+			this.localSelection()?.kind === "page"
+		);
 	}
 
 	private ensureInlineInspector(): void {
@@ -1184,13 +1247,40 @@ export class CustomDashboardView extends ItemView {
 			this.inspectorEl = this.contentEl.createDiv({
 				cls: "ioto-inspector-inline",
 			});
-			this.inspector = new ComponentInspector(this.inspectorEl, {
-				patch: (patch) => this.controller?.patch(patch),
-				stepSize: (axis, direction) =>
-					this.controller?.stepSize(axis, direction),
-				resetSize: () => this.controller?.resetSize(),
-				move: (offset) => this.controller?.move(offset),
-				remove: () => this.controller?.remove(),
+			const service = this.plugin.inspectorService;
+			this.inspector = new InspectorPanel(this.inspectorEl, {
+				component: {
+					patch: (patch) => this.controller?.patch(patch),
+					stepSize: (axis, direction) =>
+						this.controller?.stepSize(axis, direction),
+					resetSize: () => this.controller?.resetSize(),
+					move: (offset) => this.controller?.move(offset),
+					remove: () => this.controller?.remove(),
+					openPageSettings: () => {
+						const page = this.activePage;
+						if (page) this.openPageSettings(page);
+					},
+				},
+				page: {
+					rename: (name) => {
+						const controller = service.current()?.controller;
+						if (controller?.kind === "page") {
+							controller.renamePage(name);
+						}
+					},
+					setLayout: (columns, rowHeight) => {
+						const controller = service.current()?.controller;
+						if (controller?.kind === "page") {
+							controller.setPageLayout(columns, rowHeight);
+						}
+					},
+					remove: () => {
+						const controller = service.current()?.controller;
+						if (controller?.kind === "page") {
+							controller.removePage();
+						}
+					},
+				},
 			});
 			this.inspectorUnsubscribe =
 				this.plugin.inspectorService.subscribe(() =>
@@ -1207,20 +1297,17 @@ export class CustomDashboardView extends ItemView {
 		const service = this.plugin.inspectorService;
 		const current = service.current();
 		const mine =
-			this.selectedComponentId !== null &&
 			current?.selection.leafId === this.leafId &&
-			current.selection.componentId === this.selectedComponentId;
+			(current.selection.kind === "component"
+				? this.selectedComponentId === current.selection.componentId
+				: this.activePage?.id === current.selection.pageId);
 		const snapshot = mine ? service.snapshot() : null;
-		const focus = service.consumeFocus();
-		if (!snapshot) {
-			this.inspector.render(null);
-		} else {
-			this.inspector.render({ ...snapshot, focus });
-		}
-		this.inspectorEl?.toggleClass(
-			"is-hidden",
-			this.selectedComponentId === null,
-		);
+		const focus = mine ? service.consumeFocus() : null;
+		const state = (snapshot
+			? { ...snapshot, focus }
+			: null) as InspectorPanelState;
+		this.inspector.render(state);
+		this.inspectorEl?.toggleClass("is-hidden", !mine);
 	}
 
 	private destroyInlineInspector(): void {
@@ -1232,8 +1319,9 @@ export class CustomDashboardView extends ItemView {
 		this.inspectorEl = null;
 	}
 
-	private createInspectorController(): InspectorController {
+	private createInspectorController(): ComponentInspectorController {
 		return {
+			kind: "component",
 			leafId: this.leafId,
 			isEditable: () => this.editMode,
 			getTarget: () => this.inspectorTarget(),
@@ -1256,10 +1344,71 @@ export class CustomDashboardView extends ItemView {
 				if (id) void this.nudgeComponent(id, offset);
 			},
 			remove: () => this.confirmRemoveSelected(),
+			openPageSettings: () => {
+				const page = this.activePage;
+				if (page) this.openPageSettings(page);
+			},
 		};
 	}
 
-	private inspectorTarget(): InspectorTarget | null {
+	private createPageInspectorController(
+		pageId: string,
+	): PageInspectorController {
+		return {
+			kind: "page",
+			leafId: this.leafId,
+			isEditable: () => this.editMode,
+			getTarget: () => this.pageInspectorTarget(pageId),
+			renamePage: (name) => {
+				void (async () => {
+					this.store = await this.plugin.dashboardRepository.renamePage(
+						pageId,
+						name,
+					);
+					this.render();
+				})();
+			},
+			setPageLayout: (columns, rowHeight) => {
+				void (async () => {
+					this.store =
+						await this.plugin.dashboardRepository.updatePageLayout(
+							pageId,
+							columns,
+							rowHeight,
+						);
+					this.render();
+				})();
+			},
+			removePage: () => {
+				const page = this.activeDashboard?.pages.find(
+					(item) => item.id === pageId,
+				);
+				if (page) this.confirmRemovePage(page);
+			},
+		};
+	}
+
+	private openPageSettings(page: DashboardPage, focus?: InspectorFocus): void {
+		if (!this.editMode) return;
+		if (Platform.isMobile) {
+			if (focus === "name") this.openRenamePage(page);
+			else this.openPageLayout(page);
+			return;
+		}
+		const dashboard = this.activeDashboard;
+		if (!dashboard?.pages.some((item) => item.id === page.id)) return;
+		if (this.activePage?.id !== page.id) this.switchPage(page.id);
+		this.selectedComponentId = null;
+		this.syncSelectionClasses();
+		this.plugin.inspectorService.select(
+			{ kind: "page", leafId: this.leafId, pageId: page.id },
+			this.createPageInspectorController(page.id),
+			{ focus },
+		);
+		this.ensureInspectorHost();
+	}
+
+	private inspectorTarget(): ComponentInspectorTarget | null {
 		const page = this.activePage;
 		const id = this.selectedComponentId;
 		if (!page || !id) return null;
@@ -1268,6 +1417,7 @@ export class CustomDashboardView extends ItemView {
 		if (!config) return null;
 		const bounds = this.boundsFor(config);
 		return {
+			kind: "component",
 			pageName: page.name,
 			index,
 			total: page.components.length,
@@ -1275,6 +1425,26 @@ export class CustomDashboardView extends ItemView {
 			definition: this.registry.get(config.type),
 			bounds,
 			defaults: this.defaultSizeFor(config, bounds),
+		};
+	}
+
+	private pageInspectorTarget(pageId: string): PageInspectorTarget | null {
+		const dashboard = this.activeDashboard;
+		const page = this.activePage;
+		if (!dashboard || page?.id !== pageId) return null;
+		const index = dashboard.pages.findIndex((item) => item.id === pageId);
+		if (index < 0) return null;
+		return {
+			kind: "page",
+			pageId,
+			pageName: page.name,
+			dashboardName: dashboard.name,
+			index,
+			total: dashboard.pages.length,
+			componentCount: page.components.length,
+			columns: page.columns === 24 ? 24 : 12,
+			rowHeight: page.rowHeight ?? 72,
+			canDelete: dashboard.pages.length > 1,
 		};
 	}
 

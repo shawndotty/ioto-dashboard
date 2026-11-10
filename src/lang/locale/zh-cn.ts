@@ -214,7 +214,7 @@ export default {
 	COMMAND_OPEN_NAMED_DASHBOARD: "打开仪表盘：{0}",
 
 	// Component inspector
-	INSPECTOR_TITLE: "组件设置",
+	INSPECTOR_TITLE: "面板设置",
 	INSPECTOR_EMPTY_TITLE: "未选中组件",
 	INSPECTOR_EMPTY_DESC: "在编辑模式下点击卡片即可编辑设置。",
 	INSPECTOR_VIEW_MODE_HINT: "切换到编辑模式后可修改设置。",
@@ -239,6 +239,20 @@ export default {
 	INSPECTOR_HOST_AUTO: "自动",
 	INSPECTOR_HOST_SIDEBAR: "右侧栏",
 	INSPECTOR_HOST_INLINE: "Dashboard 内嵌",
+	INSPECTOR_OPEN_PAGE_SETTINGS: "打开页面设置",
+
+	// Page settings panel
+	PAGE_SETTINGS_TITLE: "页面设置",
+	PAGE_SETTINGS_SECTION_BASIC: "基础",
+	PAGE_SETTINGS_SECTION_LAYOUT: "布局",
+	PAGE_SETTINGS_NAME_LABEL: "页面名称",
+	PAGE_SETTINGS_NAME_DESC: "显示在页面标签上。",
+	PAGE_SETTINGS_POSITION: "第 {0} / 共 {1} 页",
+	PAGE_SETTINGS_COMPONENTS: "{0} 个组件",
+	PAGE_SETTINGS_COLUMNS_HINT:
+		"切换到 24 列只会让卡片显示变窄，不会改写组件宽度。",
+	PAGE_SETTINGS_DELETE: "删除页面",
+	PAGE_SETTINGS_DELETE_DESC: "不会影响笔记内容。",
 
 	// Pages
 	PAGE_TABS_ADD: "新建页面",
