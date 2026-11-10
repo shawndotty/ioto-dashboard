@@ -16,6 +16,11 @@ import {
 	normalizeDatePreset,
 } from "../data/date-presets";
 import {
+	FILE_EXTENSION_GROUPS,
+	normalizeExtensions,
+	type FileExtensionGroupKey,
+} from "../data/file-extensions";
+import {
 	groupByTarget,
 	querySourceOf,
 	type QuerySource,
@@ -568,15 +573,125 @@ export class QueryEditModal extends Modal {
 					}),
 			);
 
-		if (this.draft.target === "file" || this.draft.target === "folder") {
-			body.createDiv({
-				cls: "ioto-modal-note",
-				text: t("QUERY_FILES_NAME_ONLY"),
-			});
+		if (this.draft.target === "file") {
+			this.renderFileFilters(body);
+			return;
+		}
+		if (this.draft.target === "folder") {
+			this.renderFolderFilters(body);
 			return;
 		}
 
 		this.renderFilters(body);
+	}
+
+	private renderFileFilters(body: HTMLElement): void {
+		body.createEl("h3", {
+			cls: "setting-item-heading",
+			text: t("QUERY_SECTION_FILTERS"),
+		});
+		const filters = body.createDiv({
+			cls: "ioto-modal-filters ioto-modal-filters--single",
+		});
+		this.addFilterInput(
+			filters,
+			t("QUERY_FILTER_NAME"),
+			"name",
+			this.draft.filters.name,
+		);
+		this.renderExtensionPicker(body);
+	}
+
+	private renderFolderFilters(body: HTMLElement): void {
+		body.createEl("h3", {
+			cls: "setting-item-heading",
+			text: t("QUERY_SECTION_FILTERS"),
+		});
+		const filters = body.createDiv({
+			cls: "ioto-modal-filters ioto-modal-filters--single",
+		});
+		this.addFilterInput(
+			filters,
+			t("QUERY_FILTER_NAME"),
+			"name",
+			this.draft.filters.name,
+		);
+		body.createDiv({ cls: "ioto-modal-note", text: t("QUERY_FILES_NAME_ONLY") });
+	}
+
+	private renderExtensionPicker(body: HTMLElement): void {
+		const setting = new Setting(body).setName(t("QUERY_FILE_TYPES"));
+		setting.settingEl.addClass("ioto-extension-setting");
+
+		const chips = setting.controlEl.createDiv({ cls: "ioto-ext-chips" });
+		const input = setting.controlEl.createEl("input", {
+			cls: "ioto-ext-input",
+			attr: { type: "text", placeholder: t("QUERY_FILE_TYPES_PLACEHOLDER") },
+		});
+
+		// 打开即归一化，避免历史数据里的 ".PDF " / "md" 直接显示在文本框
+		this.draft.scope.extensions = normalizeExtensions(
+			this.draft.scope.extensions,
+		);
+		const current = (): readonly string[] => this.draft.scope.extensions ?? [];
+		const chipEls: { el: HTMLElement; extensions: readonly string[] }[] = [];
+
+		const allEl = chips.createEl("button", {
+			cls: "ioto-ext-chip ioto-ext-chip--all",
+			text: t("QUERY_FILE_TYPE_GROUP_ALL"),
+			attr: { type: "button" },
+		});
+
+		const sync = (): void => {
+			const active = new Set(current());
+			allEl.toggleClass("is-active", active.size === 0);
+			for (const chip of chipEls) {
+				chip.el.toggleClass(
+					"is-active",
+					chip.extensions.length > 0 &&
+						chip.extensions.every((ext) => active.has(ext)),
+				);
+			}
+		};
+		const write = (next: readonly string[]): void => {
+			this.draft.scope.extensions = normalizeExtensions(next);
+			input.value = current().join(", ");
+			sync();
+		};
+
+		allEl.addEventListener("click", () => write([]));
+
+		const labels: Record<FileExtensionGroupKey, LocaleKey> = {
+			document: "QUERY_FILE_TYPE_GROUP_DOCUMENT",
+			sheet: "QUERY_FILE_TYPE_GROUP_SHEET",
+			slide: "QUERY_FILE_TYPE_GROUP_SLIDE",
+			image: "QUERY_FILE_TYPE_GROUP_IMAGE",
+			media: "QUERY_FILE_TYPE_GROUP_MEDIA",
+			archive: "QUERY_FILE_TYPE_GROUP_ARCHIVE",
+		};
+		for (const group of FILE_EXTENSION_GROUPS) {
+			const el = chips.createEl("button", {
+				cls: "ioto-ext-chip",
+				text: t(labels[group.key]),
+				attr: { type: "button" },
+			});
+			chipEls.push({ el, extensions: group.extensions });
+			el.addEventListener("click", () => {
+				const active = new Set(current());
+				const on = group.extensions.every((ext) => active.has(ext));
+				for (const ext of group.extensions) {
+					if (on) active.delete(ext);
+					else active.add(ext);
+				}
+				write([...active]);
+			});
+		}
+
+		input.value = current().join(", ");
+		input.addEventListener("change", () => write(input.value.split(",")));
+		sync();
+
+		body.createDiv({ cls: "ioto-modal-note", text: t("QUERY_FILE_TYPES_HINT") });
 	}
 
 	private renderFilters(body: HTMLElement): void {

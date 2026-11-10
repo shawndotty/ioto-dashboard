@@ -23,6 +23,8 @@ export interface QueryScope {
 	includeSubfolders: boolean;
 	ioTypes?: IoType[];
 	sections?: SectionRole[];
+	/** 仅 file 目标使用：小写、不含点；空/缺省 = 全部非 Markdown 文件。 */
+	extensions?: string[];
 }
 
 export interface QueryDefinition {

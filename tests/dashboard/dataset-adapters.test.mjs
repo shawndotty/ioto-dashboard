@@ -169,8 +169,9 @@ test('file and folder adapters read the on-demand tree records', () => {
 	const files = fileAdapter(
 		adapterInput({ object: 'file', measure: 'count', queryId: 'q' }),
 	);
-	assert.equal(files.total, 2);
-	assert.equal(files.rows[1].cells.extension.text, 'png');
+	assert.equal(files.total, 1);
+	assert.equal(files.scalarText, '1');
+	assert.equal(files.rows[0].cells.extension.text, 'png');
 
 	const folders = folderAdapter(
 		adapterInput({ object: 'folder', measure: 'count', queryId: 'q' }),

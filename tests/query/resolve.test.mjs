@@ -164,7 +164,7 @@ test('builtins cover both targets with stable ids', () => {
 	for (const item of queries) assert.ok(['note', 'task'].includes(item.target));
 });
 
-test('file target filters by folder scope and file name', () => {
+test('file target filters by folder scope, file name and extension', () => {
 	const tree = {
 		...snapshot,
 		files: [
@@ -180,13 +180,65 @@ test('file target filters by folder scope and file name', () => {
 			scope: { folders: ['3-任务/Alpha'], includeSubfolders: true },
 		}),
 	);
-	assert.deepEqual(scoped.files.map((file) => file.basename), ['a', 'b']);
+	assert.deepEqual(scoped.files.map((file) => file.basename), ['b']);
 
 	const named = resolveQuery(
 		tree,
 		definition({ target: 'file', filters: { ...createDefaultFilterState(), name: 'b' } }),
 	);
 	assert.deepEqual(named.files.map((file) => file.basename), ['b']);
+
+	const png = resolveQuery(
+		tree,
+		definition({
+			target: 'file',
+			scope: { folders: ['3-任务/Alpha'], includeSubfolders: true, extensions: ['png'] },
+		}),
+	);
+	assert.deepEqual(png.files.map((file) => file.basename), ['b']);
+
+	const docx = resolveQuery(
+		tree,
+		definition({ target: 'file', scope: { folders: [], includeSubfolders: true, extensions: ['docx'] } }),
+	);
+	assert.deepEqual(docx.files, []);
+
+	const all = resolveQuery(
+		tree,
+		definition({ target: 'file', scope: { folders: [], includeSubfolders: true, extensions: [] } }),
+	);
+	assert.deepEqual(all.files.map((file) => file.basename), ['b']);
+
+	const markdown = resolveQuery(
+		tree,
+		definition({ target: 'file', scope: { folders: [], includeSubfolders: true, extensions: ['md'] } }),
+	);
+	assert.deepEqual(markdown.files.map((file) => file.basename), ['b']);
+});
+
+test('file target never returns canvas files and matches case-insensitively', () => {
+	const tree = {
+		...snapshot,
+		files: [
+			{ path: '3-任务/Alpha/d.canvas', basename: 'd', extension: 'canvas', folder: '3-任务/Alpha', size: 1, ctime: 1, mtime: 1 },
+			{ path: '3-任务/Alpha/IMG.JPG', basename: 'IMG', extension: 'JPG', folder: '3-任务/Alpha', size: 1, ctime: 1, mtime: 1 },
+			{ path: '3-任务/Alpha/sub/b.png', basename: 'b', extension: 'png', folder: '3-任务/Alpha/sub', size: 1, ctime: 1, mtime: 1 },
+		],
+	};
+	const all = resolveQuery(tree, definition({ target: 'file' }));
+	assert.deepEqual(all.files.map((file) => file.basename), ['IMG', 'b']);
+
+	const jpg = resolveQuery(
+		tree,
+		definition({ target: 'file', scope: { folders: [], includeSubfolders: true, extensions: ['jpg'] } }),
+	);
+	assert.deepEqual(jpg.files.map((file) => file.basename), ['IMG']);
+
+	const upper = resolveQuery(
+		tree,
+		definition({ target: 'file', scope: { folders: [], includeSubfolders: true, extensions: ['.PNG'] } }),
+	);
+	assert.deepEqual(upper.files.map((file) => file.basename), ['b']);
 });
 
 test('folder target filters the folder records and ignores a missing tree', () => {

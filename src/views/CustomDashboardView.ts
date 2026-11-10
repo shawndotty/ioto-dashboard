@@ -1956,6 +1956,7 @@ export class CustomDashboardView extends ItemView {
 					delete copy.nameKey;
 					this.store = await this.plugin.dashboardRepository.addQuery(copy);
 					this.queriesVersion += 1;
+					this.hub?.scheduleRefresh(0);
 					this.render();
 					const created = this.store?.queries.find(
 						(item) => item.id === copy.id,
@@ -1980,6 +1981,7 @@ export class CustomDashboardView extends ItemView {
 								this.store =
 									await this.plugin.dashboardRepository.deleteQuery(query.id);
 								this.queriesVersion += 1;
+								this.hub?.scheduleRefresh(0);
 								this.render();
 								onDeleted(this.queryRepository().list());
 							})();
@@ -2023,6 +2025,7 @@ export class CustomDashboardView extends ItemView {
 						return;
 					}
 					this.queriesVersion += 1;
+					this.hub?.scheduleRefresh(0);
 					this.render();
 					const created = this.store?.queries.find(
 						(item) => item.id === query.id,

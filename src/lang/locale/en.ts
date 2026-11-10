@@ -314,8 +314,18 @@ export default {
 	QUERY_FILTER_DATE_PRESET: "Date preset",
 	QUERY_DATE_RANGE_HINT: "Leave blank for no limit.",
 	QUERY_DATE_RANGE_INVALID: "Start date must not be after the end date.",
-	QUERY_FILES_NAME_ONLY:
-		"File and folder queries filter by name only.",
+	QUERY_FILES_NAME_ONLY: "Folder queries filter by name only.",
+	QUERY_FILE_TYPES: "File types",
+	QUERY_FILE_TYPES_PLACEHOLDER: "pdf, docx, png",
+	QUERY_FILE_TYPES_HINT:
+		"Leave blank for every non-Markdown file. Markdown and canvas files are never listed.",
+	QUERY_FILE_TYPE_GROUP_ALL: "All",
+	QUERY_FILE_TYPE_GROUP_DOCUMENT: "Documents",
+	QUERY_FILE_TYPE_GROUP_SHEET: "Sheets",
+	QUERY_FILE_TYPE_GROUP_SLIDE: "Slides",
+	QUERY_FILE_TYPE_GROUP_IMAGE: "Images",
+	QUERY_FILE_TYPE_GROUP_MEDIA: "Audio & video",
+	QUERY_FILE_TYPE_GROUP_ARCHIVE: "Archives",
 	QUERY_SAVE: "Save",
 	QUERY_DELETE_CONFIRM_TITLE: "Delete query",
 	QUERY_DELETE_CONFIRM_MSG:

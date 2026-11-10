@@ -1,4 +1,8 @@
 import type { CustomFilterDef, IndexSnapshot, SectionRole } from "../data/types";
+import {
+	matchesFileExtension,
+	normalizeExtensions,
+} from "../data/file-extensions";
 import { queryNotes } from "../data/note-query";
 import { queryTasks } from "../data/task-query";
 import type { QueryDefinition, QueryResolution } from "./types";
@@ -84,10 +88,12 @@ function resolveTreeQuery(
 	const paths = query.scope.folders;
 	const includeSubfolders = query.scope.includeSubfolders ?? true;
 	if (query.target === "file") {
+		const extensions = normalizeExtensions(query.scope.extensions);
 		const files = (snapshot.files ?? []).filter(
 			(file) =>
 				inFolderScope(file.folder, paths, includeSubfolders) &&
-				matchesName(file.basename, query.filters.name),
+				matchesName(file.basename, query.filters.name) &&
+				matchesFileExtension(file.extension, extensions),
 		);
 		return { notes: [], tasks: [], files };
 	}

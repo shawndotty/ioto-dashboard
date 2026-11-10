@@ -1140,6 +1140,54 @@
     width: 100%;
 }
 
+.ioto-dashboard-modal .ioto-modal-filters--single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.ioto-dashboard-modal .ioto-extension-setting {
+    align-items: flex-start;
+    flex-direction: column;
+}
+
+.ioto-dashboard-modal .ioto-extension-setting .setting-item-control {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+}
+
+.ioto-dashboard-modal .ioto-ext-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+}
+
+.ioto-dashboard-modal .ioto-ext-chip {
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    cursor: pointer;
+}
+
+.ioto-dashboard-modal .ioto-ext-chip:hover {
+    color: var(--text-normal);
+    border-color: var(--interactive-accent);
+}
+
+.ioto-dashboard-modal .ioto-ext-chip.is-active {
+    color: var(--text-on-accent);
+    background: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+}
+
+.ioto-dashboard-modal .ioto-ext-input {
+    width: 100%;
+}
+
 .ioto-modal-hint {
     margin: -4px 0 8px;
     font-size: var(--font-ui-small);
