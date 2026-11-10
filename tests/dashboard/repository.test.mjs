@@ -181,6 +181,23 @@ test('an undefined patch value removes that component key (cleared title)', asyn
 	assert.equal('limit' in cleared, false);
 });
 
+test('an undefined option value deletes that key and keeps the others', async () => {
+	const host = makeHost();
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	await repository.addComponent(
+		DEFAULT_PAGE_ID,
+		component({ options: { range: '30', yMin: 2, yMax: 8 } }),
+	);
+	await repository.updateComponent(DEFAULT_PAGE_ID, 'component:1', {
+		options: { yMin: undefined },
+	});
+
+	const stored = currentPage((await repository.load()).store).components[0];
+	assert.deepEqual(stored.options, { range: '30', yMax: 8 });
+});
+
 test('component and query entries with broken shapes are dropped on load', async () => {
 	const host = v4(
 		{},

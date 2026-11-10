@@ -35,7 +35,12 @@ function definition(fields) {
 test('registration components declare explicit query targets', () => {
 	assert.deepEqual(queryTargetsFor(unfinishedTasksComponent), ['task']);
 	assert.deepEqual(queryTargetsFor(lineChartComponent), ['task']);
-	assert.deepEqual(queryTargetsFor(barChartComponent), ['task', 'note']);
+	assert.deepEqual(queryTargetsFor(barChartComponent), [
+		'task',
+		'note',
+		'file',
+		'folder',
+	]);
 	assert.deepEqual(queryTargetsFor(projectProgressComponent), ['task', 'note']);
 	assert.deepEqual(queryTargetsFor(kpiComponent), ['task', 'note']);
 	assert.deepEqual(queryTargetsFor(tableComponent), [

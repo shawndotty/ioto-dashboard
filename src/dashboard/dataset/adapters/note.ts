@@ -10,7 +10,7 @@ import {
 } from "../types";
 import { cell } from "./shared";
 
-const COLUMNS: DatasetColumn[] = [
+export const NOTE_COLUMNS: DatasetColumn[] = [
 	{ key: "note", labelKey: "DATASET_COL_NOTE", type: "text" },
 	{ key: "folder", labelKey: "DATASET_COL_FOLDER", type: "path" },
 	{ key: "ioType", labelKey: "DATASET_COL_IO_TYPE", type: "text" },
@@ -27,7 +27,7 @@ const COLUMNS: DatasetColumn[] = [
 
 export const noteAdapter: DatasetAdapter = (input): Dataset => {
 	const { request, query, snapshot } = input;
-	if (!query || !snapshot) return emptyDataset(request, COLUMNS);
+	if (!query || !snapshot) return emptyDataset(request, NOTE_COLUMNS);
 	const notes = resolveQuery(snapshot, query, {
 		customFilters: input.customFilters,
 		now: input.now,
@@ -52,7 +52,7 @@ export const noteAdapter: DatasetAdapter = (input): Dataset => {
 	return {
 		object: request.object,
 		measure: request.measure,
-		columns: COLUMNS,
+		columns: NOTE_COLUMNS,
 		...truncated,
 		scalarText: String(notes.length),
 	};

@@ -16,7 +16,7 @@ import type { DashboardComponentConfig } from "./types";
 
 export type ComponentStatus = "loading" | "ready" | "empty" | "error";
 
-export type ComponentSettingGroup = "data" | "display";
+export type ComponentSettingGroup = "data" | "axes" | "display";
 
 export type ComponentCategory =
 	| "overview"
@@ -39,24 +39,32 @@ export type ComponentSetting = SettingBase &
 				fallback: CountBasis;
 		  }
 		| {
-				key: "limit";
+				key: string;
 				kind: "number";
-				group: "data";
+				group: ComponentSettingGroup;
 				min: number;
 				max: number;
 				step?: number;
 				fallback: number;
+				/** Defaults to the limit label, used by the legacy `limit` row. */
+				labelKey?: string;
+				/** Numbers round to integers unless explicitly disabled. */
+				integer?: boolean;
+				/** `options` keys land in `config.options`, everything else on config. */
+				target?: "config" | "options";
 		  }
 		| {
-				key: "title";
+				key: string;
 				kind: "text";
-				group: "display";
+				group: ComponentSettingGroup;
+				labelKey?: string;
 				placeholderKey?: string;
+				target?: "config" | "options";
 		  }
 		| {
 				key: string;
 				kind: "select";
-				group: "data" | "display";
+				group: ComponentSettingGroup;
 				labelKey: string;
 				options: Array<{ value: string; labelKey: string }>;
 				fallback: string;
@@ -66,7 +74,7 @@ export type ComponentSetting = SettingBase &
 		| {
 				key: string;
 				kind: "toggle";
-				group: "display";
+				group: ComponentSettingGroup;
 				labelKey: string;
 				fallback: boolean;
 				target?: "config" | "options";
@@ -74,8 +82,18 @@ export type ComponentSetting = SettingBase &
 		| {
 				key: string;
 				kind: "color";
-				group: "display";
+				group: ComponentSettingGroup;
 				labelKey: string;
+				target?: "config" | "options";
+		  }
+		| {
+				/** Dataset column picker; options come from the query's object. */
+				key: string;
+				kind: "field";
+				group: ComponentSettingGroup;
+				labelKey: string;
+				role: "x" | "y";
+				fallback: string;
 				target?: "config" | "options";
 		  }
 	);
@@ -163,6 +181,19 @@ export function queryTargetsFor(definition: ComponentDefinition): QueryTarget[] 
 }
 
 /**
+ * Writes one `config.options` key. `undefined` means "remove the key", which
+ * makes the component fall back to its declared default.
+ */
+function optionPatch(
+	key: string,
+	value: string | number | boolean | undefined,
+): Partial<DashboardComponentConfig> {
+	return {
+		options: { [key]: value },
+	} as unknown as Partial<DashboardComponentConfig>;
+}
+
+/**
  * Normalises one inspector input into a component patch. Pure (no DOM), so the
  * settings contract can be unit-tested; empty/invalid input returns `{}` and
  * leaves the stored value untouched.
@@ -180,20 +211,35 @@ export function coerceSettingValue(
 		case "basis":
 			return raw === "file" || raw === "section" ? { basis: raw } : {};
 		case "number": {
+			const target = setting.target === "options";
 			const parsed =
 				typeof raw === "number"
 					? raw
 					: typeof raw === "string" && raw.trim() !== ""
 						? Number(raw)
 						: Number.NaN;
-			if (!Number.isFinite(parsed)) return {};
+			if (!Number.isFinite(parsed)) {
+				// Clearing an option row falls back to the declared default.
+				return target ? optionPatch(setting.key, undefined) : {};
+			}
 			const clamped = Math.min(setting.max, Math.max(setting.min, parsed));
-			return { limit: Math.round(clamped) };
+			const value = setting.integer === false ? clamped : Math.round(clamped);
+			return target
+				? optionPatch(setting.key, value)
+				: ({ [setting.key]: value } as Partial<DashboardComponentConfig>);
 		}
 		case "text": {
 			if (typeof raw !== "string") return {};
 			const trimmed = raw.trim();
-			return trimmed ? { title: trimmed } : { title: undefined };
+			return setting.target === "options"
+				? optionPatch(setting.key, trimmed || undefined)
+				: ({ [setting.key]: trimmed || undefined } as Partial<DashboardComponentConfig>);
+		}
+		case "field": {
+			if (typeof raw !== "string" || raw.trim() === "") return {};
+			return setting.target === "options"
+				? optionPatch(setting.key, raw)
+				: ({ [setting.key]: raw } as Partial<DashboardComponentConfig>);
 		}
 		case "select": {
 			if (typeof raw !== "string") return {};

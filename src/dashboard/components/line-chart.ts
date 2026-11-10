@@ -1,4 +1,5 @@
-import { renderLineChart } from "../dataset/charts/svg";
+import { renderResponsiveChart } from "../dataset/charts/chart-host";
+import { buildLineSpec } from "../dataset/charts/spec";
 import type { ComponentDefinition } from "../registry";
 
 function rangeOf(value: unknown): 7 | 30 | 90 | 180 {
@@ -21,7 +22,21 @@ export const lineChartComponent: ComponentDefinition = {
 		queryId,
 		view: "line",
 		measure: "series",
-		options: { range: "30", showLegend: true },
+		options: {
+			range: "30",
+			xShowLabels: true,
+			xLabelFormat: "md",
+			xTitle: "",
+			yField: "total",
+			ySeriesCompleted: false,
+			ySeriesOpen: false,
+			yShowLabels: true,
+			yShowGrid: false,
+			yScale: "auto",
+			yFormat: "auto",
+			yTitle: "",
+			showLegend: true,
+		},
 		w: 6,
 		h: 3,
 	}),
@@ -39,6 +54,137 @@ export const lineChartComponent: ComponentDefinition = {
 				{ value: "180", labelKey: "SETTING_RANGE_180" },
 			],
 			fallback: "30",
+			target: "options",
+		},
+		{
+			key: "xShowLabels",
+			kind: "toggle",
+			group: "axes",
+			labelKey: "SETTING_AXIS_X_LABELS",
+			fallback: true,
+			target: "options",
+		},
+		{
+			key: "xLabelFormat",
+			kind: "select",
+			group: "axes",
+			labelKey: "SETTING_AXIS_X_FORMAT",
+			options: [
+				{ value: "iso", labelKey: "AXIS_DATE_ISO" },
+				{ value: "md", labelKey: "AXIS_DATE_MD" },
+				{ value: "short", labelKey: "AXIS_DATE_SHORT" },
+			],
+			fallback: "md",
+			target: "options",
+		},
+		{
+			key: "xTitle",
+			kind: "text",
+			group: "axes",
+			labelKey: "SETTING_AXIS_X_TITLE",
+			target: "options",
+		},
+		{
+			key: "yField",
+			kind: "select",
+			group: "axes",
+			labelKey: "SETTING_AXIS_Y_FIELD",
+			options: [
+				{ value: "total", labelKey: "DATASET_COL_TASKS" },
+				{ value: "completed", labelKey: "DATASET_COL_COMPLETED" },
+				{ value: "open", labelKey: "DATASET_COL_OPEN" },
+			],
+			fallback: "total",
+			target: "options",
+		},
+		{
+			key: "ySeriesCompleted",
+			kind: "toggle",
+			group: "axes",
+			labelKey: "SETTING_AXIS_SERIES_COMPLETED",
+			fallback: false,
+			target: "options",
+		},
+		{
+			key: "ySeriesOpen",
+			kind: "toggle",
+			group: "axes",
+			labelKey: "SETTING_AXIS_SERIES_OPEN",
+			fallback: false,
+			target: "options",
+		},
+		{
+			key: "yShowLabels",
+			kind: "toggle",
+			group: "axes",
+			labelKey: "SETTING_AXIS_Y_LABELS",
+			fallback: true,
+			target: "options",
+		},
+		{
+			key: "yShowGrid",
+			kind: "toggle",
+			group: "axes",
+			labelKey: "SETTING_AXIS_Y_GRID",
+			fallback: false,
+			target: "options",
+		},
+		{
+			key: "yScale",
+			kind: "select",
+			group: "axes",
+			labelKey: "SETTING_AXIS_Y_SCALE",
+			options: [
+				{ value: "auto", labelKey: "AXIS_SCALE_AUTO" },
+				{ value: "manual", labelKey: "AXIS_SCALE_MANUAL" },
+			],
+			fallback: "auto",
+			target: "options",
+		},
+		{
+			key: "yMin",
+			kind: "number",
+			group: "axes",
+			labelKey: "SETTING_AXIS_Y_MIN",
+			min: -1000000,
+			max: 1000000,
+			step: 1,
+			fallback: 0,
+			integer: false,
+			target: "options",
+			when: (config) => config.options?.yScale === "manual",
+		},
+		{
+			key: "yMax",
+			kind: "number",
+			group: "axes",
+			labelKey: "SETTING_AXIS_Y_MAX",
+			min: -1000000,
+			max: 1000000,
+			step: 1,
+			fallback: 0,
+			integer: false,
+			target: "options",
+			when: (config) => config.options?.yScale === "manual",
+		},
+		{
+			key: "yFormat",
+			kind: "select",
+			group: "axes",
+			labelKey: "SETTING_AXIS_Y_FORMAT",
+			options: [
+				{ value: "auto", labelKey: "AXIS_FORMAT_AUTO" },
+				{ value: "number", labelKey: "AXIS_FORMAT_NUMBER" },
+				{ value: "compact", labelKey: "AXIS_FORMAT_COMPACT" },
+			],
+			fallback: "auto",
+			target: "options",
+		},
+		{
+			key: "yTitle",
+			kind: "text",
+			group: "axes",
+			labelKey: "SETTING_AXIS_Y_TITLE",
 			target: "options",
 		},
 		{
@@ -60,13 +206,10 @@ export const lineChartComponent: ComponentDefinition = {
 	isEmptyDataset: (dataset) => dataset.rows.length === 0,
 	isEmpty: () => false,
 	render: (el, ctx) => {
-		if (!ctx.dataset) return;
-		renderLineChart(
-			el,
-			ctx.dataset.rows.map((row) => ({
-				label: row.cells.date?.text ?? "",
-				value: Number(row.cells.total?.sortValue ?? 0),
-			})),
+		const dataset = ctx.dataset;
+		if (!dataset) return;
+		renderResponsiveChart(el, (size) =>
+			buildLineSpec(dataset, ctx.config.options ?? {}, size, "task"),
 		);
 	},
 };

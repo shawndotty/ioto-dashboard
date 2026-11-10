@@ -54,7 +54,17 @@ test('setting fallbacks match the values createConfig writes', () => {
 				assert.equal(created.basis, setting.fallback, `${component.type} basis fallback`);
 			}
 			if (setting.kind === 'number') {
-				assert.equal(created[setting.key], setting.fallback, `${component.type} ${setting.key} fallback`);
+				if (setting.target === 'options') {
+					const stored = created.options?.[setting.key];
+					// yMin / yMax intentionally start empty until manual scale is chosen.
+					if (setting.key === 'yMin' || setting.key === 'yMax') {
+						assert.equal(stored, undefined, `${component.type} ${setting.key} starts empty`);
+					} else {
+						assert.equal(stored, setting.fallback, `${component.type} ${setting.key} fallback`);
+					}
+				} else {
+					assert.equal(created[setting.key], setting.fallback, `${component.type} ${setting.key} fallback`);
+				}
 			}
 			if (setting.kind === 'select') {
 				const stored =
@@ -64,6 +74,13 @@ test('setting fallbacks match the values createConfig writes', () => {
 				assert.equal(stored, setting.fallback, `${component.type} ${setting.key} fallback`);
 			}
 			if (setting.kind === 'toggle') {
+				const stored =
+					setting.target === 'options'
+						? created.options?.[setting.key]
+						: created[setting.key];
+				assert.equal(stored, setting.fallback, `${component.type} ${setting.key} fallback`);
+			}
+			if (setting.kind === 'field') {
 				const stored =
 					setting.target === 'options'
 						? created.options?.[setting.key]
@@ -83,7 +100,9 @@ test('number settings declare sane min/max/step bounds', () => {
 				setting.fallback >= setting.min && setting.fallback <= setting.max,
 				`${component.type} ${setting.key} fallback must sit inside the bounds`,
 			);
-			assert.equal(setting.max, 100, `${component.type} ${setting.key} max should stay 100`);
+			if (setting.target !== 'options') {
+				assert.equal(setting.max, 100, `${component.type} ${setting.key} max should stay 100`);
+			}
 		}
 	}
 });
@@ -122,4 +141,73 @@ test('the text setting trims, and a cleared title removes the key', () => {
 	assert.deepEqual(coerceSettingValue(setting, '', QUERY_IDS), { title: undefined });
 	assert.deepEqual(coerceSettingValue(setting, '   ', QUERY_IDS), { title: undefined });
 	assert.deepEqual(coerceSettingValue(setting, 7, QUERY_IDS), {});
+});
+
+test('options-target numbers write the key and clear it with undefined', () => {
+	const setting = {
+		key: 'topN',
+		kind: 'number',
+		group: 'axes',
+		min: 0,
+		max: 200,
+		step: 1,
+		fallback: 0,
+		target: 'options',
+	};
+	assert.deepEqual(coerceSettingValue(setting, '12.6', QUERY_IDS), {
+		options: { topN: 13 },
+	});
+	assert.deepEqual(coerceSettingValue(setting, 999, QUERY_IDS), {
+		options: { topN: 200 },
+	});
+	assert.deepEqual(coerceSettingValue(setting, '', QUERY_IDS), {
+		options: { topN: undefined },
+	});
+});
+
+test('options-target numbers keep decimals when integer is false', () => {
+	const setting = {
+		key: 'yMin',
+		kind: 'number',
+		group: 'axes',
+		min: -100,
+		max: 100,
+		fallback: 0,
+		integer: false,
+		target: 'options',
+	};
+	assert.deepEqual(coerceSettingValue(setting, '1.5', QUERY_IDS), {
+		options: { yMin: 1.5 },
+	});
+});
+
+test('options-target text trims and deletes the key when cleared', () => {
+	const setting = {
+		key: 'xTitle',
+		kind: 'text',
+		group: 'axes',
+		target: 'options',
+	};
+	assert.deepEqual(coerceSettingValue(setting, '  Days  ', QUERY_IDS), {
+		options: { xTitle: 'Days' },
+	});
+	assert.deepEqual(coerceSettingValue(setting, '   ', QUERY_IDS), {
+		options: { xTitle: undefined },
+	});
+});
+
+test('the field setting accepts non-empty column keys only', () => {
+	const setting = {
+		key: 'yField',
+		kind: 'field',
+		group: 'axes',
+		role: 'y',
+		fallback: 'completed',
+		target: 'options',
+	};
+	assert.deepEqual(coerceSettingValue(setting, 'ratio', QUERY_IDS), {
+		options: { yField: 'ratio' },
+	});
+	assert.deepEqual(coerceSettingValue(setting, '', QUERY_IDS), {});
+	assert.deepEqual(coerceSettingValue(setting, 3, QUERY_IDS), {});
 });

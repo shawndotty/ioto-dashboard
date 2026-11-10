@@ -10,7 +10,7 @@ import {
 } from "../types";
 import { cell } from "./shared";
 
-const COLUMNS: DatasetColumn[] = [
+export const FILE_COLUMNS: DatasetColumn[] = [
 	{ key: "name", labelKey: "DATASET_COL_NAME", type: "text" },
 	{ key: "folder", labelKey: "DATASET_COL_FOLDER", type: "path" },
 	{ key: "extension", labelKey: "DATASET_COL_EXTENSION", type: "text" },
@@ -20,7 +20,7 @@ const COLUMNS: DatasetColumn[] = [
 
 export const fileAdapter: DatasetAdapter = (input): Dataset => {
 	const { request, query, snapshot } = input;
-	if (!query || !snapshot) return emptyDataset(request, COLUMNS);
+	if (!query || !snapshot) return emptyDataset(request, FILE_COLUMNS);
 	const files = resolveQuery(snapshot, query, {
 		customFilters: input.customFilters,
 		now: input.now,
@@ -39,7 +39,7 @@ export const fileAdapter: DatasetAdapter = (input): Dataset => {
 	return {
 		object: request.object,
 		measure: request.measure,
-		columns: COLUMNS,
+		columns: FILE_COLUMNS,
 		...truncated,
 		scalarText: String(files.length),
 	};

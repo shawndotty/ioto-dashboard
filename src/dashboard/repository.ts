@@ -402,7 +402,18 @@ export class DashboardRepository {
 				const { options, ...rest } = patch;
 				Object.assign(component, rest);
 				if (options !== undefined) {
-					component.options = { ...component.options, ...options };
+					const nextOptions: Record<string, string | number | boolean> = {
+						...(component.options ?? {}),
+					};
+					for (const [key, value] of Object.entries(options)) {
+						if (value === undefined) {
+							delete nextOptions[key];
+						} else {
+							nextOptions[key] = value;
+						}
+					}
+					component.options =
+						Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
 				}
 				// `undefined` means "remove this key" (e.g. a cleared title).
 				for (const key of Object.keys(rest)) {

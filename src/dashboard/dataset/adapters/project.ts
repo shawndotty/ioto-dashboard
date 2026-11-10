@@ -8,7 +8,7 @@ import {
 } from "../types";
 import { cell } from "./shared";
 
-const COLUMNS: DatasetColumn[] = [
+export const PROJECT_COLUMNS: DatasetColumn[] = [
 	{ key: "name", labelKey: "DATASET_COL_NAME", type: "text" },
 	{ key: "folder", labelKey: "DATASET_COL_FOLDER", type: "path" },
 	{ key: "files", labelKey: "DATASET_COL_FILES", type: "number", align: "right" },
@@ -41,13 +41,13 @@ export const projectAdapter: DatasetAdapter = (input): Dataset => {
 		},
 	}));
 	if (rows.length === 0 && !input.metric) {
-		return emptyDataset(request, COLUMNS);
+		return emptyDataset(request, PROJECT_COLUMNS);
 	}
 	const truncated = truncateRows(rows, request.limit);
 	return {
 		object: request.object,
 		measure: request.measure,
-		columns: COLUMNS,
+		columns: PROJECT_COLUMNS,
 		...truncated,
 		scalarText: String(groups.length),
 	};

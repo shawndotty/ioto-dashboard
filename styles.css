@@ -1759,32 +1759,78 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 }
 
 /* Dataset views: charts */
-.ioto-chart {
-    width: 100%;
+.ioto-chart-host {
+    display: flex;
+    flex-direction: column;
     height: 100%;
-    min-height: 80px;
-    display: block;
+    min-height: 0;
+    overflow: hidden;
 }
 
-.ioto-chart-axis {
+.ioto-chart {
+    width: 100%;
+    display: block;
+    flex: 0 0 auto;
+}
+
+.ioto-chart-axis-line {
     stroke: var(--background-modifier-border);
     stroke-width: 1;
     vector-effect: non-scaling-stroke;
 }
 
+.ioto-chart-grid {
+    stroke: var(--background-modifier-border);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    opacity: 0.6;
+    vector-effect: non-scaling-stroke;
+}
+
+.ioto-chart-tick,
+.ioto-chart-label {
+    fill: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-chart-axis-title {
+    fill: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-chart-value-label {
+    fill: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-chart-series-1 {
+    --ioto-series-color: color-mix(in srgb, var(--interactive-accent) 95%, transparent);
+}
+
+.ioto-chart-series-2 {
+    --ioto-series-color: color-mix(in srgb, var(--interactive-accent) 70%, transparent);
+}
+
+.ioto-chart-series-3 {
+    --ioto-series-color: color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+}
+
 .ioto-chart-path {
     fill: none;
-    stroke: var(--interactive-accent);
+    stroke: var(--ioto-series-color, var(--interactive-accent));
     stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
     vector-effect: non-scaling-stroke;
 }
 
 .ioto-chart-dot {
-    fill: var(--interactive-accent);
+    fill: var(--ioto-series-color, var(--interactive-accent));
 }
 
 .ioto-chart-bar-rect {
-    fill: var(--interactive-accent);
+    fill: var(--ioto-series-color, var(--interactive-accent));
     opacity: 0.85;
 }
 
@@ -1794,21 +1840,60 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 
 .ioto-chart-legend {
     display: flex;
+    flex: 0 0 auto;
     flex-wrap: wrap;
-    gap: 4px 12px;
-    margin-top: 6px;
+    gap: 2px 12px;
+    padding-top: 4px;
     font-size: var(--font-ui-smaller);
 }
 
 .ioto-chart-legend-item {
     display: flex;
+    align-items: center;
     gap: 6px;
     color: var(--text-muted);
 }
 
-.ioto-chart-legend-value {
+.ioto-chart-legend-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--ioto-series-color, var(--interactive-accent));
+}
+
+.ioto-chart-values {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    overflow: auto;
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-chart-value-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.ioto-chart-value-label {
+    overflow: hidden;
+    color: var(--text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-chart-value-text {
+    flex: 0 0 auto;
     color: var(--text-normal);
     font-variant-numeric: tabular-nums;
+}
+
+.ioto-chart-more {
+    flex: 0 0 auto;
+    padding-top: 4px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
 }
 
 /* Component picker */

@@ -7,6 +7,11 @@ import {
 	queryTargetsFor,
 	type ComponentSetting,
 } from "../../dashboard/registry";
+import { columnsForObject } from "../../dashboard/dataset/columns";
+import {
+	barObjectForQuery,
+	objectForQuery,
+} from "../../dashboard/dataset/object";
 import type { DashboardComponentConfig } from "../../dashboard/types";
 import {
 	firstQueryOfTarget,
@@ -49,7 +54,10 @@ export class ComponentInspector {
 	private lastComponentId: string | null = null;
 	private basisSelect: HTMLSelectElement | null = null;
 	private basisFallback: "file" | "section" = "file";
-	private limitInput: HTMLInputElement | null = null;
+	private inputRefs = new Map<
+		string,
+		{ input: HTMLInputElement; setting: ComponentSetting }
+	>();
 	private titleInput: HTMLInputElement | null = null;
 	private widthValueEl: HTMLElement | null = null;
 	private heightValueEl: HTMLElement | null = null;
@@ -61,7 +69,7 @@ export class ComponentInspector {
 	private upEl: HTMLButtonElement | null = null;
 	private downEl: HTMLButtonElement | null = null;
 	private orderPositionEl: HTMLElement | null = null;
-	private titleDebouncer: Debouncer<[string], void> | null = null;
+	private textDebouncers = new Set<Debouncer<[string], void>>();
 
 	constructor(
 		container: HTMLElement,
@@ -91,19 +99,26 @@ export class ComponentInspector {
 	}
 
 	destroy(): void {
-		this.cancelTitleDebounce();
+		this.cancelTextDebouncers();
 		this.resetRefs();
 		this.root.remove();
 	}
 
 	private signatureOf(state: InspectorState): string {
 		const definition = state.target.definition;
+		const config = state.target.config;
 		return [
 			state.target.config.id,
+			state.target.config.queryId,
 			definition?.type ?? "__unknown__",
 			state.editable ? "edit" : "view",
 			(definition?.settings ?? [])
-				.map((setting) => `${setting.group}:${setting.kind}:${setting.key}`)
+				.map(
+					(setting) =>
+						`${setting.group}:${setting.kind}:${setting.key}:${
+							setting.when ? (setting.when(config) ? "1" : "0") : "2"
+						}`,
+				)
 				.join(","),
 			String(state.queriesVersion),
 		].join("|");
@@ -112,7 +127,7 @@ export class ComponentInspector {
 	private renderEmpty(): void {
 		if (this.signature === "empty") return;
 		this.signature = "empty";
-		this.cancelTitleDebounce();
+		this.cancelTextDebouncers();
 		this.resetRefs();
 		this.root.empty();
 		this.root.removeClass("is-readonly");
@@ -127,7 +142,7 @@ export class ComponentInspector {
 	}
 
 	private build(state: InspectorState): void {
-		this.cancelTitleDebounce();
+		this.cancelTextDebouncers();
 		this.resetRefs();
 		this.root.empty();
 		this.root.toggleClass("is-readonly", !state.editable);
@@ -163,6 +178,15 @@ export class ComponentInspector {
 		if (dataSettings.length > 0) {
 			const section = this.createSection("INSPECTOR_SECTION_DATA");
 			for (const setting of dataSettings) {
+				this.buildSetting(section, setting, state);
+			}
+		}
+		const axesSettings = settings.filter(
+			(setting) => setting.group === "axes",
+		);
+		if (axesSettings.length > 0) {
+			const section = this.createSection("INSPECTOR_SECTION_AXIS");
+			for (const setting of axesSettings) {
 				this.buildSetting(section, setting, state);
 			}
 		}
@@ -237,7 +261,10 @@ export class ComponentInspector {
 			}
 			case "number": {
 				field.createEl("label", {
-					text: t("INSPECTOR_LIMIT_LABEL"),
+					text: t(
+						(setting.labelKey ??
+							"INSPECTOR_LIMIT_LABEL") as LabelKey,
+					),
 				});
 				const input = field.createEl("input", {
 					type: "number",
@@ -247,8 +274,9 @@ export class ComponentInspector {
 						step: String(setting.step ?? 1),
 					},
 				});
+				const stored = this.storedSettingValue(state, setting);
 				input.value = String(
-					state.target.config.limit ?? setting.fallback,
+					typeof stored === "number" ? stored : setting.fallback,
 				);
 				input.disabled = !state.editable;
 				const queryIds = new Set(
@@ -260,13 +288,23 @@ export class ComponentInspector {
 						input.value,
 						queryIds,
 					);
-					if (patch.limit === undefined) {
+					if (setting.target === "options") {
+						// A cleared row deletes the key, which restores the default.
+						this.deps.patch(patch);
+						return;
+					}
+					const value = (
+						patch as Record<string, unknown>
+					)[setting.key];
+					if (typeof value !== "number") {
 						input.value = String(
-							state.target.config.limit ?? setting.fallback,
+							typeof stored === "number"
+								? stored
+								: setting.fallback,
 						);
 						return;
 					}
-					input.value = String(patch.limit);
+					input.value = String(value);
 					this.deps.patch(patch);
 				};
 				input.addEventListener("change", commit);
@@ -275,11 +313,16 @@ export class ComponentInspector {
 					event.preventDefault();
 					commit();
 				});
-				this.limitInput = input;
+				this.inputRefs.set(setting.key, { input, setting });
 				return;
 			}
 			case "text": {
-				field.createEl("label", { text: t("INSPECTOR_TITLE_LABEL") });
+				field.createEl("label", {
+					text: t(
+						(setting.labelKey ??
+							"INSPECTOR_TITLE_LABEL") as LabelKey,
+					),
+				});
 				const input = field.createEl("input", {
 					type: "text",
 					attr: {
@@ -289,7 +332,8 @@ export class ComponentInspector {
 						),
 					},
 				});
-				input.value = state.target.config.title ?? "";
+				const stored = this.storedSettingValue(state, setting);
+				input.value = typeof stored === "string" ? stored : "";
 				input.disabled = !state.editable;
 				const queryIds = new Set(
 					state.queries.map((query) => query.id),
@@ -303,10 +347,8 @@ export class ComponentInspector {
 					300,
 					true,
 				);
-				this.titleDebouncer = debouncer;
-				input.addEventListener("input", () =>
-					debouncer(input.value),
-				);
+				this.textDebouncers.add(debouncer);
+				input.addEventListener("input", () => debouncer(input.value));
 				input.addEventListener("keydown", (event) => {
 					if (event.key !== "Enter") return;
 					event.preventDefault();
@@ -315,7 +357,41 @@ export class ComponentInspector {
 						coerceSettingValue(setting, input.value, queryIds),
 					);
 				});
-				this.titleInput = input;
+				if (setting.key === "title") this.titleInput = input;
+				this.inputRefs.set(setting.key, { input, setting });
+				return;
+			}
+			case "field": {
+				field.createEl("label", { text: t(setting.labelKey as LabelKey) });
+				const select = field.createEl("select", { cls: "dropdown" });
+				const options = this.fieldOptions(state, setting);
+				const stored = this.storedSettingValue(state, setting);
+				const desired =
+					typeof stored === "string" ? stored : setting.fallback;
+				const current = options.some(
+					(option) => option.value === desired,
+				)
+					? desired
+					: (options[0]?.value ?? setting.fallback);
+				for (const option of options) {
+					select.createEl("option", {
+						value: option.value,
+						text: t(option.labelKey as LabelKey),
+					});
+				}
+				select.value = current;
+				select.disabled = !state.editable;
+				const queryIds = new Set(
+					state.queries.map((query) => query.id),
+				);
+				select.addEventListener("change", () => {
+					const patch = coerceSettingValue(
+						setting,
+						select.value,
+						queryIds,
+					);
+					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+				});
 				return;
 			}
 			case "select": {
@@ -385,6 +461,35 @@ export class ComponentInspector {
 				return;
 			}
 		}
+	}
+
+	private fieldOptions(
+		state: InspectorState,
+		setting: Extract<ComponentSetting, { kind: "field" }>,
+	): Array<{ value: string; labelKey: string }> {
+		const query = state.queries.find(
+			(item) => item.id === state.target.config.queryId,
+		);
+		// Bars aggregate task/note queries per project; other components read the
+		// query's own object.
+		const object =
+			state.target.definition?.type === "bar-chart"
+				? barObjectForQuery(query)
+				: objectForQuery(query);
+		return columnsForObject(object)
+			.filter((column) =>
+				setting.role === "y"
+					? column.type === "number" ||
+						column.type === "percent" ||
+						column.type === "size"
+					: column.type === "text" ||
+						column.type === "date" ||
+						column.type === "path",
+			)
+			.map((column) => ({
+				value: column.key,
+				labelKey: column.labelKey,
+			}));
 	}
 
 	private buildQuerySetting(
@@ -720,18 +825,21 @@ export class ComponentInspector {
 			this.basisSelect.value = config.basis ?? this.basisFallback;
 			this.basisSelect.disabled = !state.editable;
 		}
-		if (this.limitInput) {
-			if (this.limitInput.ownerDocument.activeElement !== this.limitInput) {
-				const fallback = this.limitFallback(state);
-				this.limitInput.value = String(config.limit ?? fallback);
+		for (const [, entry] of this.inputRefs) {
+			const { input, setting } = entry;
+			if (input.ownerDocument.activeElement !== input) {
+				const stored = this.storedSettingValue(state, setting);
+				if (setting.kind === "number") {
+					input.value = String(
+						typeof stored === "number"
+							? stored
+							: setting.fallback,
+					);
+				} else if (setting.kind === "text") {
+					input.value = typeof stored === "string" ? stored : "";
+				}
 			}
-			this.limitInput.disabled = !state.editable;
-		}
-		if (this.titleInput) {
-			if (this.titleInput.ownerDocument.activeElement !== this.titleInput) {
-				this.titleInput.value = config.title ?? "";
-			}
-			this.titleInput.disabled = !state.editable;
+			input.disabled = !state.editable;
 		}
 
 		const size = clampSize(config.w, config.h, bounds);
@@ -796,13 +904,6 @@ export class ComponentInspector {
 			| undefined;
 	}
 
-	private limitFallback(state: InspectorState): number {
-		const setting = state.target.definition?.settings?.find(
-			(item) => item.kind === "number",
-		);
-		return setting && setting.kind === "number" ? setting.fallback : 20;
-	}
-
 	private breadcrumbText(state: InspectorState): string {
 		const { config, definition, pageName } = state.target;
 		const title = config.title
@@ -831,10 +932,9 @@ export class ComponentInspector {
 		first?.focus();
 	}
 
-	private cancelTitleDebounce(): void {
-		if (!this.titleDebouncer) return;
-		this.titleDebouncer.cancel();
-		this.titleDebouncer = null;
+	private cancelTextDebouncers(): void {
+		for (const debouncer of this.textDebouncers) debouncer.cancel();
+		this.textDebouncers.clear();
 	}
 
 	private resetRefs(): void {
@@ -848,7 +948,7 @@ export class ComponentInspector {
 		this.activeQueryTarget = null;
 		this.queryHintEl = null;
 		this.basisSelect = null;
-		this.limitInput = null;
+		this.inputRefs.clear();
 		this.titleInput = null;
 		this.widthValueEl = null;
 		this.heightValueEl = null;

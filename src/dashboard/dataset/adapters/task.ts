@@ -10,7 +10,7 @@ import {
 } from "../types";
 import { cell } from "./shared";
 
-const COLUMNS: DatasetColumn[] = [
+export const TASK_COLUMNS: DatasetColumn[] = [
 	{ key: "text", labelKey: "DATASET_COL_TEXT", type: "text" },
 	{ key: "note", labelKey: "DATASET_COL_NOTE", type: "text" },
 	{ key: "project", labelKey: "DATASET_COL_PROJECT", type: "text" },
@@ -18,7 +18,7 @@ const COLUMNS: DatasetColumn[] = [
 	{ key: "status", labelKey: "DATASET_COL_STATUS", type: "text" },
 ];
 
-const SERIES_COLUMNS: DatasetColumn[] = [
+export const TASK_SERIES_COLUMNS: DatasetColumn[] = [
 	{ key: "date", labelKey: "DATASET_COL_DATE", type: "date" },
 	{ key: "total", labelKey: "DATASET_COL_TASKS", type: "number", align: "right" },
 	{
@@ -50,12 +50,12 @@ export const taskAdapter: DatasetAdapter = (input): Dataset => {
 		return {
 			object: request.object,
 			measure: request.measure,
-			columns: SERIES_COLUMNS,
+			columns: TASK_SERIES_COLUMNS,
 			...truncated,
 		};
 	}
 
-	if (!query || !snapshot) return emptyDataset(request, COLUMNS);
+	if (!query || !snapshot) return emptyDataset(request, TASK_COLUMNS);
 	const resolved = resolveQuery(snapshot, query, {
 		customFilters: input.customFilters,
 		sections: request.basis === "file" ? ALL_SECTION_ROLES : undefined,
@@ -91,7 +91,7 @@ export const taskAdapter: DatasetAdapter = (input): Dataset => {
 	return {
 		object: request.object,
 		measure: request.measure,
-		columns: COLUMNS,
+		columns: TASK_COLUMNS,
 		...truncated,
 		scalarText: scalar,
 		ratio: ratio ?? null,
