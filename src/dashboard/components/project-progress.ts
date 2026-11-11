@@ -26,7 +26,6 @@ export const projectProgressComponent: ComponentDefinition = {
 		w: 6,
 		h: 3,
 	}),
-	size: { maxH: 8 },
 	settings: [
 		{ key: "queryId", kind: "query", group: "data" },
 		{ key: "basis", kind: "basis", group: "data", fallback: "section" },

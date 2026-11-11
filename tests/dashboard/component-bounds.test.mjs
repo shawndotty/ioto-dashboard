@@ -37,10 +37,10 @@ test('unknown component types fall back to the global bounds', () => {
 	assert.deepEqual(boundsForType(registry, 'missing-type'), DEFAULT_SIZE_BOUNDS);
 });
 
-test('the three built-in components declare the expected height caps', () => {
+test('built-in components resolve the expected height caps', () => {
 	const registry = createComponentRegistry();
 
 	assert.equal(boundsForType(registry, 'kpi').maxH, 6);
-	assert.equal(boundsForType(registry, 'project-progress').maxH, 8);
+	assert.equal(boundsForType(registry, 'project-progress').maxH, DEFAULT_SIZE_BOUNDS.maxH);
 	assert.equal(boundsForType(registry, 'unfinished-tasks').maxH, 24);
 });
