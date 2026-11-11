@@ -16,7 +16,7 @@ import type { DashboardComponentConfig } from "./types";
 
 export type ComponentStatus = "loading" | "ready" | "empty" | "error";
 
-export type ComponentSettingGroup = "data" | "axes" | "display";
+export type ComponentSettingGroup = "data" | "axes" | "display" | "style";
 
 export type ComponentCategory =
 	| "overview"

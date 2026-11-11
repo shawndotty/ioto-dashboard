@@ -42,6 +42,7 @@ import {
 	type ComponentStatus,
 	type SizeBounds,
 } from "../dashboard/registry";
+import { cardStyleVars } from "../dashboard/style-settings";
 import {
 	activeDashboard as activeDashboardOf,
 	activePageOf,
@@ -927,6 +928,12 @@ export class CustomDashboardView extends ItemView {
 		const card = grid.ownerDocument.createElement("div");
 		card.addClass("ioto-dashboard-card");
 		card.setAttr("data-component-id", config.id);
+		const style = cardStyleVars(config.options);
+		if (style.fg) card.style.setProperty("--ioto-card-fg", style.fg);
+		if (style.bg) card.style.setProperty("--ioto-card-bg", style.bg);
+		if (style.align) card.style.setProperty("--ioto-card-align", style.align);
+		card.toggleClass("has-custom-fg", Boolean(style.fg));
+		card.toggleClass("has-custom-bg", Boolean(style.bg));
 		const size = clampSize(config.w, config.h, this.boundsFor(config));
 		card.style.gridColumn = `span ${size.w}`;
 		card.style.gridRow = `span ${size.h}`;

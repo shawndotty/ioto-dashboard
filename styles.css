@@ -565,8 +565,36 @@
     min-width: 0;
     border: 1px solid var(--background-modifier-border);
     border-radius: 10px;
-    background: var(--background-secondary);
+    background: var(--ioto-card-bg, var(--background-secondary));
     overflow: hidden;
+}
+
+/* 自定义背景覆盖整卡时，标题栏不再叠一层主题底色 */
+.ioto-custom-dashboard-view
+    .ioto-dashboard-card.has-custom-bg
+    .ioto-dashboard-card-header {
+    background: transparent;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-card-title,
+.ioto-custom-dashboard-view .ioto-dashboard-card-body {
+    text-align: var(--ioto-card-align, start);
+}
+
+/* 卡片级覆盖 --text-*，一处生效于标题、KPI、列表与图表文字 */
+.ioto-custom-dashboard-view .ioto-dashboard-card.has-custom-fg {
+    --text-normal: var(--ioto-card-fg);
+    --text-accent: var(--ioto-card-fg);
+    --text-muted: color-mix(
+        in srgb,
+        var(--ioto-card-fg) 68%,
+        var(--ioto-card-bg, var(--background-secondary))
+    );
+    --text-faint: color-mix(
+        in srgb,
+        var(--ioto-card-fg) 48%,
+        var(--ioto-card-bg, var(--background-secondary))
+    );
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-card-header {
@@ -1774,6 +1802,29 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 .ioto-inspector-field select,
 .ioto-inspector-field input:not([type="checkbox"]) {
     width: 100%;
+}
+
+.ioto-inspector-color-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ioto-inspector-color-row input[type="color"] {
+    flex: 1 1 auto;
+    width: auto;
+}
+
+.ioto-inspector-color-row .ioto-inspector-reset {
+    flex: 0 0 auto;
+}
+
+.ioto-inspector-color-row .ioto-inspector-reset[hidden] {
+    display: none;
+}
+
+.ioto-inspector-color-row.is-unset input[type="color"] {
+    opacity: 0.55;
 }
 
 .ioto-inspector-field > label.ioto-inspector-toggle {
