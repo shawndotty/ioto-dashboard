@@ -45,7 +45,7 @@ export class ComponentInspector {
 	private state: InspectorState | null = null;
 	private headerEl: HTMLElement | null = null;
 	private menuButtonEl: HTMLButtonElement | null = null;
-	private pageCrumbEl: HTMLButtonElement | null = null;
+	private pageCrumbEl: HTMLAnchorElement | null = null;
 	private titleCrumbEl: HTMLElement | null = null;
 	private querySelect: HTMLSelectElement | null = null;
 	private queryTypeSelect: HTMLSelectElement | null = null;
@@ -72,6 +72,8 @@ export class ComponentInspector {
 	private downEl: HTMLButtonElement | null = null;
 	private orderPositionEl: HTMLElement | null = null;
 	private textDebouncers = new Set<Debouncer<[string], void>>();
+	/** Session-only collapse state keyed by section title key, never persisted. */
+	private collapsedSections = new Set<string>();
 
 	constructor(
 		container: HTMLElement,
@@ -207,15 +209,45 @@ export class ComponentInspector {
 		buildAction?: (head: HTMLElement) => void,
 	): HTMLElement {
 		const section = this.root.createDiv({ cls: "ioto-inspector-section" });
+		const key = String(titleKey);
+		section.dataset.sectionKey = key;
 		const head = section.createDiv({
 			cls: "ioto-inspector-section-head",
 		});
-		head.createDiv({
+
+		const toggle = head.createEl("button", {
+			cls: "ioto-inspector-section-toggle",
+			attr: { type: "button", "aria-expanded": "true" },
+		});
+		const chevron = toggle.createSpan({
+			cls: "ioto-inspector-section-chevron",
+		});
+		setIcon(chevron, "chevron-down");
+		toggle.createSpan({
 			cls: "ioto-inspector-section-title",
 			text: t(titleKey),
 		});
+
+		// Head actions (layout reset) must stay siblings of the toggle button.
 		buildAction?.(head);
-		return section;
+
+		const body = section.createDiv({ cls: "ioto-inspector-section-body" });
+		if (this.collapsedSections.has(key)) this.setSectionCollapsed(section, true);
+		toggle.onClickEvent(() => {
+			this.setSectionCollapsed(section, !section.hasClass("is-collapsed"));
+		});
+		return body;
+	}
+
+	private setSectionCollapsed(section: HTMLElement, collapsed: boolean): void {
+		const key = section.dataset.sectionKey;
+		if (!key) return;
+		section.toggleClass("is-collapsed", collapsed);
+		section
+			.querySelector<HTMLElement>(".ioto-inspector-section-toggle")
+			?.setAttr("aria-expanded", String(!collapsed));
+		if (collapsed) this.collapsedSections.add(key);
+		else this.collapsedSections.delete(key);
 	}
 
 	private buildSetting(
@@ -420,8 +452,14 @@ export class ComponentInspector {
 				return;
 			}
 			case "toggle": {
-				field.createEl("label", { text: t(setting.labelKey as LabelKey) });
-				const input = field.createEl("input", { type: "checkbox" });
+				const row = field.createEl("label", {
+					cls: "ioto-inspector-toggle",
+				});
+				row.createSpan({
+					cls: "ioto-inspector-toggle-label",
+					text: t(setting.labelKey as LabelKey),
+				});
+				const input = row.createEl("input", { type: "checkbox" });
 				const stored = this.storedSettingValue(state, setting);
 				input.checked =
 					typeof stored === "boolean" ? stored : setting.fallback;
@@ -786,7 +824,10 @@ export class ComponentInspector {
 		const { config, bounds, defaults } = state.target;
 		if (this.pageCrumbEl) {
 			this.pageCrumbEl.setText(state.target.pageName);
-			this.pageCrumbEl.disabled = !state.editable || !this.deps.openPageSettings;
+			const enabled = state.editable && !!this.deps.openPageSettings;
+			this.pageCrumbEl.toggleClass("is-disabled", !enabled);
+			this.pageCrumbEl.setAttr("aria-disabled", String(!enabled));
+			this.pageCrumbEl.tabIndex = enabled ? 0 : -1;
 		}
 		this.titleCrumbEl?.setText(this.titleText(state));
 		if (this.querySelect) {
@@ -914,15 +955,25 @@ export class ComponentInspector {
 		const breadcrumb = header.createDiv({
 			cls: "ioto-inspector-breadcrumb",
 		});
-		const page = breadcrumb.createEl("button", {
+		const page = breadcrumb.createEl("a", {
 			cls: "ioto-inspector-crumb",
 			attr: {
-				type: "button",
+				role: "link",
+				tabindex: "0",
 				title: t("INSPECTOR_OPEN_PAGE_SETTINGS"),
 			},
 			text: state.target.pageName,
 		});
-		page.onClickEvent(() => this.deps.openPageSettings?.());
+		const openPage = (): void => {
+			if (!this.state?.editable || !this.deps.openPageSettings) return;
+			this.deps.openPageSettings();
+		};
+		page.onClickEvent(openPage);
+		page.addEventListener("keydown", (event) => {
+			if (event.key !== "Enter") return;
+			event.preventDefault();
+			openPage();
+		});
 		breadcrumb.createSpan({
 			cls: "ioto-inspector-crumb-sep",
 			attr: { "aria-hidden": "true" },
@@ -953,11 +1004,18 @@ export class ComponentInspector {
 			return;
 		}
 		if (this.querySelect) {
+			const section = this.querySelect.closest<HTMLElement>(
+				".ioto-inspector-section",
+			);
+			if (section?.hasClass("is-collapsed")) {
+				this.setSectionCollapsed(section, false);
+			}
 			this.querySelect.focus();
 			return;
 		}
 		const first = this.root.querySelector<HTMLElement>(
-			"select, input",
+			".ioto-inspector-section:not(.is-collapsed) select, " +
+				".ioto-inspector-section:not(.is-collapsed) input",
 		);
 		first?.focus();
 	}

@@ -28,6 +28,8 @@ export class PageInspector {
 	private rowHeightValueEl: HTMLElement | null = null;
 	private menuButtonEl: HTMLButtonElement | null = null;
 	private nameDebouncer: Debouncer<[string], void> | null = null;
+	/** Session-only collapse state keyed by section title key, never persisted. */
+	private collapsedSections = new Set<string>();
 
 	constructor(
 		container: HTMLElement,
@@ -179,14 +181,42 @@ export class PageInspector {
 
 	private createSection(titleKey: LabelKey): HTMLElement {
 		const section = this.root.createDiv({ cls: "ioto-inspector-section" });
+		const key = String(titleKey);
+		section.dataset.sectionKey = key;
 		const head = section.createDiv({
 			cls: "ioto-inspector-section-head",
 		});
-		head.createDiv({
+
+		const toggle = head.createEl("button", {
+			cls: "ioto-inspector-section-toggle",
+			attr: { type: "button", "aria-expanded": "true" },
+		});
+		const chevron = toggle.createSpan({
+			cls: "ioto-inspector-section-chevron",
+		});
+		setIcon(chevron, "chevron-down");
+		toggle.createSpan({
 			cls: "ioto-inspector-section-title",
 			text: t(titleKey),
 		});
-		return section;
+
+		const body = section.createDiv({ cls: "ioto-inspector-section-body" });
+		if (this.collapsedSections.has(key)) this.setSectionCollapsed(section, true);
+		toggle.onClickEvent(() => {
+			this.setSectionCollapsed(section, !section.hasClass("is-collapsed"));
+		});
+		return body;
+	}
+
+	private setSectionCollapsed(section: HTMLElement, collapsed: boolean): void {
+		const key = section.dataset.sectionKey;
+		if (!key) return;
+		section.toggleClass("is-collapsed", collapsed);
+		section
+			.querySelector<HTMLElement>(".ioto-inspector-section-toggle")
+			?.setAttr("aria-expanded", String(!collapsed));
+		if (collapsed) this.collapsedSections.add(key);
+		else this.collapsedSections.delete(key);
 	}
 
 	private buildBasicSection(state: PageInspectorState): void {

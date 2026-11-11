@@ -1550,21 +1550,21 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 .ioto-inspector-crumb {
     max-width: 50%;
     min-width: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
+    color: var(--text-normal);
     font: inherit;
     font-weight: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--text-faint);
+    text-underline-offset: 2px;
     cursor: pointer;
-    box-shadow: none;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.ioto-inspector-crumb:hover:not(:disabled) {
-    text-decoration: underline;
+.ioto-inspector-crumb:hover {
+    color: var(--text-accent);
+    text-decoration-color: currentColor;
 }
 
 .ioto-inspector-crumb:focus-visible {
@@ -1573,8 +1573,11 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     border-radius: 3px;
 }
 
-.ioto-inspector-crumb:disabled {
+.ioto-inspector-crumb.is-disabled {
+    color: var(--text-muted);
+    text-decoration-color: transparent;
     cursor: default;
+    pointer-events: none;
 }
 
 .ioto-inspector-crumb-sep {
@@ -1667,6 +1670,65 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     color: var(--text-muted);
 }
 
+.ioto-inspector-section-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ioto-inspector-section.is-collapsed .ioto-inspector-section-body {
+    display: none;
+}
+
+.ioto-inspector .ioto-inspector-section-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex: 1 1 auto;
+    gap: 4px;
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-semibold);
+    white-space: normal;
+    cursor: pointer;
+}
+
+.ioto-inspector .ioto-inspector-section-toggle:hover,
+.ioto-inspector .ioto-inspector-section-toggle:active {
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-normal);
+}
+
+.ioto-inspector .ioto-inspector-section-toggle:hover .ioto-inspector-section-title,
+.ioto-inspector .ioto-inspector-section-toggle:focus-visible .ioto-inspector-section-title {
+    color: var(--text-normal);
+}
+
+.ioto-inspector .ioto-inspector-section-toggle:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+    box-shadow: none;
+}
+
+.ioto-inspector-section-chevron {
+    display: inline-flex;
+    width: 14px;
+    height: 14px;
+    transition: transform 120ms ease;
+}
+
+.ioto-inspector-section.is-collapsed .ioto-inspector-section-chevron {
+    transform: rotate(-90deg);
+}
+
 .ioto-inspector-field {
     display: flex;
     flex-direction: column;
@@ -1680,8 +1742,22 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 }
 
 .ioto-inspector-field select,
-.ioto-inspector-field input {
+.ioto-inspector-field input:not([type="checkbox"]) {
     width: 100%;
+}
+
+.ioto-inspector-field > label.ioto-inspector-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+}
+
+/* 名称可收缩换行，避免长文案把开关挤出面板 */
+.ioto-inspector-toggle-label {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .ioto-inspector-query-row {
