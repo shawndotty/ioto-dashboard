@@ -480,4 +480,14 @@ export default {
 	COMPONENT_PICKER_SEARCH: "Search components",
 	DASHBOARD_NEED_QUERY: "Create a query for this object first.",
 	DASHBOARD_TABLE_EMPTY: "No rows",
+	INSPECTOR_SECTION_STYLE: "Style",
+	SETTING_TEXT_ALIGN: "Text alignment",
+	SETTING_ALIGN_LEFT: "Left",
+	SETTING_ALIGN_CENTER: "Center",
+	SETTING_ALIGN_RIGHT: "Right",
+	SETTING_TEXT_COLOR: "Text color",
+	SETTING_BACKGROUND_COLOR: "Background color",
+	SETTING_STYLE_COLOR_HINT:
+		"Overrides the theme, check contrast with the background. Leave unset to follow the theme.",
+	SETTING_STYLE_RESET_COLOR: "Reset to theme color",
 };

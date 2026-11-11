@@ -12,6 +12,7 @@ import {
 	barObjectForQuery,
 	objectForQuery,
 } from "../../dashboard/dataset/object";
+import { settingsOf } from "../../dashboard/style-settings";
 import type { DashboardComponentConfig } from "../../dashboard/types";
 import {
 	firstQueryOfTarget,
@@ -34,6 +35,9 @@ export interface ComponentInspectorDeps {
 }
 
 type LabelKey = Parameters<typeof t>[0];
+
+/** Placeholder shown while a color option is unset; the value is never stored. */
+const COLOR_PLACEHOLDER = "#5772ff";
 
 /**
  * Settings panel for one selected component. Reads everything from the passed
@@ -59,6 +63,15 @@ export class ComponentInspector {
 	private inputRefs = new Map<
 		string,
 		{ input: HTMLInputElement; setting: ComponentSetting }
+	>();
+	private colorRefs = new Map<
+		string,
+		{
+			input: HTMLInputElement;
+			reset: HTMLButtonElement;
+			row: HTMLElement;
+			setting: ComponentSetting;
+		}
 	>();
 	private titleInput: HTMLInputElement | null = null;
 	private widthValueEl: HTMLElement | null = null;
@@ -116,7 +129,7 @@ export class ComponentInspector {
 			state.target.config.queryId,
 			definition?.type ?? "__unknown__",
 			state.editable ? "edit" : "view",
-			(definition?.settings ?? [])
+			(definition ? settingsOf(definition) : [])
 				.map(
 					(setting) =>
 						`${setting.group}:${setting.kind}:${setting.key}:${
@@ -170,7 +183,7 @@ export class ComponentInspector {
 			});
 		}
 
-		const settings = (definition.settings ?? []).filter(
+		const settings = settingsOf(definition).filter(
 			(setting) => !setting.when || setting.when(state.target.config),
 		);
 		const dataSettings = settings.filter(
@@ -197,6 +210,15 @@ export class ComponentInspector {
 		if (displaySettings.length > 0) {
 			const section = this.createSection("INSPECTOR_SECTION_DISPLAY");
 			for (const setting of displaySettings) {
+				this.buildSetting(section, setting, state);
+			}
+		}
+		const styleSettings = settings.filter(
+			(setting) => setting.group === "style",
+		);
+		if (styleSettings.length > 0) {
+			const section = this.createSection("INSPECTOR_SECTION_STYLE");
+			for (const setting of styleSettings) {
 				this.buildSetting(section, setting, state);
 			}
 		}
@@ -494,11 +516,30 @@ export class ComponentInspector {
 			}
 			case "color": {
 				field.createEl("label", { text: t(setting.labelKey as LabelKey) });
-				const input = field.createEl("input", { type: "color" });
-				const stored = this.storedSettingValue(state, setting);
-				input.value =
-					typeof stored === "string" ? stored : "#5772ff";
+				const row = field.createDiv({ cls: "ioto-inspector-color-row" });
+				const input = row.createEl("input", {
+					type: "color",
+					attr: { "aria-label": t(setting.labelKey as LabelKey) },
+				});
+				const reset = row.createEl("button", {
+					cls: "clickable-icon ioto-inspector-reset",
+					attr: {
+						type: "button",
+						"aria-label": t("SETTING_STYLE_RESET_COLOR"),
+						title: t("SETTING_STYLE_RESET_COLOR"),
+					},
+					text: "↺",
+				});
+				// Unset colours show a placeholder swatch and hide the reset button.
+				const apply = (stored: unknown): void => {
+					const hasValue = typeof stored === "string";
+					input.value = hasValue ? stored : COLOR_PLACEHOLDER;
+					row.toggleClass("is-unset", !hasValue);
+					reset.hidden = !hasValue;
+				};
+				apply(this.storedSettingValue(state, setting));
 				input.disabled = !state.editable;
+				reset.disabled = !state.editable;
 				const queryIds = new Set(
 					state.queries.map((query) => query.id),
 				);
@@ -509,6 +550,20 @@ export class ComponentInspector {
 						queryIds,
 					);
 					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+					apply(input.value);
+				});
+				reset.onClickEvent(() => {
+					// `undefined` removes the options key, restoring the theme.
+					this.deps.patch({
+						options: { [setting.key]: undefined },
+					} as unknown as Partial<DashboardComponentConfig>);
+					apply(undefined);
+				});
+				this.colorRefs.set(setting.key, {
+					input,
+					reset,
+					row,
+					setting,
 				});
 				return;
 			}
@@ -903,6 +958,19 @@ export class ComponentInspector {
 			}
 			input.disabled = !state.editable;
 		}
+		for (const [, entry] of this.colorRefs) {
+			const { input, reset, row, setting } = entry;
+			const stored = this.storedSettingValue(state, setting);
+			const hasValue = typeof stored === "string";
+			if (hasValue && input.ownerDocument.activeElement !== input) {
+				input.value = stored;
+			}
+			if (!hasValue) input.value = COLOR_PLACEHOLDER;
+			row.toggleClass("is-unset", !hasValue);
+			reset.hidden = !hasValue;
+			input.disabled = !state.editable;
+			reset.disabled = !state.editable;
+		}
 
 		const size = clampSize(config.w, config.h, bounds);
 		const widthText = `${t("DASHBOARD_WIDTH")}: ${size.w} (${bounds.minW}–${bounds.maxW})`;
@@ -1056,6 +1124,7 @@ export class ComponentInspector {
 		this.queryHintEl = null;
 		this.basisSelect = null;
 		this.inputRefs.clear();
+		this.colorRefs.clear();
 		this.titleInput = null;
 		this.widthValueEl = null;
 		this.heightValueEl = null;

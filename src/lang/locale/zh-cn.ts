@@ -474,4 +474,14 @@ export default {
 	COMPONENT_PICKER_SEARCH: "搜索组件",
 	DASHBOARD_NEED_QUERY: "请先为该对象创建一个查询。",
 	DASHBOARD_TABLE_EMPTY: "暂无数据",
+	INSPECTOR_SECTION_STYLE: "样式",
+	SETTING_TEXT_ALIGN: "文字对齐",
+	SETTING_ALIGN_LEFT: "左对齐",
+	SETTING_ALIGN_CENTER: "居中",
+	SETTING_ALIGN_RIGHT: "右对齐",
+	SETTING_TEXT_COLOR: "文字颜色",
+	SETTING_BACKGROUND_COLOR: "背景颜色",
+	SETTING_STYLE_COLOR_HINT:
+		"颜色会覆盖明暗主题，请注意与背景的对比度；不设置时跟随主题。",
+	SETTING_STYLE_RESET_COLOR: "恢复主题颜色",
 };
