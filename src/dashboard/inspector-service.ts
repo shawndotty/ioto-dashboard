@@ -56,6 +56,7 @@ export interface ComponentInspectorController extends InspectorControllerBase {
 	stepSize(axis: "w" | "h", direction: -1 | 1): void;
 	resetSize(): void;
 	move(offset: -1 | 1): void;
+	duplicate(): void;
 	remove(): void;
 	openPageSettings(): void;
 }

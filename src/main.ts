@@ -253,6 +253,19 @@ export default class IotoDashboardPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "duplicate-ioto-canvas-component",
+			name: t("DASHBOARD_DUPLICATE_COMPONENT"),
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(
+					CustomDashboardView,
+				);
+				if (!view?.canDuplicateSelected()) return false;
+				if (!checking) void view.duplicateSelectedComponent();
+				return true;
+			},
+		});
+
 		// Settings Tab
 		this.addSettingTab(new DashboardSettingTab(this.app, this));
 	}

@@ -202,6 +202,9 @@ export default {
 	DASHBOARD_NEW: "New dashboard",
 	DASHBOARD_RENAME: "Rename",
 	DASHBOARD_DUPLICATE: "Duplicate",
+	DASHBOARD_DUPLICATE_COMPONENT: "Duplicate component",
+	DASHBOARD_COMPONENT_DUPLICATED: "Copied component: {0}",
+	DASHBOARD_COMPONENT_COPY_SUFFIX: " (copy)",
 	DASHBOARD_DELETE: "Delete",
 	DASHBOARD_DELETE_TITLE: "Delete dashboard",
 	DASHBOARD_DELETE_MSG:

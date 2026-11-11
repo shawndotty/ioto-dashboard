@@ -1330,6 +1330,7 @@ export class CustomDashboardView extends ItemView {
 						this.controller?.stepSize(axis, direction),
 					resetSize: () => this.controller?.resetSize(),
 					move: (offset) => this.controller?.move(offset),
+					duplicate: () => this.controller?.duplicate(),
 					remove: () => this.controller?.remove(),
 					openPageSettings: () => {
 						const page = this.activePage;
@@ -1418,6 +1419,7 @@ export class CustomDashboardView extends ItemView {
 				const id = this.selectedComponentId;
 				if (id) void this.nudgeComponent(id, offset);
 			},
+			duplicate: () => void this.duplicateSelectedComponent(),
 			remove: () => this.confirmRemoveSelected(),
 			openPageSettings: () => {
 				const page = this.activePage;
@@ -1521,6 +1523,46 @@ export class CustomDashboardView extends ItemView {
 			rowHeight: page.rowHeight ?? 72,
 			canDelete: dashboard.pages.length > 1,
 		};
+	}
+
+	canDuplicateSelected(): boolean {
+		const id = this.selectedComponentId;
+		return Boolean(
+			this.editMode &&
+				id &&
+				this.activePage?.components.some((item) => item.id === id),
+		);
+	}
+
+	async duplicateSelectedComponent(): Promise<void> {
+		if (!this.canDuplicateSelected()) return;
+		const pageId = this.activePage?.id;
+		const id = this.selectedComponentId;
+		if (!pageId || !id) return;
+		const source = this.activePage?.components.find(
+			(item) => item.id === id,
+		);
+		if (!source) return;
+		const definition = this.registry.get(source.type);
+		const suffix = t("DASHBOARD_COMPONENT_COPY_SUFFIX");
+		const base =
+			(
+				source.title ??
+				(definition
+					? t(definition.labelKey as Parameters<typeof t>[0])
+					: source.type)
+			).trim() || source.type;
+		const title = base.endsWith(suffix.trim()) ? base : `${base}${suffix}`;
+		const result = await this.plugin.dashboardRepository.duplicateComponent(
+			pageId,
+			id,
+			title,
+		);
+		if (!result) return;
+		this.store = result.store;
+		this.render();
+		this.selectComponent(result.componentId);
+		new Notice(t("DASHBOARD_COMPONENT_DUPLICATED", [title]));
 	}
 
 	private confirmRemoveSelected(): void {

@@ -30,6 +30,7 @@ export interface ComponentInspectorDeps {
 	stepSize(axis: "w" | "h", direction: -1 | 1): void;
 	resetSize(): void;
 	move(offset: -1 | 1): void;
+	duplicate(): void;
 	remove(): void;
 	openPageSettings?(): void;
 }
@@ -876,6 +877,15 @@ export class ComponentInspector {
 		if (!state?.editable || !state.target.definition) return;
 		const componentId = state.target.config.id;
 		const menu = new Menu();
+		menu.addItem((item) => {
+			item.setTitle(t("DASHBOARD_DUPLICATE_COMPONENT"))
+				.setIcon("copy")
+				.onClick(() => {
+					if (this.state?.target.config.id !== componentId) return;
+					this.deps.duplicate();
+				});
+		});
+		menu.addSeparator();
 		menu.addItem((item) => {
 			item.setTitle(t("DASHBOARD_CONFIG_REMOVE"))
 				.setIcon("trash-2")
