@@ -53,6 +53,7 @@ function sameDatasetRequests(
  * implementation detail of the adapter layer.
  */
 function metricRequestFor(request: DatasetRequest): MetricRequest | null {
+	if (request.measure === "timeline") return null;
 	if (request.measure === "series") {
 		return {
 			kind: "daily-series",

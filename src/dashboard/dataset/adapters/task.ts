@@ -9,6 +9,11 @@ import {
 	type DatasetColumn,
 } from "../types";
 import { cell } from "./shared";
+import {
+	buildTimelineRows,
+	TIMELINE_COLUMNS,
+	type TimelineRecord,
+} from "../timeline";
 
 export const TASK_COLUMNS: DatasetColumn[] = [
 	{ key: "text", labelKey: "DATASET_COL_TEXT", type: "text" },
@@ -32,6 +37,40 @@ export const TASK_SERIES_COLUMNS: DatasetColumn[] = [
 
 export const taskAdapter: DatasetAdapter = (input): Dataset => {
 	const { request, query, snapshot, metric } = input;
+
+	if (request.measure === "timeline") {
+		const columns = TIMELINE_COLUMNS.task;
+		if (!query || !snapshot) return emptyDataset(request, columns);
+		const resolved = resolveQuery(snapshot, query, {
+			customFilters: input.customFilters,
+			now: input.now,
+		});
+		const records: TimelineRecord[] = resolved.tasks.map((task) => ({
+			basename: task.noteBasename,
+			ctime: task.noteCtime,
+			mtime: task.noteMtime,
+			completed: task.marker === "done" ? 1 : 0,
+			open: task.marker === "open" ? 1 : 0,
+		}));
+		const timeline = buildTimelineRows(
+			records,
+			{
+				bucket: request.timeline?.bucket ?? "day",
+				dateField: request.timeline?.dateField ?? "auto",
+				range: request.range ?? 30,
+				now: input.now,
+			},
+			columns,
+		);
+		const truncated = truncateRows(timeline.rows, request.limit);
+		return {
+			object: request.object,
+			measure: request.measure,
+			columns: timeline.columns,
+			...truncated,
+			sourceTotal: timeline.sourceTotal,
+		};
+	}
 
 	if (request.measure === "series") {
 		const points = metric?.points ?? input.dailySeries(request.range ?? 30);

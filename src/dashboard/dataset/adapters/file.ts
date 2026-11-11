@@ -9,6 +9,11 @@ import {
 	type DatasetColumn,
 } from "../types";
 import { cell } from "./shared";
+import {
+	buildTimelineRows,
+	TIMELINE_COLUMNS,
+	type TimelineRecord,
+} from "../timeline";
 
 export const FILE_COLUMNS: DatasetColumn[] = [
 	{ key: "name", labelKey: "DATASET_COL_NAME", type: "text" },
@@ -20,6 +25,38 @@ export const FILE_COLUMNS: DatasetColumn[] = [
 
 export const fileAdapter: DatasetAdapter = (input): Dataset => {
 	const { request, query, snapshot } = input;
+	if (request.measure === "timeline") {
+		const columns = TIMELINE_COLUMNS.file;
+		if (!query || !snapshot) return emptyDataset(request, columns);
+		const files = resolveQuery(snapshot, query, {
+			customFilters: input.customFilters,
+			now: input.now,
+		}).files ?? [];
+		const records: TimelineRecord[] = files.map((file) => ({
+			basename: file.basename,
+			ctime: file.ctime,
+			mtime: file.mtime,
+			size: file.size,
+		}));
+		const timeline = buildTimelineRows(
+			records,
+			{
+				bucket: request.timeline?.bucket ?? "day",
+				dateField: request.timeline?.dateField ?? "auto",
+				range: request.range ?? 30,
+				now: input.now,
+			},
+			columns,
+		);
+		const truncated = truncateRows(timeline.rows, request.limit);
+		return {
+			object: request.object,
+			measure: request.measure,
+			columns: timeline.columns,
+			...truncated,
+			sourceTotal: timeline.sourceTotal,
+		};
+	}
 	if (!query || !snapshot) return emptyDataset(request, FILE_COLUMNS);
 	const files = resolveQuery(snapshot, query, {
 		customFilters: input.customFilters,

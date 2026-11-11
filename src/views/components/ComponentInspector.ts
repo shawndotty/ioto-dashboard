@@ -7,7 +7,7 @@ import {
 	queryTargetsFor,
 	type ComponentSetting,
 } from "../../dashboard/registry";
-import { columnsForObject } from "../../dashboard/dataset/columns";
+import { columnsForObject, timelineColumnsForObject } from "../../dashboard/dataset/columns";
 import {
 	barObjectForQuery,
 	objectForQuery,
@@ -256,6 +256,20 @@ export class ComponentInspector {
 		state: InspectorState,
 	): void {
 		const field = section.createDiv({ cls: "ioto-inspector-field" });
+		this.renderSettingControl(field, setting, state);
+		if (setting.hintKey) {
+			field.createDiv({
+				cls: "ioto-inspector-hint",
+				text: t(setting.hintKey as LabelKey),
+			});
+		}
+	}
+
+	private renderSettingControl(
+		field: HTMLElement,
+		setting: ComponentSetting,
+		state: InspectorState,
+	): void {
 		switch (setting.kind) {
 			case "query": {
 				this.buildQuerySetting(field, setting, state);
@@ -509,12 +523,15 @@ export class ComponentInspector {
 			(item) => item.id === state.target.config.queryId,
 		);
 		// Bars aggregate task/note queries per project; other components read the
-		// query's own object.
+		// query's own object. Line charts read time-series columns, not detail rows.
+		const type = state.target.definition?.type;
 		const object =
-			state.target.definition?.type === "bar-chart"
-				? barObjectForQuery(query)
-				: objectForQuery(query);
-		return columnsForObject(object)
+			type === "bar-chart" ? barObjectForQuery(query) : objectForQuery(query);
+		const columns =
+			type === "line-chart"
+				? timelineColumnsForObject(object)
+				: columnsForObject(object);
+		return columns
 			.filter((column) =>
 				setting.role === "y"
 					? column.type === "number" ||

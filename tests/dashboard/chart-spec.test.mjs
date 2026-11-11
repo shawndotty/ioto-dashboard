@@ -328,3 +328,108 @@ test('bar value labels follow their toggle', () => {
 	const off = buildBarSpec(data, {}, { w: 600, h: 300 }, 'project');
 	assert.equal(off.showValueLabels, false);
 });
+
+const NOTE_TIMELINE_COLUMNS = [
+	{ key: 'date', labelKey: 'DATASET_COL_DATE', type: 'date' },
+	{ key: 'total', labelKey: 'DATASET_COL_NOTES', type: 'number' },
+	{ key: 'tasks', labelKey: 'DATASET_COL_TASKS', type: 'number' },
+	{ key: 'completed', labelKey: 'DATASET_COL_COMPLETED', type: 'number' },
+	{ key: 'size', labelKey: 'DATASET_COL_SIZE', type: 'size' },
+];
+
+const FILE_TIMELINE_COLUMNS = [
+	{ key: 'date', labelKey: 'DATASET_COL_DATE', type: 'date' },
+	{ key: 'total', labelKey: 'DATASET_COL_FILES', type: 'number' },
+	{ key: 'size', labelKey: 'DATASET_COL_SIZE', type: 'size' },
+];
+
+test('line charts default to the timeline date/total columns for notes and files', () => {
+	const notes = dataset(
+		'note',
+		NOTE_TIMELINE_COLUMNS,
+		[
+			{
+				date: cell('2026-11-08', '2026-11-08'),
+				total: cell('2', 2),
+				tasks: cell('5', 5),
+				completed: cell('3', 3),
+				size: cell('2 KB', 2048),
+			},
+		],
+	);
+	const noteSpec = buildLineSpec(notes, {}, { w: 600, h: 300 }, 'note');
+	assert.equal(noteSpec.series[0].key, 'total');
+	assert.equal(noteSpec.series[0].points[0].value, 2);
+
+	const files = dataset(
+		'file',
+		FILE_TIMELINE_COLUMNS,
+		[
+			{
+				date: cell('2026-11-08', '2026-11-08'),
+				total: cell('3', 3),
+				size: cell('1 KB', 1024),
+			},
+		],
+	);
+	const fileSpec = buildLineSpec(files, { yField: 'tasks' }, { w: 600, h: 300 }, 'file');
+	assert.equal(fileSpec.series[0].key, 'total');
+	const sizeSpec = buildLineSpec(files, { yField: 'size' }, { w: 600, h: 300 }, 'file');
+	assert.equal(sizeSpec.series[0].key, 'size');
+	assert.equal(sizeSpec.series[0].points[0].value, 1024);
+});
+
+test('month buckets render their labels verbatim and as categories', () => {
+	const data = dataset(
+		'note',
+		NOTE_TIMELINE_COLUMNS,
+		[
+			{
+				date: cell('2026-10', '2026-10'),
+				total: cell('1', 1),
+				tasks: cell('0', 0),
+				completed: cell('0', 0),
+				size: cell('0 B', 0),
+			},
+			{
+				date: cell('2026-11', '2026-11'),
+				total: cell('4', 4),
+				tasks: cell('2', 2),
+				completed: cell('1', 1),
+				size: cell('1 KB', 1024),
+			},
+		],
+	);
+	const spec = buildLineSpec(data, { xLabelFormat: 'md' }, { w: 600, h: 300 }, 'note');
+	assert.equal(spec.x.type, 'category');
+	assert.deepEqual(
+		spec.x.ticks.map((tick) => tick.label),
+		['2026-10', '2026-11'],
+	);
+	assert.deepEqual(
+		spec.series[0].points.map((point) => point.value),
+		[1, 4],
+	);
+});
+
+test('a single month bucket still produces a centred point', () => {
+	const data = dataset(
+		'note',
+		NOTE_TIMELINE_COLUMNS,
+		[
+			{
+				date: cell('2026-11', '2026-11'),
+				total: cell('2', 2),
+				tasks: cell('3', 3),
+				completed: cell('1', 1),
+				size: cell('1 KB', 1024),
+			},
+		],
+	);
+	const spec = buildLineSpec(data, {}, { w: 600, h: 300 }, 'note');
+	assert.equal(spec.x.type, 'category');
+	assert.equal(
+		spec.series[0].points[0].x,
+		spec.plot.left + spec.plot.width / 2,
+	);
+});

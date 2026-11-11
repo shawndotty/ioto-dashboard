@@ -27,6 +27,8 @@ export type ComponentCategory =
 interface SettingBase {
 	/** Hides the row when the predicate returns false. */
 	when?(config: DashboardComponentConfig): boolean;
+	/** Optional explanatory line rendered under the control. */
+	hintKey?: string;
 }
 
 export type ComponentSetting = SettingBase &

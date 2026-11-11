@@ -101,6 +101,15 @@ const DEFAULT_FIELDS: Record<DataObject, { x: string; y: string }> = {
 	project: { x: "name", y: "completed" },
 };
 
+/** Line charts always read a time series, so every object starts at date/total. */
+const LINE_DEFAULT_FIELDS: Record<DataObject, { x: string; y: string }> = {
+	task: { x: "date", y: "total" },
+	note: { x: "date", y: "total" },
+	file: { x: "date", y: "total" },
+	folder: { x: "date", y: "total" },
+	project: { x: "date", y: "total" },
+};
+
 interface AxisLayout {
 	plot: { left: number; top: number; width: number; height: number };
 	xShow: boolean;
@@ -373,7 +382,7 @@ export function buildLineSpec(
 ): ChartSpec | null {
 	if (dataset.rows.length === 0) return null;
 	const rows = dataset.rows;
-	const defaults = DEFAULT_FIELDS[object] ?? DEFAULT_FIELDS.task;
+	const defaults = LINE_DEFAULT_FIELDS[object] ?? LINE_DEFAULT_FIELDS.task;
 	const xColumn = resolveColumn(dataset, defaults.x, "x", defaults.x);
 	if (!xColumn) return null;
 
@@ -510,7 +519,7 @@ export function buildLineSpec(
 		height: size.h,
 		ariaKey: "CHART_ARIA_LINE",
 		x: {
-			type: "date",
+			type: /^\d{4}-\d{2}$/.test(fullLabels[0] ?? "") ? "category" : "date",
 			title: layout.xTitle || undefined,
 			showLabels: layout.xShow,
 			ticks: xTicks,

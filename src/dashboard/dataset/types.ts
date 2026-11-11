@@ -11,7 +11,17 @@ export type MeasureId =
 	| "ratio"
 	| "size"
 	| "mtime"
-	| "series";
+	| "series"
+	| "timeline";
+
+export type TimelineBucket = "day" | "week" | "month";
+
+export type TimelineDateField = "auto" | "filename" | "created" | "modified";
+
+export interface TimelineRequest {
+	bucket: TimelineBucket;
+	dateField: TimelineDateField;
+}
 
 export type ViewId =
 	| "scalar"
@@ -38,6 +48,7 @@ export const MEASURE_IDS: MeasureId[] = [
 	"size",
 	"mtime",
 	"series",
+	"timeline",
 ];
 
 export const VIEW_IDS: ViewId[] = [
@@ -89,6 +100,8 @@ export interface Dataset {
 	/** Scalar/ratio measures expose their headline number here. */
 	scalarText?: string;
 	ratio?: number | null;
+	/** timeline: records inside the window, to tell "no data" from "all zero". */
+	sourceTotal?: number;
 }
 
 export interface DatasetRequest {
@@ -100,6 +113,8 @@ export interface DatasetRequest {
 	limit?: number;
 	/** Line/bar ranges in days. */
 	range?: 7 | 30 | 90 | 180;
+	/** Only read when `measure === "timeline"`. */
+	timeline?: TimelineRequest;
 }
 
 export interface DatasetAdapterInput {
@@ -124,6 +139,8 @@ export function datasetKey(request: DatasetRequest): string {
 		request.groupBy ?? "",
 		request.limit === undefined ? "" : String(request.limit),
 		request.range === undefined ? "" : String(request.range),
+		request.timeline?.bucket ?? "",
+		request.timeline?.dateField ?? "",
 	].join("|");
 }
 

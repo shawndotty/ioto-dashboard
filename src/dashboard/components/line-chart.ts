@@ -1,9 +1,21 @@
 import { renderResponsiveChart } from "../dataset/charts/chart-host";
 import { buildLineSpec } from "../dataset/charts/spec";
+import { objectForQuery } from "../dataset/object";
+import type { TimelineBucket, TimelineDateField } from "../dataset/types";
 import type { ComponentDefinition } from "../registry";
 
 function rangeOf(value: unknown): 7 | 30 | 90 | 180 {
 	return value === 7 || value === 90 || value === 180 ? value : 30;
+}
+
+function bucketOf(value: unknown): TimelineBucket {
+	return value === "week" || value === "month" ? value : "day";
+}
+
+function dateFieldOf(value: unknown): TimelineDateField {
+	return value === "filename" || value === "created" || value === "modified"
+		? value
+		: "auto";
 }
 
 export const lineChartComponent: ComponentDefinition = {
@@ -11,19 +23,21 @@ export const lineChartComponent: ComponentDefinition = {
 	labelKey: "COMPONENT_LINE_NAME",
 	descriptionKey: "COMPONENT_LINE_DESC",
 	category: "analysis",
-	objects: ["task"],
-	queryTargets: ["task"],
+	objects: ["task", "note", "file"],
+	queryTargets: ["task", "note", "file"],
 	views: ["line"],
 	viewDefault: "line",
-	measureDefault: "series",
+	measureDefault: "timeline",
 	defaultQueryId: "builtin:tasks-all",
 	size: { minW: 4, minH: 3 },
 	createConfig: (queryId) => ({
 		queryId,
 		view: "line",
-		measure: "series",
+		measure: "timeline",
 		options: {
 			range: "30",
+			dateField: "auto",
+			bucket: "day",
 			xShowLabels: true,
 			xLabelFormat: "md",
 			xTitle: "",
@@ -42,6 +56,34 @@ export const lineChartComponent: ComponentDefinition = {
 	}),
 	settings: [
 		{ key: "queryId", kind: "query", group: "data" },
+		{
+			key: "dateField",
+			kind: "select",
+			group: "data",
+			labelKey: "SETTING_TIMELINE_DATE_FIELD",
+			options: [
+				{ value: "auto", labelKey: "TIMELINE_DATE_AUTO" },
+				{ value: "filename", labelKey: "TIMELINE_DATE_FILENAME" },
+				{ value: "created", labelKey: "TIMELINE_DATE_CREATED" },
+				{ value: "modified", labelKey: "TIMELINE_DATE_MODIFIED" },
+			],
+			fallback: "auto",
+			target: "options",
+			hintKey: "SETTING_TIMELINE_DATE_HINT",
+		},
+		{
+			key: "bucket",
+			kind: "select",
+			group: "data",
+			labelKey: "SETTING_TIMELINE_BUCKET",
+			options: [
+				{ value: "day", labelKey: "TIMELINE_BUCKET_DAY" },
+				{ value: "week", labelKey: "TIMELINE_BUCKET_WEEK" },
+				{ value: "month", labelKey: "TIMELINE_BUCKET_MONTH" },
+			],
+			fallback: "day",
+			target: "options",
+		},
 		{
 			key: "range",
 			kind: "select",
@@ -86,14 +128,10 @@ export const lineChartComponent: ComponentDefinition = {
 		},
 		{
 			key: "yField",
-			kind: "select",
+			kind: "field",
 			group: "axes",
 			labelKey: "SETTING_AXIS_Y_FIELD",
-			options: [
-				{ value: "total", labelKey: "DATASET_COL_TASKS" },
-				{ value: "completed", labelKey: "DATASET_COL_COMPLETED" },
-				{ value: "open", labelKey: "DATASET_COL_OPEN" },
-			],
+			role: "y",
 			fallback: "total",
 			target: "options",
 		},
@@ -197,19 +235,24 @@ export const lineChartComponent: ComponentDefinition = {
 		},
 		{ key: "title", kind: "text", group: "display" },
 	],
-	toDatasetRequest: (config) => ({
-		object: "task",
-		measure: "series",
+	toDatasetRequest: (config, query) => ({
+		object: objectForQuery(query, "task"),
+		measure: "timeline",
 		queryId: config.queryId,
 		range: rangeOf(Number(config.options?.range)),
+		timeline: {
+			bucket: bucketOf(config.options?.bucket),
+			dateField: dateFieldOf(config.options?.dateField),
+		},
 	}),
-	isEmptyDataset: (dataset) => dataset.rows.length === 0,
+	isEmptyDataset: (dataset) => (dataset.sourceTotal ?? dataset.total) === 0,
 	isEmpty: () => false,
 	render: (el, ctx) => {
 		const dataset = ctx.dataset;
 		if (!dataset) return;
+		const object = objectForQuery(ctx.query, "task");
 		renderResponsiveChart(el, (size) =>
-			buildLineSpec(dataset, ctx.config.options ?? {}, size, "task"),
+			buildLineSpec(dataset, ctx.config.options ?? {}, size, object),
 		);
 	},
 };

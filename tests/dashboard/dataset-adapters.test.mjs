@@ -224,3 +224,117 @@ test('every adapter returns an empty dataset without a snapshot', () => {
 		assert.equal(dataset.truncated, false);
 	}
 });
+
+const TIMELINE_NOW = new Date(2026, 10, 11, 12, 0, 0).getTime();
+
+function timelineRequest(object, overrides = {}) {
+	return {
+		object,
+		measure: 'timeline',
+		queryId: 'q',
+		range: 7,
+		timeline: { bucket: 'day', dateField: 'filename' },
+		...overrides,
+	};
+}
+
+test('task timeline buckets tasks by their parent note date', () => {
+	const snapshot = {
+		notes: [],
+		tasks: [
+			task({ noteBasename: '2026-11-10-a', marker: 'done', isCompleted: true }),
+			task({ line: 4, noteBasename: '2026-11-10-a', marker: 'open' }),
+			task({ line: 5, noteBasename: '2026-11-08-b', marker: 'open' }),
+		],
+	};
+	const dataset = taskAdapter({
+		request: timelineRequest('task'),
+		query: query('task'),
+		snapshot,
+		dailySeries: () => [],
+		now: () => TIMELINE_NOW,
+	});
+	assert.deepEqual(dataset.columns.map((column) => column.key), [
+		'date',
+		'total',
+		'completed',
+		'open',
+	]);
+	assert.equal(dataset.sourceTotal, 3);
+	assert.equal(dataset.rows.length, 7);
+	const row = dataset.rows[5];
+	assert.equal(row.cells.date.text, '2026-11-10');
+	assert.equal(row.cells.total.text, '2');
+	assert.equal(row.cells.completed.text, '1');
+	assert.equal(row.cells.open.text, '1');
+});
+
+test('note timeline aggregates tasks and size per day', () => {
+	const snapshot = {
+		notes: [
+			note({ basename: '2026-11-09-a', size: 1024, fileTaskCount: 2, fileCompletedCount: 1 }),
+			note({ basename: '2026-11-09-b', size: 2048, fileTaskCount: 3, fileCompletedCount: 2 }),
+		],
+		tasks: [],
+	};
+	const dataset = noteAdapter({
+		request: timelineRequest('note'),
+		query: query('note'),
+		snapshot,
+		dailySeries: () => [],
+		now: () => TIMELINE_NOW,
+	});
+	assert.deepEqual(dataset.columns.map((column) => column.key), [
+		'date',
+		'total',
+		'tasks',
+		'completed',
+		'size',
+	]);
+	const row = dataset.rows[4];
+	assert.equal(row.cells.total.text, '2');
+	assert.equal(row.cells.tasks.sortValue, 5);
+	assert.equal(row.cells.completed.sortValue, 3);
+	assert.equal(row.cells.size.sortValue, 3072);
+});
+
+test('file timeline sums the file sizes inside the window', () => {
+	const snapshot = {
+		notes: [],
+		tasks: [],
+		files: [
+			{ path: 'a/2026-11-07-a.pdf', basename: '2026-11-07-a', extension: 'pdf', folder: 'a', size: 1000, ctime: 1, mtime: 2 },
+			{ path: 'a/2026-11-07-b.png', basename: '2026-11-07-b', extension: 'png', folder: 'a', size: 500, ctime: 1, mtime: 2 },
+			{ path: 'a/2026-10-01-old.pdf', basename: '2026-10-01-old', extension: 'pdf', folder: 'a', size: 9999, ctime: 1, mtime: 2 },
+		],
+	};
+	const dataset = fileAdapter({
+		request: timelineRequest('file'),
+		query: query('file'),
+		snapshot,
+		dailySeries: () => [],
+		now: () => TIMELINE_NOW,
+	});
+	assert.deepEqual(dataset.columns.map((column) => column.key), [
+		'date',
+		'total',
+		'size',
+	]);
+	assert.equal(dataset.sourceTotal, 2);
+	const row = dataset.rows[2];
+	assert.equal(row.cells.total.text, '2');
+	assert.equal(row.cells.size.sortValue, 1500);
+});
+
+test('timeline without a query returns the time-series columns and no rows', () => {
+	const taskData = taskAdapter({
+		request: timelineRequest('task'),
+		query: undefined,
+		snapshot: SNAPSHOT,
+		dailySeries: () => [],
+		now: () => TIMELINE_NOW,
+	});
+	assert.deepEqual(taskData.rows, []);
+	assert.equal(taskData.columns.length, 4);
+	assert.equal(taskData.sourceTotal, undefined);
+});
