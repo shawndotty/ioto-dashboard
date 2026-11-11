@@ -793,6 +793,198 @@ test('duplicateDashboard regenerates every page/component id and deep-copies con
 	);
 });
 
+test('duplicateComponent inserts a copy right after the source and returns its id', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [
+				page({
+					id: DEFAULT_PAGE_ID,
+					components: [
+						component({ id: 'component:a' }),
+						component({ id: 'component:b' }),
+						component({ id: 'component:c' }),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const result = await repository.duplicateComponent(
+		DEFAULT_PAGE_ID,
+		'component:a',
+		'A (copy)',
+	);
+
+	assert.ok(result);
+	const components = currentPage(result.store).components;
+	assert.equal(components.length, 4);
+	assert.deepEqual(
+		components.map((item) => item.id),
+		['component:a', result.componentId, 'component:b', 'component:c'],
+	);
+	assert.equal(host.writes, 1);
+});
+
+test('duplicateComponent deep-copies the config and keeps a shared queryId', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [
+				page({
+					id: DEFAULT_PAGE_ID,
+					components: [
+						component({
+							id: 'component:a',
+							title: 'Tasks',
+							basis: 'section',
+							view: 'list',
+							measure: 'count',
+							options: { accent: '#fff' },
+							w: 6,
+							h: 3,
+							x: 2,
+							y: 5,
+						}),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const result = await repository.duplicateComponent(
+		DEFAULT_PAGE_ID,
+		'component:a',
+	);
+	assert.ok(result);
+
+	const [source, copy] = currentPage(result.store).components;
+	assert.notEqual(copy.id, source.id);
+	assert.equal(copy.title, 'Tasks');
+	assert.equal(copy.type, source.type);
+	assert.equal(copy.queryId, source.queryId);
+	assert.equal(copy.basis, 'section');
+	assert.equal(copy.view, 'list');
+	assert.equal(copy.measure, 'count');
+	assert.equal(copy.w, 6);
+	assert.equal(copy.h, 3);
+	assert.equal(copy.x, 2);
+	assert.equal(copy.y, 5);
+	assert.deepEqual(copy.options, { accent: '#fff' });
+	assert.notEqual(copy.options, source.options);
+	copy.options.accent = '#000';
+	assert.equal(source.options.accent, '#fff');
+});
+
+test('duplicateComponent avoids every id already used in the store', async () => {
+	const originalNow = Date.now;
+	Date.now = () => 1234;
+	try {
+		const host = v4({}, [
+			dashboard({
+				id: DEFAULT_DASHBOARD_ID,
+				pages: [
+					page({
+						id: DEFAULT_PAGE_ID,
+						components: [component({ id: 'component:1234' })],
+					}),
+				],
+			}),
+			dashboard({
+				id: 'dashboard:two',
+				name: 'Two',
+				pages: [
+					page({
+						id: 'page:two',
+						components: [component({ id: 'component:1234-2' })],
+					}),
+				],
+			}),
+		]);
+		const repository = new DashboardRepository(host);
+		await repository.load();
+
+		const result = await repository.duplicateComponent(
+			DEFAULT_PAGE_ID,
+			'component:1234',
+		);
+		assert.ok(result);
+		assert.equal(result.componentId, 'component:1234-3');
+	} finally {
+		Date.now = originalNow;
+	}
+});
+
+test('duplicateComponent only overrides the title when one is provided', async () => {
+	const host = makeHost();
+	const repository = new DashboardRepository(host);
+	await repository.load();
+	await repository.addComponent(
+		DEFAULT_PAGE_ID,
+		component({ id: 'component:titled', title: 'Mine' }),
+	);
+	await repository.addComponent(
+		DEFAULT_PAGE_ID,
+		component({ id: 'component:untitled' }),
+	);
+
+	const titled = await repository.duplicateComponent(
+		DEFAULT_PAGE_ID,
+		'component:titled',
+		'Mine (copy)',
+	);
+	const untitled = await repository.duplicateComponent(
+		DEFAULT_PAGE_ID,
+		'component:untitled',
+	);
+	assert.ok(titled && untitled);
+
+	const store = (await repository.load()).store;
+	const byId = (id) =>
+		currentPage(store).components.find((item) => item.id === id);
+	assert.equal(byId(titled.componentId).title, 'Mine (copy)');
+	assert.equal(byId('component:titled').title, 'Mine');
+	assert.equal('title' in byId(untitled.componentId), false);
+});
+
+test('duplicateComponent returns null for unknown ids but still writes once', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [
+				page({
+					id: DEFAULT_PAGE_ID,
+					components: [component({ id: 'component:a' })],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	const writesBefore = host.writes;
+
+	const missingComponent = await repository.duplicateComponent(
+		DEFAULT_PAGE_ID,
+		'component:missing',
+	);
+	const missingPage = await repository.duplicateComponent(
+		'page:missing',
+		'component:a',
+	);
+
+	assert.equal(missingComponent, null);
+	assert.equal(missingPage, null);
+	const { store } = await repository.load();
+	assert.deepEqual(
+		store.dashboards[0].pages[0].components.map((item) => item.id),
+		['component:a'],
+	);
+	assert.equal(host.writes, writesBefore + 2);
+});
+
 test('findDashboardForPage resolves the owning dashboard', async () => {
 	const repository = new DashboardRepository(makeHost());
 	const { store } = await repository.load();

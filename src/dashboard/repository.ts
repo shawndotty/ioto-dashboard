@@ -462,6 +462,36 @@ export class DashboardRepository {
 		});
 	}
 
+	async duplicateComponent(
+		pageId: string,
+		componentId: string,
+		title?: string,
+	): Promise<{ store: DashboardStoreData; componentId: string } | null> {
+		let newId: string | null = null;
+		const store = await this.mutate((data) => {
+			const page = this.findPage(data, pageId)?.page;
+			if (!page) return;
+			const index = page.components.findIndex(
+				(item) => item.id === componentId,
+			);
+			const source = page.components[index];
+			if (index < 0 || !source) return;
+			const taken = new Set(
+				data.dashboards.flatMap((item) =>
+					item.pages.flatMap((p) => p.components.map((c) => c.id)),
+				),
+			);
+			newId = uniqueId(`component:${Date.now()}`, taken);
+			const copy: DashboardComponentConfig = {
+				...structuredClone(source),
+				id: newId,
+			};
+			if (title !== undefined) copy.title = title;
+			page.components.splice(index + 1, 0, copy);
+		});
+		return newId ? { store, componentId: newId } : null;
+	}
+
 	async addPage(
 		dashboardId: string,
 		page: DashboardPage,
