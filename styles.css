@@ -576,9 +576,13 @@
     background: transparent;
 }
 
-.ioto-custom-dashboard-view .ioto-dashboard-card-title,
+/* 文字对齐只作用于卡片正文，标题栏始终保持默认对齐 */
 .ioto-custom-dashboard-view .ioto-dashboard-card-body {
     text-align: var(--ioto-card-align, start);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-card-title {
+    text-align: start;
 }
 
 /* 卡片级覆盖 --text-*，一处生效于标题、KPI、列表与图表文字 */
