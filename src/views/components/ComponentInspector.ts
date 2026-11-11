@@ -516,11 +516,10 @@ export class ComponentInspector {
 				return;
 			}
 			case "color": {
-				field.createEl("label", { text: t(setting.labelKey as LabelKey) });
 				const row = field.createDiv({ cls: "ioto-inspector-color-row" });
-				const input = row.createEl("input", {
-					type: "color",
-					attr: { "aria-label": t(setting.labelKey as LabelKey) },
+				row.createEl("label", {
+					cls: "ioto-inspector-color-label",
+					text: t(setting.labelKey as LabelKey),
 				});
 				const reset = row.createEl("button", {
 					cls: "clickable-icon ioto-inspector-reset",
@@ -530,6 +529,10 @@ export class ComponentInspector {
 						title: t("SETTING_STYLE_RESET_COLOR"),
 					},
 					text: "↺",
+				});
+				const input = row.createEl("input", {
+					type: "color",
+					attr: { "aria-label": t(setting.labelKey as LabelKey) },
 				});
 				// Unset colours show a placeholder swatch and hide the reset button.
 				const apply = (stored: unknown): void => {
