@@ -1,12 +1,15 @@
 import {
 	ItemView,
 	MarkdownRenderer,
+	Menu,
 	Notice,
 	Platform,
 	TFile,
 	TFolder,
 	ViewStateResult,
 	WorkspaceLeaf,
+	setIcon,
+	setTooltip,
 } from "obsidian";
 import { CUSTOM_DASHBOARD_VIEW_TYPE } from "../models/constants";
 import type IotoDashboardPlugin from "../main";
@@ -364,9 +367,26 @@ export class CustomDashboardView extends ItemView {
 		const toolbar = this.toolbarEl;
 		if (!toolbar) return;
 		toolbar.empty();
-		toolbar.createEl("h2", {
+
+		const title = toolbar.createDiv({ cls: "ioto-dashboard-toolbar-title" });
+		title.createEl("h2", {
 			text: dashboard?.name ?? t("CUSTOM_DASHBOARD_TITLE"),
 		});
+
+		const manage = toolbar.createDiv({ cls: "ioto-dashboard-manage" });
+		this.addIconToolbarButton(
+			manage,
+			"list-filter",
+			t("DASHBOARD_MANAGE_QUERIES"),
+			() => this.openQueryManager(),
+		);
+		this.addIconToolbarButton(
+			manage,
+			"layout-dashboard",
+			t("DASHBOARD_MANAGER_TOOLTIP"),
+			() => this.openDashboardManager(),
+		);
+
 		const actions = toolbar.createDiv({ cls: "ioto-dashboard-actions" });
 		if (this.editMode) {
 			this.addToolbarButton(
@@ -377,14 +397,12 @@ export class CustomDashboardView extends ItemView {
 				"mod-cta",
 			);
 		}
-		this.addToolbarButton(actions, "edit", t("DASHBOARD_MANAGE_QUERIES"), () =>
-			this.openQueryManager(),
-		);
-		this.addToolbarButton(
+		this.addIconToolbarButton(
 			actions,
-			"settings-2",
-			t("DASHBOARD_MANAGER_OPEN"),
-			() => this.openDashboardManager(),
+			"more-horizontal",
+			t("DASHBOARD_MANAGE_GROUP"),
+			(event, button) => this.openManageMenu(event, button),
+			"ioto-dashboard-manage-more",
 		);
 		this.addToolbarButton(
 			actions,
@@ -783,6 +801,49 @@ export class CustomDashboardView extends ItemView {
 		button.createSpan({ cls: "ioto-button-label", text: label });
 		button.setAttr("data-icon", icon);
 		button.onClickEvent(onClick);
+	}
+
+	private addIconToolbarButton(
+		container: HTMLElement,
+		icon: string,
+		label: string,
+		onClick: (event: MouseEvent, button: HTMLButtonElement) => void,
+		extraClass?: string,
+	): void {
+		const button = container.createEl("button", {
+			cls: extraClass
+				? `clickable-icon ioto-icon-button ${extraClass}`
+				: "clickable-icon ioto-icon-button",
+			attr: { type: "button", "aria-label": label },
+		});
+		setIcon(button, icon);
+		setTooltip(button, label);
+		button.onClickEvent((event) => onClick(event, button));
+	}
+
+	private openManageMenu(
+		event: MouseEvent,
+		button: HTMLButtonElement,
+	): void {
+		const menu = new Menu();
+		menu.addItem((item) =>
+			item
+				.setTitle(t("DASHBOARD_MANAGE_QUERIES"))
+				.setIcon("list-filter")
+				.onClick(() => this.openQueryManager()),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(t("DASHBOARD_MANAGER_TOOLTIP"))
+				.setIcon("layout-dashboard")
+				.onClick(() => this.openDashboardManager()),
+		);
+		if (event.detail > 0) {
+			menu.showAtMouseEvent(event);
+			return;
+		}
+		const rect = button.getBoundingClientRect();
+		menu.showAtPosition({ x: rect.right, y: rect.bottom });
 	}
 
 	/**

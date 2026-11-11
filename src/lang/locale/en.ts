@@ -193,6 +193,8 @@ export default {
 	DASHBOARD_RENAME_PLACEHOLDER: "Component title",
 	DASHBOARD_MANAGER_TITLE: "Dashboards",
 	DASHBOARD_MANAGER_OPEN: "Manage dashboards…",
+	DASHBOARD_MANAGER_TOOLTIP: "Manage dashboards",
+	DASHBOARD_MANAGE_GROUP: "Manage",
 	DASHBOARD_STATUS_OPEN: "Open",
 	DASHBOARD_OPEN: "Open",
 	DASHBOARD_CREATED: "Created dashboard: {0}",
