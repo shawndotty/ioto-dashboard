@@ -7,7 +7,6 @@ import {
 	TFolder,
 	ViewStateResult,
 	WorkspaceLeaf,
-	setIcon,
 } from "obsidian";
 import { CUSTOM_DASHBOARD_VIEW_TYPE } from "../models/constants";
 import type IotoDashboardPlugin from "../main";
@@ -578,12 +577,23 @@ export class CustomDashboardView extends ItemView {
 				cls: "ioto-dashboard-page-tab-label",
 				text: page.name,
 			});
-			tab.onClickEvent(() => this.switchPage(page.id));
-			tab.addEventListener("dblclick", () => {
-				if (!this.editMode) return;
-				this.openPageSettings(page, "name");
+			tab.onClickEvent(() => {
+				if (this.editMode && !Platform.isMobile) {
+					this.openPageSettings(page);
+					return;
+				}
+				this.switchPage(page.id);
 			});
+			if (Platform.isMobile) {
+				tab.addEventListener("dblclick", () => {
+					if (!this.editMode) return;
+					this.openPageSettings(page, "name");
+				});
+			}
 			if (this.editMode) {
+				if (!Platform.isMobile) {
+					tab.setAttr("title", t("PAGE_SETTINGS_TITLE"));
+				}
 				this.renderPageTabTools(tab, page);
 			}
 		}
@@ -619,19 +629,6 @@ export class CustomDashboardView extends ItemView {
 			rename.onClickEvent((event) => {
 				event.stopPropagation();
 				this.openRenamePage(page);
-			});
-		} else {
-			const settings = tab.createEl("button", {
-				cls: "ioto-dashboard-page-close",
-				attr: {
-					"aria-label": t("PAGE_SETTINGS_TITLE"),
-					title: t("PAGE_SETTINGS_TITLE"),
-				},
-			});
-			setIcon(settings, "settings-2");
-			settings.onClickEvent((event) => {
-				event.stopPropagation();
-				this.openPageSettings(page);
 			});
 		}
 		const remove = tab.createEl("button", {

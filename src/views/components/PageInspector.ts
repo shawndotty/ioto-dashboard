@@ -1,4 +1,4 @@
-import { debounce, type Debouncer } from "obsidian";
+import { Menu, debounce, setIcon, type Debouncer } from "obsidian";
 import { t } from "../../lang/helpers";
 import type { PageInspectorState } from "../../dashboard/inspector-service";
 
@@ -26,7 +26,7 @@ export class PageInspector {
 	private columnsSelect: HTMLSelectElement | null = null;
 	private rowHeightInput: HTMLInputElement | null = null;
 	private rowHeightValueEl: HTMLElement | null = null;
-	private deleteEl: HTMLButtonElement | null = null;
+	private menuButtonEl: HTMLButtonElement | null = null;
 	private nameDebouncer: Debouncer<[string], void> | null = null;
 
 	constructor(
@@ -114,6 +114,7 @@ export class PageInspector {
 			attr: { "aria-current": "page" },
 			text: state.target.pageName,
 		});
+		this.createMenuButton(header, state);
 
 		if (!state.editable) {
 			this.root.createDiv({
@@ -124,7 +125,56 @@ export class PageInspector {
 
 		this.buildBasicSection(state);
 		this.buildLayoutSection(state);
-		this.buildDangerSection(state);
+	}
+
+	private createMenuButton(
+		header: HTMLElement,
+		state: PageInspectorState,
+	): void {
+		const button = header.createEl("button", {
+			cls: "clickable-icon",
+			attr: {
+				type: "button",
+				"aria-label": t("INSPECTOR_MORE_ACTIONS"),
+				title: t("INSPECTOR_MORE_ACTIONS"),
+				"aria-haspopup": "menu",
+			},
+		});
+		setIcon(button, "more-horizontal");
+		button.onClickEvent((event) => this.openMoreMenu(event, button));
+		button.disabled = !state.editable;
+		this.menuButtonEl = button;
+	}
+
+	private openMoreMenu(
+		event: MouseEvent,
+		button: HTMLButtonElement,
+	): void {
+		const state = this.state;
+		if (!state?.editable) return;
+		const pageId = state.target.pageId;
+		const canDelete = state.target.canDelete;
+		const menu = new Menu();
+		menu.addItem((item) => {
+			item.setTitle(
+				canDelete
+					? t("PAGE_SETTINGS_DELETE")
+					: t("PAGE_LAST_CANNOT_DELETE"),
+			)
+				.setIcon("trash-2")
+				.setWarning(canDelete)
+				.setDisabled(!canDelete)
+				.onClick(() => {
+					if (this.state?.target.pageId !== pageId) return;
+					this.deps.remove();
+				});
+		});
+		if (event.detail > 0) {
+			menu.showAtMouseEvent(event);
+			return;
+		}
+		const rect = button.getBoundingClientRect();
+		menu.showAtPosition({ x: rect.right, y: rect.bottom });
 	}
 
 	private createSection(titleKey: LabelKey): HTMLElement {
@@ -247,24 +297,6 @@ export class PageInspector {
 		this.rowHeightValueEl = value;
 	}
 
-	private buildDangerSection(state: PageInspectorState): void {
-		const section = this.root.createDiv({
-			cls: "ioto-inspector-section ioto-inspector-danger",
-		});
-		const button = section.createEl("button", {
-			cls: "mod-warning",
-			attr: { type: "button" },
-			text: t("PAGE_SETTINGS_DELETE"),
-		});
-		button.onClickEvent(() => this.deps.remove());
-		section.createDiv({
-			cls: "ioto-inspector-hint",
-			text: t("PAGE_SETTINGS_DELETE_DESC"),
-		});
-		this.deleteEl = button;
-		this.deleteEl.disabled = !state.editable || !state.target.canDelete;
-	}
-
 	private syncValues(state: PageInspectorState): void {
 		const target = state.target;
 		this.dashboardCrumbEl?.setText(target.dashboardName);
@@ -294,13 +326,8 @@ export class PageInspector {
 			this.rowHeightInput.disabled = !state.editable;
 		}
 		this.rowHeightValueEl?.setText(`${target.rowHeight}px`);
-		if (this.deleteEl) {
-			this.deleteEl.disabled = !state.editable || !target.canDelete;
-			const hint = target.canDelete
-				? t("PAGE_SETTINGS_DELETE")
-				: t("PAGE_LAST_CANNOT_DELETE");
-			this.deleteEl.setAttr("title", hint);
-			this.deleteEl.setAttr("aria-label", hint);
+		if (this.menuButtonEl) {
+			this.menuButtonEl.disabled = !state.editable;
 		}
 		this.state = state;
 	}
@@ -336,6 +363,6 @@ export class PageInspector {
 		this.columnsSelect = null;
 		this.rowHeightInput = null;
 		this.rowHeightValueEl = null;
-		this.deleteEl = null;
+		this.menuButtonEl = null;
 	}
 }

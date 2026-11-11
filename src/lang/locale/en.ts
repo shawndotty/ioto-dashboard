@@ -251,7 +251,6 @@ export default {
 	PAGE_SETTINGS_COLUMNS_HINT:
 		"Switching to 24 columns only narrows card display; component widths are kept.",
 	PAGE_SETTINGS_DELETE: "Delete page",
-	PAGE_SETTINGS_DELETE_DESC: "Notes are not affected.",
 
 	// Pages
 	PAGE_TABS_ADD: "Add page",

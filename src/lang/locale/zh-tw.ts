@@ -251,7 +251,6 @@ export default {
 	PAGE_SETTINGS_COLUMNS_HINT:
 		"切換到 24 欄只會讓卡片顯示變窄，不會改寫元件寬度。",
 	PAGE_SETTINGS_DELETE: "刪除頁面",
-	PAGE_SETTINGS_DELETE_DESC: "不會影響筆記內容。",
 
 	// Pages
 	PAGE_TABS_ADD: "新增頁面",

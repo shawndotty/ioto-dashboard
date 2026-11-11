@@ -446,6 +446,12 @@
     white-space: nowrap;
 }
 
+.ioto-custom-dashboard-view.is-editing
+    .ioto-dashboard-page-tab:hover
+    .ioto-dashboard-page-tab-label {
+    text-decoration: underline;
+}
+
 .ioto-custom-dashboard-view .ioto-dashboard-page-close,
 .ioto-custom-dashboard-view .ioto-dashboard-page-add {
     display: inline-flex;
@@ -1616,14 +1622,6 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     text-align: right;
     font-size: var(--font-ui-smaller);
     font-variant-numeric: tabular-nums;
-}
-
-.ioto-inspector-danger {
-    border-top: 1px solid var(--background-modifier-error);
-}
-
-.ioto-inspector-danger .mod-warning {
-    width: 100%;
 }
 
 .ioto-inspector-slot.is-hidden {

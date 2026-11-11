@@ -252,7 +252,6 @@ export default {
 	PAGE_SETTINGS_COLUMNS_HINT:
 		"切换到 24 列只会让卡片显示变窄，不会改写组件宽度。",
 	PAGE_SETTINGS_DELETE: "删除页面",
-	PAGE_SETTINGS_DELETE_DESC: "不会影响笔记内容。",
 
 	// Pages
 	PAGE_TABS_ADD: "新建页面",
