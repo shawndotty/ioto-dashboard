@@ -412,6 +412,7 @@ export class CustomDashboardView extends ItemView {
 				);
 				await this.plugin.activateCustomDashboard(workspace.id);
 				this.refreshHeader();
+				return workspace.id;
 			},
 			onRename: async (id, name) => {
 				this.store = await this.plugin.dashboardRepository.renameDashboard(
@@ -433,6 +434,7 @@ export class CustomDashboardView extends ItemView {
 					await this.plugin.activateCustomDashboard(copy.id);
 				}
 				this.refreshHeader();
+				return copy?.id ?? null;
 			},
 			onDelete: async (id) => {
 				const staleLeaves = this.plugin.getDashboardLeaves(id, {
@@ -449,7 +451,15 @@ export class CustomDashboardView extends ItemView {
 				this.app.workspace.requestSaveLayout();
 				this.refreshHeader();
 			},
-		}).open();
+		},
+		{
+			layout: this.plugin.settings.modalLayout ?? "list",
+			onLayoutChange: (layout) => {
+				this.plugin.settings.modalLayout = layout;
+				void this.plugin.saveSettings();
+			},
+		},
+	).open();
 	}
 
 	private createDashboardWorkspace(name: string): DashboardWorkspace {

@@ -10,7 +10,8 @@ export type ModalKind =
 	| "query-manager"
 	| "query-editor"
 	| "component-picker"
-	| "page-layout";
+	| "page-layout"
+	| "dashboard-manager";
 
 export interface ModalShellOptions {
 	kind: ModalKind;

@@ -32,6 +32,7 @@ import {
 	type CollectionItem,
 	type CollectionLayout,
 	renderCollection,
+	revealCollectionItem,
 } from "./collection-view";
 import { applyModalShell, createLayoutToggle } from "./modal-shell";
 import { FolderPickerModal } from "./pickers/folder-picker";
@@ -64,9 +65,6 @@ export interface QueryManagerPreferences {
 }
 
 type LocaleKey = Parameters<typeof t>[0];
-
-/** Must match the `.is-newly-created::after` animation length in styles.css. */
-const REVEAL_HIGHLIGHT_MS = 900;
 
 const SOURCE_LABEL_KEYS: Record<QuerySource, LocaleKey> = {
 	builtin: "QUERY_SOURCE_BUILTIN",
@@ -332,7 +330,7 @@ export class QueryManagerModal extends Modal {
 			this.rebuildReferences();
 			this.renderTabs();
 			this.renderItems();
-			this.revealItem(result.created.id);
+			revealCollectionItem(this.collectionEl, result.created.id);
 			new Notice(t("QUERY_DUPLICATED", [result.created.name]));
 		} finally {
 			this.duplicating = false;
@@ -349,7 +347,7 @@ export class QueryManagerModal extends Modal {
 		}
 		this.renderTabs();
 		this.renderItems();
-		this.revealItem(result.created.id);
+		revealCollectionItem(this.collectionEl, result.created.id);
 		if (announce) {
 			new Notice(t("QUERY_CREATED", [displayName(result.created)]));
 		}
@@ -361,18 +359,6 @@ export class QueryManagerModal extends Modal {
 		this.rebuildReferences();
 		this.renderTabs();
 		this.renderItems();
-	}
-
-	private revealItem(id: string): void {
-		const el = this.collectionEl?.querySelector<HTMLElement>(
-			`[data-id="${CSS.escape(id)}"]`,
-		);
-		if (!el) return;
-		el.scrollIntoView({ block: "nearest" });
-		el.addClass("is-newly-created");
-		el.setAttribute("tabindex", "-1");
-		el.focus({ preventScroll: true });
-		window.setTimeout(() => el.removeClass("is-newly-created"), REVEAL_HIGHLIGHT_MS);
 	}
 
 	onClose(): void {

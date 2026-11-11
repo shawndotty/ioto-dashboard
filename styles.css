@@ -483,81 +483,6 @@
     gap: 8px;
 }
 
-/* Dashboard manager modal */
-.ioto-dashboard-manager-modal .ioto-dashboard-manager-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin: 8px 0 16px;
-}
-
-.ioto-dashboard-manager-modal .ioto-dashboard-manager-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 8px;
-    background: var(--background-secondary);
-}
-
-.ioto-dashboard-manager-modal .ioto-dashboard-manager-row.is-open {
-    border-color: var(--interactive-accent);
-}
-
-.ioto-dashboard-manager-modal .ioto-dashboard-manager-main {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    flex: 1 1 auto;
-    min-width: 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
-}
-
-.ioto-dashboard-manager-modal .ioto-dashboard-manager-name {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
-    color: var(--text-normal);
-}
-
-.ioto-dashboard-manager-modal .ioto-dashboard-manager-summary {
-    font-size: 0.85em;
-    color: var(--text-muted);
-}
-
-.ioto-dashboard-manager-modal .ioto-dashboard-manager-status {
-    padding: 1px 6px;
-    border-radius: 4px;
-    background: var(--background-modifier-hover);
-    font-size: 0.75em;
-    color: var(--text-muted);
-}
-
-.ioto-dashboard-manager-modal .ioto-dashboard-manager-actions {
-    display: flex;
-    flex: 0 0 auto;
-    gap: 2px;
-}
-
-.ioto-dashboard-manager-modal .ioto-dashboard-manager-action {
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.85em;
-}
-
-.ioto-dashboard-manager-modal .ioto-dashboard-manager-footer {
-    display: flex;
-    justify-content: flex-end;
-}
-
 .ioto-custom-dashboard-view .ioto-dashboard-grid {
     position: relative;
     display: grid;
@@ -777,17 +702,35 @@
     border-radius: 0;
 }
 
-/* 只加宽查询管理窗，不污染编辑/选择器弹窗；全屏时仍走 100% 宽度（内容列再限宽） */
-.modal.ioto-dashboard-modal.ioto-dashboard-modal--query-manager:not(.is-fullscreen) {
+/* 只加宽查询管理窗与仪表盘管理窗，不污染编辑/选择器弹窗；全屏时仍走 100% 宽度（内容列再限宽） */
+.modal.ioto-dashboard-modal.ioto-dashboard-modal--query-manager:not(.is-fullscreen),
+.modal.ioto-dashboard-modal.ioto-dashboard-modal--dashboard-manager:not(.is-fullscreen) {
     width: min(760px, 92vw);
 }
 
-/* 全屏仅查询管理窗限宽居中；与工具条同宽 */
+/* 全屏时内容列与工具条同宽居中 */
 .ioto-dashboard-modal--query-manager.is-fullscreen .ioto-query-toolbar,
-.ioto-dashboard-modal--query-manager.is-fullscreen .ioto-modal-body {
+.ioto-dashboard-modal--query-manager.is-fullscreen .ioto-modal-body,
+.ioto-dashboard-modal--dashboard-manager.is-fullscreen .ioto-query-toolbar,
+.ioto-dashboard-modal--dashboard-manager.is-fullscreen .ioto-modal-body {
     width: 100%;
     max-width: 960px;
     margin-inline: auto;
+}
+
+/* 非全屏：让 .ioto-modal-body 真正滚动，仪表盘多时不被核心 max-height 截断 */
+.ioto-dashboard-modal--dashboard-manager:not(.is-fullscreen) .modal-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: calc(100vh - 8em);
+    overflow: hidden;
+}
+
+.ioto-dashboard-modal--dashboard-manager .ioto-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
 }
 
 .ioto-dashboard-modal .modal-title {
@@ -1255,24 +1198,28 @@
     justify-content: flex-end;
 }
 
-/* 仅查询管理：2 列 + 更宽内边距（选择器仍用上面的 220px 多列网格） */
-.ioto-dashboard-modal--query-manager .ioto-modal-cards {
+/* 查询管理与仪表盘管理：2 列 + 更宽内边距（选择器仍用上面的 220px 多列网格） */
+.ioto-dashboard-modal--query-manager .ioto-modal-cards,
+.ioto-dashboard-modal--dashboard-manager .ioto-modal-cards {
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 16px;
 }
 
-.ioto-dashboard-modal--query-manager .ioto-modal-card {
+.ioto-dashboard-modal--query-manager .ioto-modal-card,
+.ioto-dashboard-modal--dashboard-manager .ioto-modal-card {
     gap: 10px;
     min-height: 104px;
     padding: 16px;
     border-radius: 10px;
 }
 
-.ioto-dashboard-modal--query-manager .ioto-modal-card:hover {
+.ioto-dashboard-modal--query-manager .ioto-modal-card:hover,
+.ioto-dashboard-modal--dashboard-manager .ioto-modal-card:hover {
     border-color: var(--background-modifier-border-hover);
 }
 
-.ioto-dashboard-modal--query-manager .ioto-modal-card__header {
+.ioto-dashboard-modal--query-manager .ioto-modal-card__header,
+.ioto-dashboard-modal--dashboard-manager .ioto-modal-card__header {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
@@ -1284,7 +1231,8 @@
     color: var(--text-normal);
 }
 
-.ioto-dashboard-modal--query-manager .ioto-modal-card__meta {
+.ioto-dashboard-modal--query-manager .ioto-modal-card__meta,
+.ioto-dashboard-modal--dashboard-manager .ioto-modal-card__meta {
     margin-inline-start: 0;
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);
@@ -1321,6 +1269,11 @@
 .ioto-dashboard-modal .ioto-modal-collection .setting-item:not(.setting-item-heading):hover {
     border-radius: 6px;
     background: var(--background-modifier-hover);
+}
+
+.ioto-dashboard-modal .ioto-modal-collection .setting-item.is-activatable,
+.ioto-dashboard-modal .ioto-modal-card.is-activatable {
+    cursor: pointer;
 }
 
 /* 危险操作：常驻与普通图标同权重，只有在“准备点它”时才提示错误色 */
