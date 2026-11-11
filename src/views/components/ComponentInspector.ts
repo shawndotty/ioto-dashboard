@@ -452,6 +452,7 @@ export class ComponentInspector {
 				return;
 			}
 			case "toggle": {
+				field.addClass("is-inline");
 				const row = field.createEl("label", {
 					cls: "ioto-inspector-toggle",
 				});

@@ -124,6 +124,26 @@ Notes:
 - `customFilters` are frontmatter-driven filters typed as `text | number | boolean | date | list` and targeted at `all | note | task`.
 - On a fresh install **only** (no `data.json`), folder paths are seeded from the `ioto-settings` plugin when it is enabled (`src/services/ioto-settings-services.ts`). Never overwrite existing user settings.
 
+## Inspector settings UI
+
+Custom dashboard inspector (page settings + component settings, shared by the
+right sidebar and the inline canvas host) follows one spacing/typography spec.
+All spacing comes from three tokens defined on `.ioto-inspector`:
+
+- `--ioto-inspector-space-inline` (4px): label ↔ control ↔ hint
+- `--ioto-inspector-space-field` (14px): between settings in one section
+- `--ioto-inspector-space-section` (16px): between sections
+
+Rules for adding a setting:
+
+1. One setting = one container: stacked `label → control → optional .ioto-inspector-hint` uses `.ioto-inspector-field`; a single toggle line uses `.ioto-inspector-field.is-inline`; compact stepper rows use `.ioto-inspector-row`.
+2. Fixed structure: `label` → control → optional `.ioto-inspector-hint`. Hints state the non-obvious consequence, never restate the label.
+3. Never write local spacing: no `margin` inside a field, no `margin-top` between fields — spacing comes from the three tokens.
+4. Never group by blank lines or spacer divs. Need a semantic group? Create a collapsible `section`.
+5. Only split a new section when there are ≥ 3 settings or the concern is genuinely different; do not make every setting its own section.
+6. Colors and sizes must use Obsidian variables (`--text-*`, `--font-*`, `--background-modifier-border`); no hard-coded hex or px font sizes.
+7. A hint must never match the label's size/weight/color — that two-level typography is what makes new settings readable.
+
 ## i18n conventions
 
 - `t(key, args?)` resolves via `moment.locale()`, merges over `en` as fallback, and interpolates `{0}`, `{1}`, … .
