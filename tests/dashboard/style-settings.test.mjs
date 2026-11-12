@@ -128,6 +128,7 @@ test('settingsOf appends style settings and hides alignment where unsupported', 
 		'bar-chart',
 		'task-list',
 		'note-list',
+		'table',
 	]);
 	for (const component of COMPONENTS) {
 		const merged = settingsOf(component);

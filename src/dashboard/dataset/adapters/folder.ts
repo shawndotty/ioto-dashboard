@@ -10,7 +10,7 @@ import {
 	type DatasetColumn,
 	type MeasureId,
 } from "../types";
-import { cell } from "./shared";
+import { cell, summaryItem } from "./shared";
 
 export const FOLDER_COLUMNS: DatasetColumn[] = [
 	{ key: "name", labelKey: "DATASET_COL_NAME", type: "text" },
@@ -57,11 +57,31 @@ export const folderAdapter: DatasetAdapter = (input): Dataset => {
 		},
 	}));
 	const truncated = truncateRows(rows, request.limit);
+	const totalFiles = folders.reduce((sum, folder) => sum + folder.fileCount, 0);
+	const latestMtime = folders.reduce(
+		(max, folder) => (folder.latestMtime > max ? folder.latestMtime : max),
+		0,
+	);
 	return {
 		object: request.object,
 		measure: request.measure,
 		columns: FOLDER_COLUMNS,
 		...truncated,
 		scalarText: scalarTextFor(folders, request.measure),
+		summary: {
+			items: [
+				summaryItem(
+					"DATASET_SUMMARY_FOLDERS_TOTAL",
+					String(folders.length),
+					"count",
+				),
+				summaryItem("DATASET_SUMMARY_FILES_TOTAL", String(totalFiles)),
+				summaryItem(
+					"DATASET_SUMMARY_LATEST_MTIME",
+					formatDate(latestMtime),
+					"mtime",
+				),
+			],
+		},
 	};
 };

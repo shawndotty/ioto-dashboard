@@ -8,7 +8,7 @@ import {
 	type DatasetAdapter,
 	type DatasetColumn,
 } from "../types";
-import { cell } from "./shared";
+import { cell, summaryItem } from "./shared";
 import {
 	buildTimelineRows,
 	TIMELINE_COLUMNS,
@@ -112,6 +112,29 @@ export const taskAdapter: DatasetAdapter = (input): Dataset => {
 	} else if (request.measure === "open") {
 		tasks = tasks.filter((task) => task.marker === "open");
 	}
+	const totalTasks = sortedTasks.length;
+	const completedTasks = sortedTasks.filter(
+		(task) => task.marker === "done",
+	).length;
+	const openTasks = sortedTasks.filter(
+		(task) => task.marker === "open",
+	).length;
+	const summary = {
+		items: [
+			summaryItem("DATASET_SUMMARY_TASKS_TOTAL", String(totalTasks), "count"),
+			summaryItem(
+				"DATASET_SUMMARY_TASKS_COMPLETED",
+				String(completedTasks),
+				"completed",
+			),
+			summaryItem("DATASET_SUMMARY_TASKS_OPEN", String(openTasks), "open"),
+			summaryItem(
+				"DATASET_SUMMARY_TASKS_RATIO",
+				formatPercent(totalTasks === 0 ? null : completedTasks / totalTasks),
+				"ratio",
+			),
+		],
+	};
 	const rows = tasks.map((task) => ({
 		id: `${task.path}:${task.line}`,
 		cells: {
@@ -140,5 +163,6 @@ export const taskAdapter: DatasetAdapter = (input): Dataset => {
 		...truncated,
 		scalarText: scalar,
 		ratio: ratio ?? null,
+		summary,
 	};
 };

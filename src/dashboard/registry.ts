@@ -111,6 +111,14 @@ export type ComponentSetting = SettingBase &
 				fallback: string;
 				target?: "config" | "options";
 		  }
+		| {
+				/** Column visibility checkboxes; options come from the query's object. */
+				key: string;
+				kind: "columns";
+				group: ComponentSettingGroup;
+				labelKey: string;
+				target?: "options";
+		  }
 	);
 
 export interface ComponentRenderContext {
@@ -126,8 +134,12 @@ export interface ComponentRenderContext {
 	openProjectTasks(group: ProjectProgressGroup, ratioBase: string): void;
 	/** Any vault file, not just Markdown. */
 	openFile(path: string, line?: number): void;
+	/** Opens any vault file in a new tab; absent in hosts that cannot. */
+	openFileInNewTab?(path: string, line?: number): void;
 	openFolder(path: string): void;
 	revealInExplorer(path: string): void;
+	/** 按 Vault 实际节点类型分流：文件→新标签、文件夹→内容弹窗、缺失→Notice。 */
+	openLink?(path: string, line: number | undefined, newTab: boolean): void;
 	/** Renders Markdown owned by the current view, so it unloads with the card. */
 	renderMarkdown(el: HTMLElement, path: string): Promise<void>;
 	/** Renders a fragment of Markdown owned by the current view (inline task text). */
@@ -294,6 +306,16 @@ export function coerceSettingValue(
 				: ({
 						[setting.key]: raw,
 					} as Partial<DashboardComponentConfig>);
+		}
+		case "columns": {
+			if (!Array.isArray(raw)) return {};
+			const values = raw.filter(
+				(value): value is string =>
+					typeof value === "string" && value.trim().length > 0,
+			);
+			return setting.target === "options"
+				? optionPatch(setting.key, values.join(",") || undefined)
+				: {};
 		}
 		case "color": {
 			if (typeof raw !== "string" || !/^#[0-9a-fA-F]{6}$/.test(raw)) {

@@ -12,7 +12,8 @@ export type ModalKind =
 	| "component-picker"
 	| "page-layout"
 	| "dashboard-manager"
-	| "project-tasks";
+	| "project-tasks"
+	| "folder-contents";
 
 export interface ModalShellOptions {
 	kind: ModalKind;

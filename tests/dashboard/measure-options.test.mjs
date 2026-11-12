@@ -9,6 +9,7 @@ const { resolveSettingOptions, coerceSettingValue } = await load(
 	'../../src/dashboard/registry.ts',
 );
 const { kpiComponent } = await load('../../src/dashboard/components/kpi.ts');
+const { tableComponent } = await load('../../src/dashboard/components/table.ts');
 
 function query(target) {
 	return {
@@ -186,4 +187,78 @@ test('KPI requests carry basis only for task queries', () => {
 		).basis,
 		'file',
 	);
+});
+
+function tableSetting(key) {
+	const setting = tableComponent.settings.find((item) => item.key === key);
+	assert.ok(setting, `table is missing the ${key} setting`);
+	return setting;
+}
+
+test('table exposes measures derived from the query object', () => {
+	const setting = tableSetting('measure');
+	assert.equal(setting.kind, 'select');
+	assert.equal(typeof setting.options, 'function');
+	assert.deepEqual(
+		resolveSettingOptions(setting, { query: query('task') }).map(
+			(option) => option.value,
+		),
+		['count', 'completed', 'open', 'ratio'],
+	);
+	assert.deepEqual(
+		resolveSettingOptions(setting, { query: query('file') }).map(
+			(option) => option.value,
+		),
+		['count', 'size', 'mtime'],
+	);
+	assert.deepEqual(
+		resolveSettingOptions(setting, { query: query('folder') }).map(
+			(option) => option.value,
+		),
+		['count', 'mtime'],
+	);
+	assert.deepEqual(
+		resolveSettingOptions(setting, { query: query('note') }).map(
+			(option) => option.value,
+		),
+		['count'],
+	);
+});
+
+test('table requests normalise a stale measure and keep a fixed row cap', () => {
+	const stale = {
+		id: 'component:1',
+		type: 'table',
+		queryId: 'builtin:files-all',
+		measure: 'completed',
+	};
+	const request = tableComponent.toDatasetRequest(stale, query('file'));
+	assert.equal(request.object, 'file');
+	assert.equal(request.measure, 'count');
+	assert.equal(request.limit, 2000);
+	assert.equal(request.basis, undefined);
+
+	const taskRequest = tableComponent.toDatasetRequest(
+		{ ...stale, queryId: 'builtin:tasks-all', measure: 'ratio' },
+		query('task'),
+	);
+	assert.equal(taskRequest.measure, 'ratio');
+	assert.equal(taskRequest.basis, 'file');
+});
+
+test('table only offers grouping dimensions the object can group by', () => {
+	const setting = tableSetting('groupBy');
+	assert.equal(setting.target, 'options');
+	const values = (target) =>
+		resolveSettingOptions(setting, { query: query(target) }).map(
+			(option) => option.value,
+		);
+	assert.deepEqual(values('task'), ['none', 'project', 'section', 'status']);
+	assert.deepEqual(values('note'), ['none', 'ioType', 'folder']);
+	assert.deepEqual(values('file'), ['none', 'extension', 'folder']);
+	assert.deepEqual(values('folder'), ['none']);
+	assert.deepEqual(coerceSettingValue(setting, 'status', QUERY_IDS, query('task')), {
+		options: { groupBy: 'status' },
+	});
+	assert.deepEqual(coerceSettingValue(setting, 'status', QUERY_IDS, query('note')), {});
 });

@@ -219,3 +219,26 @@ test('the field setting accepts non-empty column keys only', () => {
 	assert.deepEqual(coerceSettingValue(setting, '', QUERY_IDS), {});
 	assert.deepEqual(coerceSettingValue(setting, 3, QUERY_IDS), {});
 });
+
+test('the columns setting stores a comma-separated option list', () => {
+	const setting = tableComponent.settings.find((item) => item.key === 'columns');
+	assert.equal(setting.kind, 'columns');
+	assert.equal(setting.target, 'options');
+	assert.deepEqual(
+		coerceSettingValue(setting, ['note', 'folder', ' '], QUERY_IDS),
+		{ options: { columns: 'note,folder' } },
+	);
+	assert.deepEqual(coerceSettingValue(setting, [], QUERY_IDS), {
+		options: { columns: undefined },
+	});
+	assert.deepEqual(coerceSettingValue(setting, 'note', QUERY_IDS), {});
+});
+
+test('the table writes defaults its settings advertise', () => {
+	const created = tableComponent.createConfig(tableComponent.defaultQueryId);
+	assert.equal(created.basis, 'file');
+	assert.equal(created.measure, 'count');
+	assert.equal(created.limit, 50);
+	assert.equal(created.options?.groupBy, 'none');
+	assert.equal(created.options?.showRowNumber, false);
+});

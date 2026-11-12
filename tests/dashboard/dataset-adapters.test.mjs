@@ -164,6 +164,53 @@ test('note adapter lists notes with formatted cells', () => {
 	assert.equal(dataset.scalarText, '2');
 	assert.equal(dataset.rows[0].cells.tasks.text, '2');
 	assert.match(dataset.rows[0].cells.size.text, /B$/);
+	// 文件夹单元格必须指向文件夹本身，而不是笔记路径。
+	assert.equal(dataset.rows[0].cells.folder.path, '3-任务/P1');
+});
+
+test('every list adapter exposes a full-collection summary', () => {
+	const tasks = taskAdapter(
+		adapterInput({ object: 'task', measure: 'count', queryId: 'q', limit: 1 }),
+	);
+	assert.deepEqual(
+		tasks.summary.items.map((item) => item.value),
+		['2', '1', '1', '50%'],
+	);
+	assert.deepEqual(
+		tasks.summary.items.map((item) => item.measure),
+		['count', 'completed', 'open', 'ratio'],
+	);
+
+	// 行过滤与 limit 不改变汇总口径。
+	const completed = taskAdapter(
+		adapterInput({ object: 'task', measure: 'completed', queryId: 'q' }),
+	);
+	assert.equal(completed.total, 1);
+	assert.equal(completed.summary.items[0].value, '2');
+
+	const notes = noteAdapter(
+		adapterInput({ object: 'note', measure: 'count', queryId: 'q', limit: 1 }),
+	);
+	assert.deepEqual(
+		notes.summary.items.map((item) => item.value),
+		['2', '4', '2'],
+	);
+
+	const files = fileAdapter(
+		adapterInput({ object: 'file', measure: 'count', queryId: 'q', limit: 1 }),
+	);
+	assert.deepEqual(
+		files.summary.items.map((item) => item.value),
+		['1', '2 KB', formatDate(20)],
+	);
+
+	const folders = folderAdapter(
+		adapterInput({ object: 'folder', measure: 'count', queryId: 'q', limit: 1 }),
+	);
+	assert.deepEqual(
+		folders.summary.items.map((item) => item.value),
+		['1', '1', formatDate(10)],
+	);
 });
 
 test('file and folder adapters read the on-demand tree records', () => {

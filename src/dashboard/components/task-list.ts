@@ -190,6 +190,7 @@ export const taskListComponent: ComponentDefinition = {
 					});
 					link.addEventListener("click", (event) => {
 						event.preventDefault();
+						if (ctx.editMode) return;
 						event.stopPropagation();
 						ctx.openFile(notePath);
 					});
@@ -201,7 +202,10 @@ export const taskListComponent: ComponentDefinition = {
 				}
 				if (!path) return itemEl;
 				itemEl.setAttr("tabindex", "0");
-				const open = () => ctx.openFile(path, textCell?.line);
+				const open = () => {
+					if (ctx.editMode) return;
+					ctx.openFile(path, textCell?.line);
+				};
 				itemEl.onClickEvent((event) => {
 					if (event.target instanceof HTMLElement && event.target.closest("a.internal-link")) {
 						return;

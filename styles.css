@@ -918,6 +918,166 @@
     color: var(--text-error);
 }
 
+/* Folder contents modal */
+.modal.ioto-dashboard-modal.ioto-dashboard-modal--folder-contents:not(.is-fullscreen) {
+    width: min(620px, 92vw);
+}
+
+.ioto-dashboard-modal--folder-contents:not(.is-fullscreen) .modal-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: calc(100vh - 8em);
+    overflow: hidden;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 8px;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-path {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    user-select: text;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-count {
+    flex: 0 0 auto;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-nav {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-crumbs {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    min-width: 0;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-crumb {
+    padding: 2px 4px;
+    border: none;
+    border-radius: var(--radius-s);
+    background: transparent;
+    box-shadow: none;
+    color: var(--link-color);
+    font-size: var(--font-ui-smaller);
+    cursor: pointer;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-crumb:hover {
+    background: var(--background-modifier-hover);
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-crumb.is-current {
+    color: var(--text-muted);
+    cursor: default;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-subfolders {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-inline-start: 8px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-top: 6px;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: var(--radius-s);
+    color: var(--text-normal);
+    cursor: pointer;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-row:hover,
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-row:focus-visible {
+    background: var(--background-modifier-hover);
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-muted);
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-row.is-folder .ioto-folder-contents-name {
+    font-weight: var(--font-medium);
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-meta {
+    flex: 0 0 auto;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-reveal {
+    flex: 0 0 auto;
+    opacity: 0;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-row:hover .ioto-folder-contents-reveal,
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-row:focus-within .ioto-folder-contents-reveal,
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-reveal:focus-visible {
+    opacity: 1;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-empty {
+    padding: 16px 8px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.ioto-dashboard-modal--folder-contents .ioto-folder-contents-truncated {
+    flex: 0 0 auto;
+    padding-top: 8px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+
 /* Task list */
 .ioto-custom-dashboard-view .ioto-task-list-items {
     list-style: none;
@@ -2327,6 +2487,33 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     min-width: 0;
 }
 
+.ioto-inspector-columns {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ioto-inspector-space-inline);
+}
+
+.ioto-inspector-column {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    cursor: pointer;
+}
+
+.ioto-inspector-column input {
+    margin: 0;
+}
+
+.ioto-inspector-column input:disabled {
+    cursor: default;
+}
+
+.ioto-inspector-column input:disabled + span {
+    color: var(--text-muted);
+}
+
 .ioto-inspector-query-row {
     display: flex;
     flex-wrap: wrap;
@@ -2439,9 +2626,19 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 }
 
 /* Dataset views: table */
+.ioto-table {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    --ioto-table-head-height: 28px;
+}
+
 .ioto-table-wrapper {
+    flex: 1 1 auto;
     width: 100%;
     overflow: auto;
+    min-height: 0;
 }
 
 .ioto-table-el {
@@ -2460,27 +2657,84 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     text-overflow: ellipsis;
 }
 
-.ioto-table-el th {
+.ioto-table-el thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--background-primary);
     color: var(--text-muted);
     font-weight: 600;
     cursor: pointer;
     user-select: none;
 }
 
-.ioto-table-el th:hover {
+.ioto-table-el thead th:hover {
     color: var(--text-normal);
+}
+
+.ioto-table-el thead th:focus-visible,
+.ioto-table-el tbody tr:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: -2px;
+}
+
+.ioto-table-el th.is-asc::after,
+.ioto-table-el th.is-desc::after {
+    margin-inline-start: 4px;
+    font-size: 0.7em;
+    color: var(--text-accent);
+}
+
+.ioto-table-el th.is-asc::after {
+    content: "▲";
+}
+
+.ioto-table-el th.is-desc::after {
+    content: "▼";
 }
 
 .ioto-table-el .is-right {
     text-align: right;
 }
 
-.ioto-table-el tbody tr {
+.ioto-table-el tbody tr.is-clickable {
     cursor: pointer;
 }
 
 .ioto-table-el tbody tr:hover {
     background: var(--background-modifier-hover);
+}
+
+/* 编辑态点击行只选中卡片，指针与悬停反馈回到「不可打开」。 */
+.ioto-table.is-editing .ioto-table-el tbody tr,
+.ioto-table.is-editing .ioto-table-el tbody tr:hover {
+    cursor: default;
+    background: transparent;
+}
+
+.ioto-table-el td a.internal-link {
+    color: var(--link-color);
+    text-decoration: none;
+}
+
+.ioto-table-el td a.internal-link:hover {
+    text-decoration: underline;
+}
+
+.ioto-table-group-row th {
+    position: sticky;
+    top: var(--ioto-table-head-height);
+    z-index: 1;
+    background: var(--background-secondary);
+    color: var(--text-muted);
+    font-weight: 600;
+    cursor: default;
+}
+
+.ioto-table-group-count {
+    margin-inline-start: 6px;
+    color: var(--text-faint);
+    font-weight: 400;
 }
 
 .ioto-table-index {
@@ -2490,9 +2744,92 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 }
 
 .ioto-table-footer {
-    padding-top: 4px;
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 12px;
+    padding-top: 6px;
     color: var(--text-faint);
     font-size: var(--font-ui-smaller);
+}
+
+.ioto-table-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+}
+
+.ioto-table-summary-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.ioto-table-summary-item.is-emphasis {
+    color: var(--text-normal);
+    font-weight: 600;
+}
+
+.ioto-table-summary-value {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+.ioto-table-summary-item.is-emphasis .ioto-table-summary-value {
+    color: var(--text-normal);
+}
+
+.ioto-table-footer-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-inline-start: auto;
+}
+
+.ioto-table-page-size {
+    font-size: var(--font-ui-smaller);
+}
+
+/* 表格页脚内的分页条：不继承列表的贴底整条样式 */
+.ioto-custom-dashboard-view .ioto-card-pager.ioto-table-pager {
+    position: static;
+    z-index: auto;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border-top: none;
+}
+
+.ioto-custom-dashboard-view .ioto-table-footer {
+    row-gap: 6px;
+}
+
+.ioto-custom-dashboard-view .ioto-table-footer-controls {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    min-width: 0;
+    row-gap: 4px;
+}
+
+.ioto-custom-dashboard-view .ioto-table-page-size {
+    flex: 0 0 auto;
+}
+
+.ioto-custom-dashboard-view .ioto-table-page-size-label {
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+
+/* 编辑态右下角缩放手柄：安全区内边距挂到页脚，而不是页脚内的分页条 */
+.ioto-custom-dashboard-view.is-editing .ioto-table-footer {
+    padding-inline-end: 24px;
+}
+
+.ioto-table-no-match {
+    padding: 8px 0;
 }
 
 /* Dataset views: charts */

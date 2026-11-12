@@ -10,7 +10,7 @@ import {
 	type DatasetColumn,
 	type MeasureId,
 } from "../types";
-import { cell } from "./shared";
+import { cell, summaryItem } from "./shared";
 import {
 	buildTimelineRows,
 	TIMELINE_COLUMNS,
@@ -92,11 +92,27 @@ export const fileAdapter: DatasetAdapter = (input): Dataset => {
 		},
 	}));
 	const truncated = truncateRows(rows, request.limit);
+	const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+	const latestMtime = files.reduce(
+		(max, file) => (file.mtime > max ? file.mtime : max),
+		0,
+	);
 	return {
 		object: request.object,
 		measure: request.measure,
 		columns: FILE_COLUMNS,
 		...truncated,
 		scalarText: scalarTextFor(files, request.measure),
+		summary: {
+			items: [
+				summaryItem("DATASET_SUMMARY_FILES_TOTAL", String(files.length), "count"),
+				summaryItem("DATASET_SUMMARY_FILES_SIZE", formatSize(totalSize), "size"),
+				summaryItem(
+					"DATASET_SUMMARY_LATEST_MTIME",
+					formatDate(latestMtime),
+					"mtime",
+				),
+			],
+		},
 	};
 };

@@ -8,7 +8,7 @@ import {
 	type DatasetAdapter,
 	type DatasetColumn,
 } from "../types";
-import { cell } from "./shared";
+import { cell, summaryItem } from "./shared";
 import {
 	buildTimelineRows,
 	TIMELINE_COLUMNS,
@@ -75,7 +75,7 @@ export const noteAdapter: DatasetAdapter = (input): Dataset => {
 		id: note.path,
 		cells: {
 			note: cell(note.basename, { path: note.path }),
-			folder: cell(note.folder, { path: note.path }),
+			folder: cell(note.folder, { path: note.folder }),
 			ioType: cell(note.ioType),
 			tasks: cell(String(note.fileTaskCount), {
 				sortValue: note.fileTaskCount,
@@ -88,11 +88,23 @@ export const noteAdapter: DatasetAdapter = (input): Dataset => {
 		},
 	}));
 	const truncated = truncateRows(rows, request.limit);
+	const totalTasks = notes.reduce((sum, note) => sum + note.fileTaskCount, 0);
+	const completedTasks = notes.reduce(
+		(sum, note) => sum + note.fileCompletedCount,
+		0,
+	);
 	return {
 		object: request.object,
 		measure: request.measure,
 		columns: NOTE_COLUMNS,
 		...truncated,
 		scalarText: String(notes.length),
+		summary: {
+			items: [
+				summaryItem("DATASET_SUMMARY_NOTES_TOTAL", String(notes.length), "count"),
+				summaryItem("DATASET_SUMMARY_NOTES_TASKS", String(totalTasks)),
+				summaryItem("DATASET_SUMMARY_NOTES_COMPLETED", String(completedTasks)),
+			],
+		},
 	};
 };

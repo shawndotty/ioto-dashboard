@@ -89,6 +89,17 @@ export interface DatasetRow {
 	cells: Record<string, DatasetCell>;
 }
 
+export interface DatasetSummaryItem {
+	labelKey: string;
+	value: string;
+	/** Which measure this item reports; views use it to highlight the active one. */
+	measure?: MeasureId;
+}
+
+export interface DatasetSummary {
+	items: DatasetSummaryItem[];
+}
+
 export interface Dataset {
 	object: DataObject;
 	measure: MeasureId;
@@ -102,6 +113,8 @@ export interface Dataset {
 	ratio?: number | null;
 	/** timeline: records inside the window, to tell "no data" from "all zero". */
 	sourceTotal?: number;
+	/** Full-collection figures, computed before row filtering and truncation. */
+	summary?: DatasetSummary;
 }
 
 export interface DatasetRequest {

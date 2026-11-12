@@ -4,6 +4,7 @@ import {
 	Menu,
 	Notice,
 	Platform,
+	TAbstractFile,
 	TFile,
 	TFolder,
 	ViewStateResult,
@@ -62,6 +63,7 @@ import {
 	DashboardManagerModal,
 	uniqueDashboardName,
 } from "../ui/dashboard-manager";
+import { FolderContentsModal } from "../ui/folder-contents-modal";
 import { PageLayoutModal } from "../ui/page-layout-modal";
 import { PageNameModal } from "../ui/page-name-modal";
 import { PagePickerModal, type PageTarget } from "../ui/page-picker";
@@ -1052,8 +1054,12 @@ export class CustomDashboardView extends ItemView {
 			openProjectTasks: (group, ratioBase) =>
 				this.openProjectTasks(group, ratioBase),
 			openFile: (path, line) => void this.openNote(path, line),
+			openFileInNewTab: (path, line) =>
+				void this.openNote(path, line, true),
 			openFolder: (path) => void this.openFolder(path),
 			revealInExplorer: (path) => void this.revealInExplorer(path),
+			openLink: (path, line, newTab) =>
+				void this.openVaultTarget(path, line, newTab),
 			renderMarkdown: (el, path) => this.renderMarkdown(el, path),
 			renderInlineMarkdown: (el, markdown, sourcePath) =>
 				MarkdownRenderer.render(this.app, markdown, el, sourcePath, this),
@@ -2482,6 +2488,41 @@ export class CustomDashboardView extends ItemView {
 		if (!(file instanceof TFile)) return;
 		const leaf = this.app.workspace.getLeaf(newTab ? "tab" : false);
 		await leaf.openFile(file, { eState: { line: line ?? 0 } });
+	}
+
+	private async openVaultTarget(
+		path: string,
+		line: number | undefined,
+		newTab: boolean,
+	): Promise<void> {
+		if (!path) return;
+		let node: TAbstractFile | null =
+			this.app.vault.getAbstractFileByPath(path);
+
+		// 兜底：单元格里若不是绝对路径（如 [[笔记]] 文本），按链接解析
+		if (!node) {
+			node = this.app.metadataCache.getFirstLinkpathDest(path, "");
+		}
+
+		// 文件夹必须先于文件判定，否则会走 openFile 失败
+		if (node instanceof TFolder) {
+			this.openFolderContents(node.path);
+			return;
+		}
+		if (node instanceof TFile) {
+			const leaf = this.app.workspace.getLeaf(newTab ? "tab" : false);
+			await leaf.openFile(node, { eState: { line: line ?? 0 } });
+			return;
+		}
+		new Notice(t("TABLE_LINK_MISSING", [path]));
+	}
+
+	private openFolderContents(path: string): void {
+		new FolderContentsModal(this.app, {
+			rootPath: path,
+			openFile: (filePath) => void this.openNote(filePath, undefined, true),
+			reveal: (target) => void this.revealInExplorer(target),
+		}).open();
 	}
 
 	private openProjectTasks(

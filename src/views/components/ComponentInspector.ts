@@ -8,7 +8,11 @@ import {
 	resolveSettingOptions,
 	type ComponentSetting,
 } from "../../dashboard/registry";
-import { columnsForObject, timelineColumnsForObject } from "../../dashboard/dataset/columns";
+import {
+	columnsForObject,
+	parseColumnSelection,
+	timelineColumnsForObject,
+} from "../../dashboard/dataset/columns";
 import {
 	barObjectForQuery,
 	objectForQuery,
@@ -501,14 +505,31 @@ export class ComponentInspector {
 				const queryIds = new Set(
 					state.queries.map((query) => query.id),
 				);
+				// 存量非法值（例如换过查询对象）写回首个合法选项，避免「显示与存储不一致」。
+				if (state.editable && typeof stored === "string" && stored !== current) {
+					const patch = coerceSettingValue(
+						setting,
+						current,
+						queryIds,
+						query,
+					);
+					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+				}
 				select.addEventListener("change", () => {
 					const patch = coerceSettingValue(
 						setting,
 						select.value,
 						queryIds,
-						query,
 					);
-					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+					if (Object.keys(patch).length === 0) return;
+					const nextQuery = state.queries.find(
+						(item) => item.id === select.value,
+					);
+					this.deps.patch(
+						nextQuery
+							? this.withMeasureFallback(state, nextQuery, patch)
+							: patch,
+					);
 				});
 				return;
 			}
@@ -593,6 +614,53 @@ export class ComponentInspector {
 					row,
 					setting,
 				});
+				return;
+			}
+			case "columns": {
+				field.createEl("label", { text: t(setting.labelKey as LabelKey) });
+				const query = state.queries.find(
+					(item) => item.id === state.target.config.queryId,
+				);
+				const columns = columnsForObject(objectForQuery(query));
+				if (columns.length === 0) return;
+				const primary = columns[0]?.key ?? "";
+				const stored = parseColumnSelection(
+					this.storedSettingValue(state, setting),
+				);
+				const selected = new Set(
+					stored ?? columns.map((column) => column.key),
+				);
+				const queryIds = new Set(
+					state.queries.map((item) => item.id),
+				);
+				const list = field.createDiv({ cls: "ioto-inspector-columns" });
+				const boxes: { key: string; input: HTMLInputElement }[] = [];
+				for (const column of columns) {
+					const row = list.createEl("label", {
+						cls: "ioto-inspector-column",
+					});
+					const input = row.createEl("input", { type: "checkbox" });
+					const fixed = column.key === primary;
+					input.checked = fixed || selected.has(column.key);
+					input.disabled = !state.editable || fixed;
+					row.createSpan({ text: t(column.labelKey as LabelKey) });
+					boxes.push({ key: column.key, input });
+				}
+				const commit = (): void => {
+					const values = boxes
+						.filter((box) => box.input.checked)
+						.map((box) => box.key);
+					this.deps.patch(
+						coerceSettingValue(
+							setting,
+							values.length === columns.length ? [] : values,
+							queryIds,
+						),
+					);
+				};
+				for (const box of boxes) {
+					box.input.addEventListener("change", commit);
+				}
 				return;
 			}
 		}

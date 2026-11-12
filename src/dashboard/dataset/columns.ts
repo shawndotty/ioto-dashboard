@@ -26,6 +26,16 @@ export function seriesColumnsForTask(): DatasetColumn[] {
 	return TASK_SERIES_COLUMNS;
 }
 
+/** `config.options.columns` is a comma-separated key list; empty means "all". */
+export function parseColumnSelection(value: unknown): string[] | undefined {
+	if (typeof value !== "string" || value.trim() === "") return undefined;
+	const keys = value
+		.split(",")
+		.map((key) => key.trim())
+		.filter((key) => key.length > 0);
+	return keys.length > 0 ? keys : undefined;
+}
+
 /** Time-series columns the line chart exposes for each time-bucketed object. */
 export function timelineColumnsForObject(object: DataObject): DatasetColumn[] {
 	switch (object) {
