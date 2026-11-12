@@ -15,6 +15,8 @@ import {
 	type MetricEvaluationContext,
 	type MetricRequest,
 	type MetricResult,
+	type ProjectPendingCounts,
+	type ProjectPendingTask,
 	type ProjectProgressGroup,
 	type UnfinishedTaskItem,
 } from "./types";
@@ -81,15 +83,18 @@ function collectTasks(
 	return tasks.filter((task) => sections.includes(task.sectionRole));
 }
 
+function byNoteRecency(a: TaskRecord, b: TaskRecord): number {
+	return (
+		b.noteMtime - a.noteMtime ||
+		a.path.localeCompare(b.path) ||
+		a.line - b.line
+	);
+}
+
 function unfinishedItems(tasks: TaskRecord[], limit: number): UnfinishedTaskItem[] {
 	return tasks
 		.filter((task) => task.marker === "open" && task.text.trim().length > 0)
-		.sort(
-			(a, b) =>
-				b.noteMtime - a.noteMtime ||
-				a.path.localeCompare(b.path) ||
-				a.line - b.line,
-		)
+		.sort(byNoteRecency)
 		.slice(0, limit)
 		.map((task) => ({
 			path: task.path,
@@ -100,6 +105,49 @@ function unfinishedItems(tasks: TaskRecord[], limit: number): UnfinishedTaskItem
 			noteMtime: task.noteMtime,
 			sectionRole: task.sectionRole,
 		}));
+}
+
+export const PENDING_LIST_LIMIT = 200;
+
+/**
+ * Tasks shown by the project drill-down. Counts always come from the
+ * untruncated set so they stay equal to the row's `bucket.open + bucket.other`.
+ */
+export function buildPendingSnapshot(
+	tasks: TaskRecord[],
+	limit: number = PENDING_LIST_LIMIT,
+): {
+	items: ProjectPendingTask[];
+	total: number;
+	counts: ProjectPendingCounts;
+} {
+	const counts: ProjectPendingCounts = {
+		open: 0,
+		inProgress: 0,
+		forwarded: 0,
+		other: 0,
+	};
+	const pending: TaskRecord[] = [];
+	for (const task of tasks) {
+		if (task.marker === "done" || task.marker === "cancelled") continue;
+		pending.push(task);
+		if (task.marker === "open") counts.open += 1;
+		else if (task.marker === "in-progress") counts.inProgress += 1;
+		else if (task.marker === "forwarded") counts.forwarded += 1;
+		else counts.other += 1;
+	}
+	const items = [...pending]
+		.sort(byNoteRecency)
+		.slice(0, limit)
+		.map((task) => ({
+			path: task.path,
+			line: task.line,
+			text: task.text,
+			marker: task.marker,
+			noteBasename: task.noteBasename,
+			noteMtime: task.noteMtime,
+		}));
+	return { items, total: pending.length, counts };
 }
 
 function projectInScope(
@@ -124,25 +172,47 @@ function projectGroups(
 ): ProjectProgressGroup[] {
 	const universe = listProjectUniverse(ctx.snapshot, ctx.taskFolder);
 	const includeSubfolders = query.scope.includeSubfolders ?? true;
+	const known = new Set(universe.map((project) => project.key));
+	const byProject = new Map<string, TaskRecord[]>();
+	const loose: TaskRecord[] = [];
+	for (const task of tasks) {
+		if (!task.project || !known.has(task.project)) {
+			loose.push(task);
+			continue;
+		}
+		const list = byProject.get(task.project);
+		if (list) list.push(task);
+		else byProject.set(task.project, [task]);
+	}
+
 	const groups: ProjectProgressGroup[] = universe
 		.filter((project) =>
 			projectInScope(project.folder, query, includeSubfolders),
 		)
-		.map((project) => ({
-			key: project.key,
-			name: project.name,
-			folder: project.folder,
-			fileCount: ctx.snapshot.notes.filter((note) =>
-				note.path.startsWith(`${project.folder}/`),
-			).length,
-			bucket: bucketOf(tasks.filter((task) => task.project === project.key)),
-		}));
+		.map((project) => {
+			const projectTasks = byProject.get(project.key) ?? [];
+			const record = ctx.snapshot.projects.find(
+				(item) => item.folder === project.folder,
+			);
+			const pending = buildPendingSnapshot(projectTasks);
+			return {
+				key: project.key,
+				name: project.name,
+				folder: project.folder,
+				fileCount: ctx.snapshot.notes.filter((note) =>
+					note.path.startsWith(`${project.folder}/`),
+				).length,
+				bucket: bucketOf(projectTasks),
+				status: record?.status,
+				dueDate: record?.dueDate,
+				pending: pending.items,
+				pendingTotal: pending.total,
+				pendingCounts: pending.counts,
+			};
+		});
 
-	const known = new Set(universe.map((project) => project.key));
-	const loose = tasks.filter(
-		(task) => !task.project || !known.has(task.project),
-	);
 	if (loose.length > 0) {
+		const pending = buildPendingSnapshot(loose);
 		groups.push({
 			key: "",
 			name: "Unclassified",
@@ -150,6 +220,9 @@ function projectGroups(
 			folder: "",
 			fileCount: 0,
 			bucket: bucketOf(loose),
+			pending: pending.items,
+			pendingTotal: pending.total,
+			pendingCounts: pending.counts,
 		});
 	}
 	return groups;

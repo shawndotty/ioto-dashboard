@@ -65,6 +65,7 @@ import {
 import { PageLayoutModal } from "../ui/page-layout-modal";
 import { PageNameModal } from "../ui/page-name-modal";
 import { PagePickerModal, type PageTarget } from "../ui/page-picker";
+import { ProjectTasksModal } from "../ui/project-tasks-modal";
 import {
 	QueryEditModal,
 	QueryManagerModal,
@@ -1048,7 +1049,8 @@ export class CustomDashboardView extends ItemView {
 			messageKey,
 			editMode: this.editMode,
 			openNote: (path, line) => void this.openNote(path, line),
-			openProject: (group) => void this.openProject(group),
+			openProjectTasks: (group, ratioBase) =>
+				this.openProjectTasks(group, ratioBase),
 			openFile: (path, line) => void this.openNote(path, line),
 			openFolder: (path) => void this.openFolder(path),
 			revealInExplorer: (path) => void this.revealInExplorer(path),
@@ -2471,26 +2473,34 @@ export class CustomDashboardView extends ItemView {
 		).open();
 	}
 
-	private async openNote(path: string, line?: number): Promise<void> {
+	private async openNote(
+		path: string,
+		line?: number,
+		newTab = false,
+	): Promise<void> {
 		const file = this.app.vault.getAbstractFileByPath(path);
 		if (!(file instanceof TFile)) return;
-		const leaf = this.app.workspace.getLeaf(false);
+		const leaf = this.app.workspace.getLeaf(newTab ? "tab" : false);
 		await leaf.openFile(file, { eState: { line: line ?? 0 } });
 	}
 
-	private async openProject(group: ProjectProgressGroup): Promise<void> {
-		if (!group.key) return;
-		const execute = this.app.commands.executeCommandById.bind(
-			this.app.commands,
-		) as unknown as (id: string) => boolean;
-		let executed = false;
-		try {
-			executed = execute("open-project-center-view");
-		} catch (error) {
-			console.warn("IOTO Dashboard: project drill-down failed", error);
-		}
-		if (executed) return;
-		await this.openNote(`${group.folder}/_project.md`);
+	private openProjectTasks(
+		group: ProjectProgressGroup,
+		ratioBase: string,
+	): void {
+		const hasFolder = group.folder.length > 0;
+		const notePath = hasFolder ? `${group.folder}/_project.md` : "";
+		new ProjectTasksModal(this.app, {
+			group,
+			ratioBase,
+			projectNotePath: notePath,
+			projectNoteExists:
+				hasFolder &&
+				this.app.vault.getAbstractFileByPath(notePath) instanceof TFile,
+			revealable: hasFolder,
+			openTask: (path, line, newTab) => void this.openNote(path, line, newTab),
+			reveal: (path) => void this.revealInExplorer(path),
+		}).open();
 	}
 
 	private async openFolder(path: string): Promise<void> {

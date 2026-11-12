@@ -180,20 +180,16 @@ export const projectProgressComponent: ComponentDefinition = {
 			const name = group.nameKey
 				? t(group.nameKey as Parameters<typeof t>[0])
 				: group.name;
-			const clickable = group.key !== "";
-			row.toggleClass("is-static", !clickable);
-			if (clickable) {
-				row.setAttr("role", "button");
-				row.setAttr("tabindex", "0");
-				row.setAttr("aria-label", t("PROJECT_PROGRESS_ROW_HINT", [name]));
-				row.onClickEvent(() => ctx.openProject(group));
-				row.addEventListener("keydown", (event) => {
-					if (event.key === "Enter" || event.key === " ") {
-						event.preventDefault();
-						ctx.openProject(group);
-					}
-				});
-			}
+			row.setAttr("role", "button");
+			row.setAttr("tabindex", "0");
+			row.setAttr("aria-label", t("PROJECT_PROGRESS_ROW_HINT", [name]));
+			row.onClickEvent(() => ctx.openProjectTasks(group, ratioBase));
+			row.addEventListener("keydown", (event) => {
+				if (event.key === "Enter" || event.key === " ") {
+					event.preventDefault();
+					ctx.openProjectTasks(group, ratioBase);
+				}
+			});
 
 			const head = row.createDiv({ cls: "ioto-progress-head" });
 			head.createSpan({ cls: "ioto-progress-name", text: name });

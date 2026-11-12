@@ -123,7 +123,7 @@ export interface ComponentRenderContext {
 	message?: string;
 	editMode: boolean;
 	openNote(path: string, line?: number): void;
-	openProject(group: ProjectProgressGroup): void;
+	openProjectTasks(group: ProjectProgressGroup, ratioBase: string): void;
 	/** Any vault file, not just Markdown. */
 	openFile(path: string, line?: number): void;
 	openFolder(path: string): void;

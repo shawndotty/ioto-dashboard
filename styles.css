@@ -708,14 +708,6 @@
     outline: none;
 }
 
-.ioto-custom-dashboard-view .ioto-progress-row.is-static {
-    cursor: default;
-}
-
-.ioto-custom-dashboard-view .ioto-progress-row.is-static:hover {
-    background: none;
-}
-
 .ioto-custom-dashboard-view .ioto-progress-head {
     display: flex;
     align-items: baseline;
@@ -762,6 +754,168 @@
     font-size: 0.78em;
     color: var(--text-faint);
     font-variant-numeric: tabular-nums;
+}
+
+/* Project tasks modal (outside the dashboard view container) */
+.modal.ioto-dashboard-modal.ioto-dashboard-modal--project-tasks:not(.is-fullscreen) {
+    width: min(560px, 92vw);
+}
+
+.ioto-dashboard-modal--project-tasks:not(.is-fullscreen) .modal-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: calc(100vh - 8em);
+    overflow: hidden;
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-overview {
+    flex: 0 0 auto;
+    padding-bottom: 12px;
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-summary {
+    color: var(--text-normal);
+    font-size: var(--font-ui-medium);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-meta {
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-chip {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--background-modifier-hover);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-body {
+    padding-top: 4px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-note-group + .ioto-project-tasks-note-group {
+    margin-top: 8px;
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-note {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--modal-background);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-note-link {
+    font-size: var(--font-ui-small);
+    font-weight: var(--font-medium);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-note-meta {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding-block: 6px;
+    padding-inline: 8px 10px;
+    border-inline-start: 2px solid transparent;
+    border-bottom: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-item:hover,
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-item:focus-visible {
+    background: var(--background-modifier-hover);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-item[data-task="/"] {
+    border-inline-start-color: var(--interactive-accent);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-item[data-task=">"] {
+    border-inline-start-color: var(--text-faint);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-item .task-list-item-checkbox {
+    margin-block-start: 2px;
+    pointer-events: none;
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-text > p {
+    margin: 0;
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-text > p + p {
+    margin-top: 4px;
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-badge {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--background-modifier-hover);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 160px;
+    padding: 24px 16px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-empty-ratio {
+    color: var(--text-normal);
+    font-size: var(--font-ui-large);
+    font-weight: var(--font-semibold);
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-scope {
+    margin-bottom: 8px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-dashboard-modal--project-tasks .ioto-project-tasks-scope > div + div {
+    margin-top: 2px;
+}
+
+.ioto-dashboard-modal--project-tasks .is-overdue {
+    color: var(--text-error);
 }
 
 /* Task list */
@@ -1147,8 +1301,8 @@
 
 /* 关闭按钮入行后只覆盖核心的 absolute；尺寸/底色/hover 仍吃核心。
    旧版类名 modal-close-button 一起留着兜底。 */
-.ioto-dashboard-modal .modal-header-button,
-.ioto-dashboard-modal .modal-close-button {
+.ioto-dashboard-modal.is-close-in-row .modal-header-button,
+.ioto-dashboard-modal.is-close-in-row .modal-close-button {
     position: static;
     flex: 0 0 auto;
 }

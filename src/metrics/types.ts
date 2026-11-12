@@ -2,6 +2,7 @@ import type {
 	CustomFilterDef,
 	IndexSnapshot,
 	SectionRole,
+	TaskMarker,
 } from "../data/types";
 import type { QueryDefinition } from "../query/types";
 
@@ -48,6 +49,24 @@ export interface UnfinishedTaskItem {
 	sectionRole: SectionRole;
 }
 
+export interface ProjectPendingTask {
+	path: string;
+	line: number;
+	/** May be empty; the view falls back to its own placeholder text. */
+	text: string;
+	/** Only open / in-progress / forwarded / other ever appear here. */
+	marker: TaskMarker;
+	noteBasename: string;
+	noteMtime: number;
+}
+
+export interface ProjectPendingCounts {
+	open: number;
+	inProgress: number;
+	forwarded: number;
+	other: number;
+}
+
 export interface ProjectProgressGroup {
 	key: string;
 	name: string;
@@ -55,6 +74,11 @@ export interface ProjectProgressGroup {
 	folder: string;
 	fileCount: number;
 	bucket: MetricBucket;
+	status?: string;
+	dueDate?: string;
+	pending?: ProjectPendingTask[];
+	pendingTotal?: number;
+	pendingCounts?: ProjectPendingCounts;
 }
 
 export interface DailyPoint {

@@ -2,9 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { load } from '../data/helpers.mjs';
 
-const { evaluateMetric, evaluateMetrics, bucketOf } = await load(
-	'../../src/metrics/evaluate.ts',
-);
+const {
+	evaluateMetric,
+	evaluateMetrics,
+	bucketOf,
+	buildPendingSnapshot,
+	PENDING_LIST_LIMIT,
+} = await load('../../src/metrics/evaluate.ts');
 const { createDefaultFilterState } = await load(
 	'../../src/data/saved-query-adapter.ts',
 );
@@ -200,4 +204,177 @@ test('missing query yields no scalar (config error handled by the view)', () => 
 	const ctx = context(snapshot([task()]), []);
 	const result = evaluateMetric({ kind: 'task-count', queryId: 'user:none' }, ctx);
 	assert.equal(result.scalar, undefined);
+});
+
+// ---- project drill-down pending snapshot ----
+
+test('buildPendingSnapshot classifies markers and drops done/cancelled', () => {
+	const snap = buildPendingSnapshot([
+		task({ marker: 'open' }),
+		task({ marker: 'in-progress' }),
+		task({ marker: 'forwarded' }),
+		task({ marker: 'other' }),
+		task({ marker: 'done', isCompleted: true }),
+		task({ marker: 'cancelled' }),
+	]);
+	assert.deepEqual(snap.counts, { open: 1, inProgress: 1, forwarded: 1, other: 1 });
+	assert.equal(snap.total, 4);
+	assert.deepEqual(
+		snap.items.map((item) => item.marker).sort(),
+		['forwarded', 'in-progress', 'open', 'other'],
+	);
+	assert.equal(PENDING_LIST_LIMIT, 200);
+});
+
+test('pending counts stay invariant with the row bucket', () => {
+	const tasks = [
+		task({ line: 1 }),
+		task({ line: 2 }),
+		task({ line: 3, marker: 'done', isCompleted: true }),
+		task({ line: 4, marker: 'cancelled' }),
+		task({ line: 5, marker: 'in-progress' }),
+		task({ line: 6, marker: 'forwarded' }),
+		task({ line: 7, marker: 'other' }),
+	];
+	const ctx = context(snapshot(tasks));
+	const group = evaluateMetric(
+		{ kind: 'project-progress', queryId: 'user:q' },
+		ctx,
+	).groups.find((item) => item.key === 'Alpha');
+	assert.ok(group);
+	assert.equal(group.pendingTotal, group.bucket.open + group.bucket.other);
+	assert.equal(
+		group.pendingCounts.open +
+			group.pendingCounts.inProgress +
+			group.pendingCounts.forwarded +
+			group.pendingCounts.other,
+		group.pendingTotal,
+	);
+});
+
+test('buildPendingSnapshot keeps empty task text so numbers match the list', () => {
+	const snap = buildPendingSnapshot([
+		task({ text: '', marker: 'open' }),
+		task({ line: 2, text: 'named', marker: 'open' }),
+	]);
+	assert.equal(snap.total, 2);
+	assert.equal(snap.items.length, 2);
+	assert.ok(snap.items.some((item) => item.text === ''));
+});
+
+test('buildPendingSnapshot truncates items but not counts', () => {
+	const snap = buildPendingSnapshot(
+		[task({ line: 1 }), task({ line: 2 }), task({ line: 3 })],
+		2,
+	);
+	assert.equal(snap.items.length, 2);
+	assert.equal(snap.total, 3);
+	assert.equal(snap.counts.open, 3);
+});
+
+test('buildPendingSnapshot sorts by note recency, path then line', () => {
+	const snap = buildPendingSnapshot([
+		task({ path: '3-任务/Alpha/b.md', line: 2, noteMtime: NOW }),
+		task({ path: '3-任务/Alpha/a.md', line: 9, noteMtime: NOW }),
+		task({ path: '3-任务/Alpha/b.md', line: 1, noteMtime: NOW }),
+		task({ path: '3-任务/Alpha/old.md', line: 4, noteMtime: NOW - 1000 }),
+	]);
+	assert.deepEqual(
+		snap.items.map((item) => `${item.path}#${item.line}`),
+		[
+			'3-任务/Alpha/a.md#9',
+			'3-任务/Alpha/b.md#1',
+			'3-任务/Alpha/b.md#2',
+			'3-任务/Alpha/old.md#4',
+		],
+	);
+});
+
+test('project pending lists stay isolated per project', () => {
+	const tasks = [
+		task({ line: 1, project: 'Alpha' }),
+		task({
+			line: 2,
+			project: 'Beta',
+			path: '3-任务/Beta/b.md',
+			noteBasename: 'b',
+		}),
+		task({ line: 3, project: undefined, path: '3-任务/loose.md' }),
+	];
+	const ctx = context(
+		snapshot(tasks, [
+			note(),
+			note({
+				path: '3-任务/Beta/b.md',
+				folder: '3-任务/Beta',
+				basename: 'b',
+				project: 'Beta',
+			}),
+		]),
+	);
+	const groups = evaluateMetric(
+		{ kind: 'project-progress', queryId: 'user:q' },
+		ctx,
+	).groups;
+	const alpha = groups.find((item) => item.key === 'Alpha');
+	const beta = groups.find((item) => item.key === 'Beta');
+	const loose = groups.find((item) => item.key === '');
+	assert.ok(alpha && beta && loose);
+	assert.deepEqual(alpha.pending.map((item) => item.path), ['3-任务/Alpha/n.md']);
+	assert.deepEqual(beta.pending.map((item) => item.path), ['3-任务/Beta/b.md']);
+	assert.deepEqual(loose.pending.map((item) => item.path), ['3-任务/loose.md']);
+});
+
+test('project groups carry status and due date from _project.md records', () => {
+	const tasks = [task()];
+	const notes = [note()];
+	const ctx = context({
+		notes,
+		tasks,
+		projects: [
+			{
+				path: '3-任务/Alpha/_project.md',
+				folder: '3-任务/Alpha',
+				name: 'Alpha',
+				status: '进行中',
+				dueDate: '2026-12-01',
+			},
+		],
+	});
+	const group = evaluateMetric(
+		{ kind: 'project-progress', queryId: 'user:q' },
+		ctx,
+	).groups.find((item) => item.key === 'Alpha');
+	assert.ok(group);
+	assert.equal(group.status, '进行中');
+	assert.equal(group.dueDate, '2026-12-01');
+});
+
+test('empty project exposes an empty pending snapshot', () => {
+	const ctx = context(
+		snapshot(
+			[],
+			[
+				note({
+					path: '3-任务/Empty/x.md',
+					folder: '3-任务/Empty',
+					project: 'Empty',
+				}),
+			],
+		),
+	);
+	const group = evaluateMetric(
+		{ kind: 'project-progress', queryId: 'user:q' },
+		ctx,
+	).groups.find((item) => item.key === 'Empty');
+	assert.ok(group);
+	assert.deepEqual(group.pending, []);
+	assert.equal(group.pendingTotal, 0);
+	assert.deepEqual(group.pendingCounts, {
+		open: 0,
+		inProgress: 0,
+		forwarded: 0,
+		other: 0,
+	});
+	assert.equal(group.bucket.ratio, null);
 });

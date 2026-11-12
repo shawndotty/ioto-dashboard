@@ -11,7 +11,8 @@ export type ModalKind =
 	| "query-editor"
 	| "component-picker"
 	| "page-layout"
-	| "dashboard-manager";
+	| "dashboard-manager"
+	| "project-tasks";
 
 export interface ModalShellOptions {
 	kind: ModalKind;
