@@ -14,6 +14,7 @@ const {
 	truncateText,
 	arcRatio,
 	nearestIndex,
+	nearestBandIndex,
 } = await load('../../src/dashboard/dataset/charts/geometry.ts');
 
 test('scaleLinear maps a domain onto a range', () => {
@@ -133,4 +134,21 @@ test('nearestIndex resolves the closest bucket and clamps to the plot', () => {
 	assert.equal(nearestIndex(5000, 10, 100, 5), 4);
 	assert.equal(nearestIndex(50, 0, 0, 5), 0);
 	assert.equal(nearestIndex(50, 0, 100, 2), 1);
+});
+
+test('nearestBandIndex rounds by slot and clamps to the plot', () => {
+	assert.equal(nearestBandIndex(50, 0, 100, 0), -1);
+	assert.equal(nearestBandIndex(50, 0, 100, 1), 0);
+	assert.equal(nearestBandIndex(50, 0, 0, 5), 0);
+	assert.equal(nearestBandIndex(0, 10, 100, 5), 0);
+	assert.equal(nearestBandIndex(-500, 10, 100, 5), 0);
+	assert.equal(nearestBandIndex(5000, 10, 100, 5), 4);
+	// 5 slots of 20px starting at 10: slot 0 ends at 30.
+	assert.equal(nearestBandIndex(29, 10, 100, 5), 0);
+	assert.equal(nearestBandIndex(31, 10, 100, 5), 1);
+	assert.equal(nearestBandIndex(60, 10, 100, 5), 2);
+	assert.equal(nearestBandIndex(110, 10, 100, 5), 4);
+	// 2 slots of 50px: the midpoint belongs to the right slot.
+	assert.equal(nearestBandIndex(49, 0, 100, 2), 0);
+	assert.equal(nearestBandIndex(51, 0, 100, 2), 1);
 });

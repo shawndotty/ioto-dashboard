@@ -6,8 +6,10 @@ const {
 	lineChartComponent,
 	bucketOptionsForRange,
 	xLabelFormatOptionsForBucket,
-	yFormatOptionsForField,
 } = await load('../../src/dashboard/components/line-chart.ts');
+const { yFormatOptionsForField } = await load(
+	'../../src/dashboard/dataset/charts/settings.ts',
+);
 const { coerceSettingValue } = await load('../../src/dashboard/registry.ts');
 
 function query(target) {

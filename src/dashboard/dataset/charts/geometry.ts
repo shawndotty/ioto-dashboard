@@ -210,6 +210,23 @@ export function nearestIndex(
 	return Math.max(0, Math.min(count - 1, Math.round(ratio * (count - 1))));
 }
 
+/**
+ * Nearest band slot for a pointer x; O(1). Unlike `nearestIndex` this rounds by
+ * slot, so the gap between two bars never selects the wrong bar.
+ */
+export function nearestBandIndex(
+	px: number,
+	left: number,
+	width: number,
+	count: number,
+): number {
+	if (count <= 0) return -1;
+	if (count === 1) return 0;
+	if (!(width > 0)) return 0;
+	const slot = width / count;
+	return Math.max(0, Math.min(count - 1, Math.floor((px - left) / slot)));
+}
+
 export function arcRatio(value: number, total: number): number {
 	if (!Number.isFinite(total) || total <= 0) return 0;
 	return Math.min(1, Math.max(0, value / total));

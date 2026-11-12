@@ -63,8 +63,12 @@ export interface ChartBar {
 	h: number;
 	label: string;
 	value: number;
-	/** Reserved for the upcoming bar click-through; not wired yet. */
+	/** Target for click-through navigation. */
 	ref?: { path?: string; line?: number; bucketKey?: string };
+	/** Row id of this bar, used by the interaction layer. */
+	bucketKey?: string;
+	/** Column key of the series this bar belongs to. */
+	seriesKey?: string;
 }
 
 export interface ChartSeries {
@@ -96,7 +100,7 @@ export interface ChartSpec {
 	showValueLabels: boolean;
 	valueList: Array<{ label: string; text: string }> | null;
 	xRotate: 0 | 45 | 90;
-	/** Only line charts opt into the hover/click layer. */
+	/** Line and bar charts opt into the hover/click layer. */
 	interactive?: boolean;
 }
 
@@ -128,6 +132,8 @@ interface AxisLayout {
 	yGrid: boolean;
 	xTitle: string;
 	yTitle: string;
+	/** Max text width a rotated X label may occupy; already capped by the reserve. */
+	xLabelBudget?: number;
 }
 
 interface YAxisResult {
@@ -361,13 +367,17 @@ function computeLayout(
 	const bottomBase = 8;
 	const availHeight = size.h - PAD_TOP - bottomBase;
 	let bottom = bottomBase;
+	let xLabelBudget: number | undefined;
 	if (xShow) {
 		if (rotate === 0) {
 			bottom += 12;
 		} else {
 			// Rotated labels extend by roughly their text width, not a fixed step.
 			const reserve = rotate === 45 ? maxXLabelWidth * 0.72 : maxXLabelWidth;
-			bottom += Math.min(Math.ceil(reserve), Math.ceil(availHeight * 0.35));
+			const capped = Math.min(Math.ceil(reserve), Math.ceil(availHeight * 0.35));
+			bottom += capped;
+			// 45° reserves the projected width; convert back to text width.
+			xLabelBudget = rotate === 45 ? Math.floor(capped / 0.72) : capped;
 		}
 	}
 	if (xTitle) bottom += 14;
@@ -405,6 +415,7 @@ function computeLayout(
 		yTitle = "";
 		left = 8;
 		bottom = xShow ? 16 : 4;
+		xLabelBudget = undefined;
 		plotWidth = size.w - left - rightPad;
 		plotHeight = size.h - PAD_TOP - bottom;
 	}
@@ -422,6 +433,7 @@ function computeLayout(
 		yGrid,
 		xTitle,
 		yTitle,
+		xLabelBudget,
 	};
 }
 
@@ -435,6 +447,74 @@ function sortEntries(entries: BarDatum[], mode: string): BarDatum[] {
 	if (mode === "value-asc") return copy.sort((a, b) => a.value - b.value);
 	if (mode === "label") return copy.sort((a, b) => a.label.localeCompare(b.label));
 	return copy;
+}
+
+/** Nudges the first/last 0° tick inward when its text would leave the canvas. */
+function applyEdgeAnchors(
+	ticks: ChartTick[],
+	canvasWidth: number,
+	fontSize: number,
+): void {
+	if (ticks.length === 0) return;
+	const first = ticks[0];
+	const last = ticks[ticks.length - 1];
+	if (
+		first &&
+		first.position - estimateTextWidth(first.label, fontSize) / 2 < 0
+	) {
+		first.anchor = "start";
+	}
+	if (
+		last &&
+		last.position + estimateTextWidth(last.label, fontSize) / 2 > canvasWidth
+	) {
+		last.anchor = "end";
+	}
+}
+
+/** Horizontal width a label consumes once rotated. */
+function projectedLabelWidth(label: string, rotate: 0 | 45 | 90): number {
+	if (rotate === 45) return estimateTextWidth(label, LABEL_FONT) * 0.72;
+	// A 90° label only occupies one line height across the X axis.
+	if (rotate === 90) return LABEL_FONT * 1.2;
+	return estimateTextWidth(label, LABEL_FONT);
+}
+
+/**
+ * Thins labels until neighbours cannot overlap, then truncates each one to its
+ * slot. "Never overlap" wins over "show full text"; the full string stays in
+ * `fullLabel` for native titles and the hover tooltip.
+ */
+function planBarLabels(
+	labels: string[],
+	plot: { width: number },
+	rotate: 0 | 45 | 90,
+	budget: number | undefined,
+): { kept: number[]; display: string[] } {
+	let total = 0;
+	for (const label of labels) total += projectedLabelWidth(label, rotate);
+	const average = total / Math.max(1, labels.length);
+	const gap = rotate === 0 ? 12 : 6;
+	const maxLabels = Math.max(
+		1,
+		Math.floor(plot.width / (Math.max(average, 24) + gap)),
+	);
+	const kept = thinLabels(
+		labels.map((_, index) => index),
+		maxLabels,
+	);
+	const slot = plot.width / Math.max(1, kept.length);
+	const allowWidth =
+		rotate === 0
+			? Math.max(slot - 4, 18)
+			: Math.max(
+					18,
+					Math.min(budget ?? 80, rotate === 45 ? slot / 0.72 : slot / 0.9),
+				);
+	return {
+		kept,
+		display: labels.map((label) => truncateText(label, allowWidth, LABEL_FONT)),
+	};
 }
 
 export function buildLineSpec(
@@ -581,23 +661,7 @@ export function buildLineSpec(
 			fullLabel: fullLabels[index] ?? "",
 			position: xPosition(index),
 		}));
-		if (rotate === 0 && xTicks.length > 0) {
-			const first = xTicks[0];
-			const last = xTicks[xTicks.length - 1];
-			if (
-				first &&
-				first.position - estimateTextWidth(first.label, LABEL_FONT) / 2 < 0
-			) {
-				first.anchor = "start";
-			}
-			if (
-				last &&
-				last.position + estimateTextWidth(last.label, LABEL_FONT) / 2 >
-					size.w
-			) {
-				last.anchor = "end";
-			}
-		}
+		if (rotate === 0) applyEdgeAnchors(xTicks, size.w, LABEL_FONT);
 	}
 
 	const series: ChartSeries[] = seriesData.map((data, index) => ({
@@ -700,14 +764,18 @@ export function buildBarSpec(
 		provisionalTicks,
 	);
 	const rotate = rotateOf(options);
+	// Rotated labels feed their full text into the layout so the gutter matches
+	// what the labels really occupy; 0° keeps the 34px probe to avoid a huge
+	// right reserve on long horizontal labels.
+	const layoutLabels = shown.map((entry) =>
+		rotate === 0 ? truncateText(entry.label, 34, LABEL_FONT) : entry.label,
+	);
 	const layout = computeLayout(
 		size,
 		options,
 		rotate,
 		yAxis.labels,
-		shown.map((entry) =>
-			truncateText(entry.label, rotate === 0 ? 34 : 80, LABEL_FONT),
-		),
+		layoutLabels,
 		optionBoolean(options, "xShowLabels", true),
 		optionString(options, "xTitle", ""),
 		optionString(options, "yTitle", ""),
@@ -757,30 +825,29 @@ export function buildBarSpec(
 				path: entry.path,
 				bucketKey: entry.rowId,
 			},
+			bucketKey: entry.rowId,
+			seriesKey: yColumn.key,
 		};
 	});
 
 	let xTicks: ChartTick[] = [];
 	if (layout.xShow) {
-		const maxTextWidth =
-			rotate === 0 ? Math.max(band.width - 2, 34) : 80;
-		const displayLabels = shown.map((entry) =>
-			truncateText(entry.label, maxTextWidth, LABEL_FONT),
+		const plan = planBarLabels(
+			shown.map((entry) => entry.label),
+			plot,
+			rotate,
+			layout.xLabelBudget,
 		);
-		let kept = shown.map((_, index) => index);
-		if (band.step < 10) {
-			const maxLabels = Math.max(1, Math.floor(plot.width / 16));
-			kept = thinLabels(kept, maxLabels);
-		}
-		xTicks = kept.map((index) => ({
+		xTicks = plan.kept.map((index) => ({
 			value: index,
-			label: displayLabels[index] ?? "",
+			label: plan.display[index] ?? "",
 			fullLabel: shown[index]?.label ?? "",
 			position: band.center(index),
 		}));
+		if (rotate === 0) applyEdgeAnchors(xTicks, size.w, LABEL_FONT);
 	}
 
-	const showLabels = optionBoolean(options, "showLabels", true);
+	const showLabels = optionBoolean(options, "showLabels", false);
 	return {
 		kind: "bar",
 		width: size.w,
@@ -822,5 +889,6 @@ export function buildBarSpec(
 				}))
 			: null,
 		xRotate: rotate,
+		interactive: true,
 	};
 }

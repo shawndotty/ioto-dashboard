@@ -53,7 +53,6 @@ export class ChartBucketModal extends Modal {
 		this.contentEl.addClass("ioto-chart-bucket");
 		this.render();
 	}
-
 	onClose(): void {
 		this.contentEl.empty();
 	}
@@ -95,7 +94,12 @@ export class ChartBucketModal extends Modal {
 				text: t("CHART_BUCKET_CUMULATIVE_HINT"),
 			});
 		}
-		if (payload.object === "task") {
+		if (payload.source === "project") {
+			content.createDiv({
+				cls: "ioto-chart-bucket-hint",
+				text: t("CHART_BUCKET_PROJECT_HINT"),
+			});
+		} else if (payload.object === "task") {
 			content.createDiv({
 				cls: "ioto-chart-bucket-hint",
 				text: t("CHART_BUCKET_SOURCE_HINT"),

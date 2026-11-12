@@ -453,3 +453,59 @@ test('timeline without a query returns the time-series columns and no rows', () 
 	assert.equal(taskData.columns.length, 4);
 	assert.equal(taskData.sourceTotal, undefined);
 });
+
+test('project rows carry their pending tasks for the drill-down modal', () => {
+	const groups = [
+		{
+			key: 'P1',
+			name: 'P1',
+			folder: '3-任务/P1',
+			fileCount: 1,
+			bucket: { total: 2, completed: 1, open: 1, cancelled: 0, other: 0, ratio: 0.5 },
+			pending: [
+				{
+					path: '3-任务/P1/a.md',
+					line: 3,
+					text: 'do it',
+					marker: 'open',
+					noteBasename: 'a',
+					noteMtime: 10,
+				},
+				{
+					path: '3-任务/P1/a.md',
+					line: 4,
+					text: 'doing it',
+					marker: 'in-progress',
+					noteBasename: 'a',
+					noteMtime: 10,
+				},
+			],
+			pendingTotal: 5,
+		},
+		{
+			key: 'P2',
+			name: 'P2',
+			folder: '3-任务/P2',
+			fileCount: 0,
+			bucket: { total: 0, completed: 0, open: 0, cancelled: 0, other: 0, ratio: null },
+		},
+	];
+	const dataset = projectAdapter(
+		adapterInput(
+			{ object: 'project', measure: 'ratio', queryId: 'q' },
+			{ metric: { groups } },
+		),
+	);
+	assert.equal(dataset.rows[0].related.length, 2);
+	assert.equal(dataset.rows[0].relatedTotal, 5);
+	assert.deepEqual(
+		dataset.rows[0].related.map((ref) => ref.kind),
+		['task', 'task'],
+	);
+	assert.deepEqual(
+		dataset.rows[0].related.map((ref) => ref.marker),
+		['open', 'in-progress'],
+	);
+	assert.deepEqual(dataset.rows[1].related, []);
+	assert.equal(dataset.rows[1].relatedTotal, 0);
+});

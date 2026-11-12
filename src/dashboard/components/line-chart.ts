@@ -1,5 +1,6 @@
 import { renderResponsiveChart } from "../dataset/charts/chart-host";
 import { buildLineSpec, type ChartSpec } from "../dataset/charts/spec";
+import { yFormatOptionsForField } from "../dataset/charts/settings";
 import { objectForQuery } from "../dataset/object";
 import type { TimelineBucket, TimelineDateField } from "../dataset/types";
 import type {
@@ -57,18 +58,6 @@ export function xLabelFormatOptionsForBucket(bucket: unknown): SettingOption[] {
 		{ value: "iso", labelKey: "AXIS_DATE_ISO" },
 		{ value: "md", labelKey: "AXIS_DATE_MD" },
 		{ value: "short", labelKey: "AXIS_DATE_SHORT" },
-	];
-}
-
-/** Sizes only ever format as KB/MB, never as raw counts. */
-export function yFormatOptionsForField(field: unknown): SettingOption[] {
-	if (field === "size") {
-		return [{ value: "auto", labelKey: "AXIS_FORMAT_AUTO" }];
-	}
-	return [
-		{ value: "auto", labelKey: "AXIS_FORMAT_AUTO" },
-		{ value: "number", labelKey: "AXIS_FORMAT_NUMBER" },
-		{ value: "compact", labelKey: "AXIS_FORMAT_COMPACT" },
 	];
 }
 

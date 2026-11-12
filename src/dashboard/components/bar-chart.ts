@@ -1,7 +1,17 @@
 import { renderResponsiveChart } from "../dataset/charts/chart-host";
-import { buildBarSpec } from "../dataset/charts/spec";
+import { buildBarSpec, type ChartSpec } from "../dataset/charts/spec";
+import { yFormatOptionsForField } from "../dataset/charts/settings";
 import { barObjectForQuery } from "../dataset/object";
+import type { DatasetRow } from "../dataset/types";
 import type { ComponentDefinition } from "../registry";
+
+function firstCellPath(row: DatasetRow | undefined): string | undefined {
+	if (!row) return undefined;
+	for (const cell of Object.values(row.cells)) {
+		if (cell.path) return cell.path;
+	}
+	return undefined;
+}
 
 export const barChartComponent: ComponentDefinition = {
 	type: "bar-chart",
@@ -32,7 +42,7 @@ export const barChartComponent: ComponentDefinition = {
 			yScale: "auto",
 			yFormat: "auto",
 			yTitle: "",
-			showLabels: true,
+			showLabels: false,
 			showValueLabels: false,
 		},
 		w: 6,
@@ -43,7 +53,7 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "xField",
 			kind: "field",
-			group: "axes",
+			group: "axesX",
 			labelKey: "SETTING_AXIS_X_FIELD",
 			role: "x",
 			fallback: "name",
@@ -52,7 +62,7 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "xShowLabels",
 			kind: "toggle",
-			group: "axes",
+			group: "axesX",
 			labelKey: "SETTING_AXIS_X_LABELS",
 			fallback: true,
 			target: "options",
@@ -60,7 +70,7 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "xRotate",
 			kind: "select",
-			group: "axes",
+			group: "axesX",
 			labelKey: "SETTING_AXIS_X_ROTATE",
 			options: [
 				{ value: "0", labelKey: "AXIS_ROTATE_0" },
@@ -73,7 +83,7 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "xSort",
 			kind: "select",
-			group: "axes",
+			group: "axesX",
 			labelKey: "SETTING_AXIS_X_SORT",
 			options: [
 				{ value: "dataset", labelKey: "AXIS_SORT_DATASET" },
@@ -87,14 +97,14 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "xTitle",
 			kind: "text",
-			group: "axes",
+			group: "axesX",
 			labelKey: "SETTING_AXIS_X_TITLE",
 			target: "options",
 		},
 		{
 			key: "topN",
 			kind: "number",
-			group: "axes",
+			group: "axesX",
 			labelKey: "SETTING_AXIS_TOP_N",
 			min: 0,
 			max: 200,
@@ -105,7 +115,7 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "yField",
 			kind: "field",
-			group: "axes",
+			group: "axesY",
 			labelKey: "SETTING_AXIS_Y_FIELD",
 			role: "y",
 			fallback: "completed",
@@ -114,7 +124,7 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "yShowLabels",
 			kind: "toggle",
-			group: "axes",
+			group: "axesY",
 			labelKey: "SETTING_AXIS_Y_LABELS",
 			fallback: true,
 			target: "options",
@@ -122,7 +132,7 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "yShowGrid",
 			kind: "toggle",
-			group: "axes",
+			group: "axesY",
 			labelKey: "SETTING_AXIS_Y_GRID",
 			fallback: false,
 			target: "options",
@@ -130,8 +140,9 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "yScale",
 			kind: "select",
-			group: "axes",
+			group: "axesY",
 			labelKey: "SETTING_AXIS_Y_SCALE",
+			hintKey: "SETTING_AXIS_Y_SCALE_HINT",
 			options: [
 				{ value: "auto", labelKey: "AXIS_SCALE_AUTO" },
 				{ value: "manual", labelKey: "AXIS_SCALE_MANUAL" },
@@ -142,7 +153,7 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "yMin",
 			kind: "number",
-			group: "axes",
+			group: "axesY",
 			labelKey: "SETTING_AXIS_Y_MIN",
 			min: -1000000,
 			max: 1000000,
@@ -155,7 +166,7 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "yMax",
 			kind: "number",
-			group: "axes",
+			group: "axesY",
 			labelKey: "SETTING_AXIS_Y_MAX",
 			min: -1000000,
 			max: 1000000,
@@ -168,20 +179,17 @@ export const barChartComponent: ComponentDefinition = {
 		{
 			key: "yFormat",
 			kind: "select",
-			group: "axes",
+			group: "axesY",
 			labelKey: "SETTING_AXIS_Y_FORMAT",
-			options: [
-				{ value: "auto", labelKey: "AXIS_FORMAT_AUTO" },
-				{ value: "number", labelKey: "AXIS_FORMAT_NUMBER" },
-				{ value: "compact", labelKey: "AXIS_FORMAT_COMPACT" },
-			],
+			options: ({ config }) => yFormatOptionsForField(config?.options?.yField),
+			refreshOn: ["yField"],
 			fallback: "auto",
 			target: "options",
 		},
 		{
 			key: "yTitle",
 			kind: "text",
-			group: "axes",
+			group: "axesY",
 			labelKey: "SETTING_AXIS_Y_TITLE",
 			target: "options",
 		},
@@ -189,8 +197,8 @@ export const barChartComponent: ComponentDefinition = {
 			key: "showLabels",
 			kind: "toggle",
 			group: "display",
-			labelKey: "SETTING_SHOW_LABELS",
-			fallback: true,
+			labelKey: "SETTING_SHOW_DATA_LIST",
+			fallback: false,
 			target: "options",
 		},
 		{
@@ -214,8 +222,53 @@ export const barChartComponent: ComponentDefinition = {
 		const dataset = ctx.dataset;
 		if (!dataset) return;
 		const object = barObjectForQuery(ctx.query);
-		renderResponsiveChart(el, (size) =>
-			buildBarSpec(dataset, ctx.config.options ?? {}, size, object),
+		let lastSpec: ChartSpec | null = null;
+		renderResponsiveChart(
+			el,
+			(size) => {
+				lastSpec = buildBarSpec(
+					dataset,
+					ctx.config.options ?? {},
+					size,
+					object,
+				);
+				return lastSpec;
+			},
+			80,
+			{
+				isEnabled: () => !ctx.editMode,
+				onActivate: ({ bucketKey }) => {
+					const row = dataset.rows.find((entry) => entry.id === bucketKey);
+					const bar = lastSpec?.series[0]?.bars?.find(
+						(entry) => entry.bucketKey === bucketKey,
+					);
+					if (object === "project") {
+						const refs = row?.related ?? [];
+						const relatedTotal = row?.relatedTotal ?? refs.length;
+						const series = (lastSpec?.series ?? []).map((entry) => ({
+							key: entry.key,
+							label: entry.label,
+							value:
+								entry.bars?.find((item) => item.bucketKey === bucketKey)
+									?.value ?? 0,
+						}));
+						// An empty project still opens: silence would read as a bug.
+						ctx.openChartBucket?.({
+							bucketKey,
+							object: "project",
+							cumulative: false,
+							series,
+							refs,
+							relatedTotal,
+							source: "project",
+						});
+						return;
+					}
+					const path = bar?.ref?.path ?? firstCellPath(row);
+					if (!path) return;
+					ctx.openLink?.(path, undefined, object === "file");
+				},
+			},
 		);
 	},
 };

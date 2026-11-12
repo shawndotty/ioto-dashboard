@@ -6,6 +6,7 @@ import {
 	type DatasetAdapter,
 	type DatasetColumn,
 } from "../types";
+import type { TimelineSourceRef } from "../timeline";
 import { cell } from "./shared";
 
 export const PROJECT_COLUMNS: DatasetColumn[] = [
@@ -39,6 +40,18 @@ export const projectAdapter: DatasetAdapter = (input): Dataset => {
 				sortValue: group.bucket.ratio ?? 0,
 			}),
 		},
+		// Upstream already caps `pending` (PENDING_LIST_LIMIT); keep the real
+		// total so the modal can say "first 200 of N".
+		related: (group.pending ?? []).map(
+			(task): TimelineSourceRef => ({
+				path: task.path,
+				line: task.line,
+				label: task.text,
+				kind: "task",
+				marker: task.marker,
+			}),
+		),
+		relatedTotal: group.pendingTotal ?? group.pending?.length ?? 0,
 	}));
 	if (rows.length === 0 && !input.metric) {
 		return emptyDataset(request, PROJECT_COLUMNS);

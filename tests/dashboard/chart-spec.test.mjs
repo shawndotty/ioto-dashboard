@@ -214,7 +214,7 @@ test('bars sort, truncate and report the hidden count', () => {
 	]);
 	const spec = buildBarSpec(
 		data,
-		{ xSort: 'value-desc', topN: 2, yField: 'completed' },
+		{ xSort: 'value-desc', topN: 2, yField: 'completed', showLabels: true },
 		{ w: 600, h: 300 },
 		'project',
 	);
@@ -233,7 +233,7 @@ test('bars sort, truncate and report the hidden count', () => {
 
 test('ratio columns format as percentages', () => {
 	const data = projectDataset([['A', 1, 0.5]]);
-	const spec = buildBarSpec(data, { yField: 'ratio' }, { w: 600, h: 300 }, 'project');
+	const spec = buildBarSpec(data, { yField: 'ratio', showLabels: true }, { w: 600, h: 300 }, 'project');
 	assert.equal(spec.y.format(0.5), '50%');
 	assert.equal(spec.valueList[0].text, '50%');
 });
@@ -274,7 +274,7 @@ test('bar defaults follow the object when no fields are stored', () => {
 	assert.equal(noteSpec.series[0].key, 'tasks');
 });
 
-test('every bar keeps a matching X label', () => {
+test('dense bars thin their X labels instead of overlapping', () => {
 	const rows = Array.from({ length: 20 }, (_, index) => [
 		`P${index + 1}`,
 		index,
@@ -287,8 +287,35 @@ test('every bar keeps a matching X label', () => {
 		'project',
 	);
 	assert.equal(spec.series[0].bars.length, 20);
-	assert.equal(spec.x.ticks.length, 20);
-	assert.equal(spec.valueList.length, 20);
+	assert.ok(spec.x.ticks.length >= 2);
+	assert.ok(spec.x.ticks.length <= 20);
+	assert.equal(spec.x.ticks[0].position, spec.series[0].bars[0].x + spec.series[0].bars[0].w / 2);
+	const lastBar = spec.series[0].bars[spec.series[0].bars.length - 1];
+	const lastTick = spec.x.ticks[spec.x.ticks.length - 1];
+	assert.equal(lastTick.position, lastBar.x + lastBar.w / 2);
+});
+
+test('bar data lists are off unless explicitly enabled', () => {
+	const rows = Array.from({ length: 20 }, (_, index) => [
+		`P${index + 1}`,
+		index,
+		index / 20,
+	]);
+	const data = projectDataset(rows);
+	assert.equal(
+		buildBarSpec(data, { yField: 'completed' }, { w: 600, h: 300 }, 'project')
+			.valueList,
+		null,
+	);
+	assert.equal(
+		buildBarSpec(
+			data,
+			{ yField: 'completed', showLabels: true },
+			{ w: 600, h: 300 },
+			'project',
+		).valueList.length,
+		20,
+	);
 });
 
 test('narrow cards hide Y labels, titles and grid', () => {
@@ -726,4 +753,143 @@ test('bars carry the row path for the reserved click-through', () => {
 		path: '3-任务/Alpha.md',
 		bucketKey: 'project:alpha',
 	});
+});
+
+function labelBarDataset(labels, values) {
+	return dataset(
+		'project',
+		[
+			{ key: 'name', labelKey: 'DATASET_COL_NAME', type: 'text' },
+			{ key: 'completed', labelKey: 'DATASET_COL_COMPLETED', type: 'number' },
+		],
+		labels.map((label, index) => ({
+			name: cell(label),
+			completed: cell(String(values?.[index] ?? index + 1), values?.[index] ?? index + 1),
+		})),
+	);
+}
+
+test('50 wide labels are thinned by width, not cut at a fixed 34px', () => {
+	const labels = Array.from({ length: 50 }, () => '长'.repeat(12));
+	const spec = buildBarSpec(
+		labelBarDataset(labels),
+		{},
+		{ w: 600, h: 300 },
+		'project',
+	);
+	assert.ok(spec.x.ticks.length < 50, 'dense labels get thinned');
+	assert.ok(
+		spec.x.ticks.some((tick) => estimateTextWidth(tick.label, LABEL_FONT) > 34),
+		'kept labels may exceed the old 34px cut',
+	);
+	for (let index = 1; index < spec.x.ticks.length; index += 1) {
+		const previous = spec.x.ticks[index - 1];
+		const current = spec.x.ticks[index];
+		const gap = current.position - previous.position;
+		assert.ok(
+			gap >=
+				Math.max(
+					estimateTextWidth(previous.label, LABEL_FONT),
+					estimateTextWidth(current.label, LABEL_FONT),
+				) + 6,
+			'neighbouring labels never overlap',
+		);
+	}
+});
+
+test('60 bars keep the first and last tick and stay within the slot budget', () => {
+	const labels = Array.from({ length: 60 }, () => '长'.repeat(12));
+	const spec = buildBarSpec(
+		labelBarDataset(labels),
+		{},
+		{ w: 600, h: 300 },
+		'project',
+	);
+	assert.ok(spec.x.ticks.length <= Math.floor(spec.plot.width / 30));
+	const bars = spec.series[0].bars;
+	assert.ok(Math.abs(spec.x.ticks[0].position - (bars[0].x + bars[0].w / 2)) < 1e-9);
+	const last = bars[bars.length - 1];
+	assert.ok(
+		Math.abs(
+			spec.x.ticks[spec.x.ticks.length - 1].position -
+				(last.x + last.w / 2),
+		) < 1e-9,
+	);
+});
+
+test('90° labels fit the bottom reserve at a short card height', () => {
+	const labels = Array.from({ length: 50 }, () => '长'.repeat(12));
+	const spec = buildBarSpec(
+		labelBarDataset(labels),
+		{ xRotate: '90' },
+		{ w: 600, h: 160 },
+		'project',
+	);
+	const reserve = spec.height - (spec.plot.top + spec.plot.height);
+	assert.ok(spec.plot.height >= 30);
+	for (const tick of spec.x.ticks) {
+		assert.ok(estimateTextWidth(tick.label, LABEL_FONT) <= reserve);
+	}
+	assert.ok(spec.plot.top + spec.plot.height <= spec.height);
+});
+
+test('45° labels fit their projected width into the bottom reserve', () => {
+	const labels = Array.from({ length: 50 }, () => '长'.repeat(12));
+	const spec = buildBarSpec(
+		labelBarDataset(labels),
+		{ xRotate: '45' },
+		{ w: 600, h: 160 },
+		'project',
+	);
+	const reserve = spec.height - (spec.plot.top + spec.plot.height);
+	for (const tick of spec.x.ticks) {
+		assert.ok(estimateTextWidth(tick.label, LABEL_FONT) * 0.72 <= reserve);
+	}
+});
+
+test('0° labels always stay inside the canvas after truncation', () => {
+	const spec = buildBarSpec(
+		labelBarDataset(['长'.repeat(30), 'B', 'C']),
+		{},
+		{ w: 600, h: 300 },
+		'project',
+	);
+	for (const tick of spec.x.ticks) {
+		const half = estimateTextWidth(tick.label, LABEL_FONT) / 2;
+		assert.ok(tick.position - half >= 0);
+		assert.ok(tick.position + half <= spec.width);
+		assert.equal(tick.anchor, undefined);
+	}
+});
+
+test('a single bar centres its label and is never thinned away', () => {
+	const spec = buildBarSpec(
+		labelBarDataset(['Only']),
+		{},
+		{ w: 600, h: 300 },
+		'project',
+	);
+	assert.equal(spec.x.ticks.length, 1);
+	assert.equal(
+		spec.x.ticks[0].position,
+		spec.plot.left + spec.plot.width / 2,
+	);
+});
+
+test('bars expose row ids for the interaction layer', () => {
+	const data = labelBarDataset(['A', 'B']);
+	const spec = buildBarSpec(data, {}, { w: 600, h: 300 }, 'project');
+	assert.equal(spec.interactive, true);
+	assert.deepEqual(
+		spec.series[0].bars.map((bar) => bar.bucketKey),
+		data.rows.map((row) => row.id),
+	);
+	assert.deepEqual(
+		spec.series[0].bars.map((bar) => bar.seriesKey),
+		['completed', 'completed'],
+	);
+	assert.deepEqual(
+		spec.series[0].bars.map((bar) => bar.ref.bucketKey),
+		data.rows.map((row) => row.id),
+	);
 });

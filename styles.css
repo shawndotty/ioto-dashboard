@@ -2930,6 +2930,12 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     opacity: 1;
 }
 
+.ioto-chart-bar-rect.is-active {
+    opacity: 1;
+    stroke: var(--background-primary);
+    stroke-width: 1.5;
+}
+
 .ioto-chart-legend {
     display: flex;
     flex: 0 0 auto;

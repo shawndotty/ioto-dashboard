@@ -18,15 +18,18 @@ import type { DashboardComponentConfig } from "./types";
 
 export type ComponentStatus = "loading" | "ready" | "empty" | "error";
 
-/** Everything the bucket detail modal needs; assembled by the line chart. */
+/** Everything the bucket detail modal needs; assembled by line and bar charts. */
 export interface ChartBucketPayload {
 	bucketKey: string;
-	object: "task" | "note" | "file";
+	object: "task" | "note" | "file" | "project";
 	cumulative: boolean;
 	series: Array<{ key: string; label: string; value: number }>;
 	refs: TimelineSourceRef[];
 	relatedTotal: number;
-	bucket: TimelineBucket;
+	/** Only time buckets have one; project groups leave it empty. */
+	bucket?: TimelineBucket;
+	/** Timeline or project grouping; absent means timeline. */
+	source?: "timeline" | "project";
 }
 
 export type ComponentSettingGroup =
