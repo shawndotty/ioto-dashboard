@@ -105,7 +105,11 @@ test('number settings declare sane min/max/step bounds', () => {
 				`${component.type} ${setting.key} fallback must sit inside the bounds`,
 			);
 			if (setting.target !== 'options') {
-				assert.equal(setting.max, 100, `${component.type} ${setting.key} max should stay 100`);
+				// Row-count caps are not percentages; everything else stays within 100.
+				const rowCountCap = component.type === 'project-progress' && setting.key === 'limit';
+				if (!rowCountCap) {
+					assert.equal(setting.max, 100, `${component.type} ${setting.key} max should stay 100`);
+				}
 			}
 		}
 	}

@@ -49,7 +49,7 @@ test('registration components declare explicit query targets', () => {
 		'file',
 		'folder',
 	]);
-	assert.deepEqual(queryTargetsFor(projectProgressComponent), ['task', 'note']);
+	assert.deepEqual(queryTargetsFor(projectProgressComponent), ['task']);
 	assert.deepEqual(queryTargetsFor(kpiComponent), [
 		'task',
 		'note',

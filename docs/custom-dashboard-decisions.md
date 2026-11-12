@@ -7,7 +7,7 @@
 
 1. **项目归属**：`3-任务/<Project>/` 文件夹优先 → frontmatter `Project` → 未分类；其他根目录仍以 frontmatter 为准。
 2. **进度口径**：首版默认 `basis: "file"`（任务笔记全文 checkbox）；`section` 为可选项；UI 必须显示当前口径。
-3. **进度分母**：`completed / total`，`total = completed + open + cancelled + other`；`total = 0` 时 `ratio = null`（显示「—」而不是 0%）。
+3. **进度分母**：`completed / total`，`total = completed + open + cancelled + other`；`total = 0` 时 `ratio = null`（显示「—」而不是 0%）。分母默认包含已取消任务；项目进度组件的 `ratioBase` 可切换为「不含已取消」，此时分母为 `total - cancelled`。
 4. **查询是一等资源**：组件只引用 `queryId`；排序/分组/分页属于呈现层，不进查询定义。
 5. **Dashboard 只读**：只投影与下钻，不承担写操作（勾选、删除、AI 执行都不发生在面板内）。
 6. **面板配置**：`schemaVersion: 3`，多 Page 从 schema 第一天支持；必须经 `DashboardRepository` 读写；不调用 `saveSettings()`。
@@ -38,7 +38,7 @@
 
 项目归属改为 folder-first 后，旧三视图的「项目」筛选**选项会变多**：此前没有 frontmatter `Project` 的任务根笔记不参与项目筛选，现在会按 `3-任务/<Project>/` 被归入对应项目。这是预期行为，不是回归；除此之外旧三视图零功能变化。
 
-KPI 与项目进度组件首次选中 `basis` 时分别默认 `file` / `section`，编辑模式下会显示口径选择器，避免把「按笔记全文」误读为「仅当前分节」。
+KPI 与项目进度组件首次选中 `basis` 时均默认 `file`，编辑模式下会显示口径选择器，避免把「按笔记全文」误读为「仅当前分节」。
 
 ## 4. 与快照相关的验收口径
 

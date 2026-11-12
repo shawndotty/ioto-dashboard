@@ -171,7 +171,7 @@ export interface ComponentDefinition {
 	/** Dataset emptiness; defaults to `dataset.total === 0`. */
 	isEmptyDataset?(dataset: Dataset): boolean;
 	/** `true` when the metric is valid but has nothing meaningful to show. */
-	isEmpty(result: MetricResult): boolean;
+	isEmpty(result: MetricResult, config?: DashboardComponentConfig): boolean;
 	render(el: HTMLElement, ctx: ComponentRenderContext): void;
 	/** 在卡片头部标题右侧渲染组件级操作（如搜索入口）；加载/错误态与编辑态不调用。 */
 	renderHeaderActions?(el: HTMLElement, ctx: ComponentRenderContext): void;

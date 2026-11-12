@@ -1024,6 +1024,7 @@ export class CustomDashboardView extends ItemView {
 			query,
 			result,
 			dataset,
+			config,
 		);
 		if (status === "loading") {
 			body.createDiv({ cls: "ioto-loading", text: t("DASHBOARD_LOADING") });
@@ -1068,6 +1069,7 @@ export class CustomDashboardView extends ItemView {
 		query: QueryDefinition | undefined,
 		result: MetricResult | undefined,
 		dataset: import("../dashboard/dataset/types").Dataset | undefined,
+		config: DashboardComponentConfig,
 	): { status: ComponentStatus; messageKey?: string } {
 		if (!query) return { status: "error", messageKey: "DASHBOARD_ERROR_CONFIG" };
 		if (definition.toDatasetRequest) {
@@ -1080,7 +1082,7 @@ export class CustomDashboardView extends ItemView {
 		}
 		if (this.hub?.isLoading() && !result) return { status: "loading" };
 		if (!result) return { status: "loading" };
-		if (definition.isEmpty(result)) return { status: "empty" };
+		if (definition.isEmpty(result, config)) return { status: "empty" };
 		return { status: "ready" };
 	}
 
