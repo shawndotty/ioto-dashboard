@@ -1789,10 +1789,12 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     gap: var(--ioto-inspector-space-inline);
 }
 
-/* 仅堆叠式字段之间画线；toggle 行（is-inline）与 stepper 行不参与 */
+/* 仅堆叠式字段之间画线；toggle 行（is-inline）与 stepper 行不参与。
+   线画在后一个 field 的顶边，因此需用 padding-top 补出线下方间距。 */
 .ioto-inspector-section-body > .ioto-inspector-field:not(.is-inline)
     + .ioto-inspector-field:not(.is-inline) {
     border-top: 1px solid var(--background-modifier-border);
+    padding-top: var(--ioto-inspector-space-field);
 }
 
 .ioto-inspector-field > label,
