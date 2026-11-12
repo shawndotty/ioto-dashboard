@@ -1895,6 +1895,7 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     bottom: 0;
     width: 14px;
     height: 14px;
+    z-index: 4;
     cursor: nwse-resize;
     touch-action: none;
     opacity: 0.45;
@@ -2430,6 +2431,11 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 
 .ioto-custom-dashboard-view.is-editing .ioto-dashboard-card {
     cursor: pointer;
+}
+
+/* 编辑态右下角是缩放把手热区，给分页条让出角落，避免误触翻页。 */
+.ioto-custom-dashboard-view.is-editing .ioto-card-pager {
+    padding-inline-end: 24px;
 }
 
 /* Dataset views: table */
