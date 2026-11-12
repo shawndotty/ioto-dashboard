@@ -562,6 +562,12 @@ export default {
 	CHART_BUCKET_FILTER_ALL: "All",
 	CHART_BUCKET_SOURCE_HINT: "Tasks are bucketed by the date of their note.",
 	CHART_BUCKET_PROJECT_HINT: "These are the unfinished tasks in this project.",
+	CHART_BUCKET_SEARCH_PLACEHOLDER: "Search tasks, notes or files…",
+	CHART_BUCKET_SEARCH_CLEAR: "Clear search",
+	CHART_BUCKET_NO_MATCH: "No matches for “{0}”",
+	CHART_BUCKET_COUNT: "Showing {0} of {1}",
+	CHART_BUCKET_CANCELLED_HINT:
+		"“Open” excludes cancelled tasks (`[-]`): cancelled means the task is no longer needed.",
 	DASHBOARD_TRUNCATED: "Showing {0} of {1}",
 	DASHBOARD_RETRY: "Retry",
 	DASHBOARD_REFRESH_FAILED: "Refresh failed — {0}",

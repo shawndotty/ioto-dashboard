@@ -553,6 +553,12 @@ export default {
 	CHART_BUCKET_FILTER_ALL: "全部",
 	CHART_BUCKET_SOURCE_HINT: "任務按所在筆記的日期分桶。",
 	CHART_BUCKET_PROJECT_HINT: "以下為該專案下未完成的任務。",
+	CHART_BUCKET_SEARCH_PLACEHOLDER: "搜尋任務、筆記或檔案…",
+	CHART_BUCKET_SEARCH_CLEAR: "清除搜尋",
+	CHART_BUCKET_NO_MATCH: "沒有符合 “{0}” 的項目",
+	CHART_BUCKET_COUNT: "顯示 {0} / {1}",
+	CHART_BUCKET_CANCELLED_HINT:
+		"「未完成」不含已取消（`[-]`）的任務；取消表示這件事不再需要處理。",
 	DASHBOARD_TRUNCATED: "已顯示 {0} / 共 {1}",
 	DASHBOARD_RETRY: "重試",
 	DASHBOARD_REFRESH_FAILED: "刷新失敗 — {0}",

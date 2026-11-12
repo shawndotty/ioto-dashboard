@@ -3171,6 +3171,65 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     font-size: var(--font-ui-smaller);
 }
 
+/* Chart bucket: task state, search and keyboard affordances.
+   The modal is not inside .ioto-custom-dashboard-view, so scope by modal kind. */
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-row {
+    border-inline-start: 2px solid transparent;
+}
+
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-row[data-task="/"] {
+    border-inline-start-color: var(--interactive-accent);
+}
+
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-row[data-task=">"] {
+    border-inline-start-color: var(--text-faint);
+}
+
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-row[data-task="?"] {
+    border-inline-start-color: var(--text-warning);
+}
+
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-row[data-task="x"] .ioto-chart-bucket-label,
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-row[data-task="-"] .ioto-chart-bucket-label {
+    color: var(--text-muted);
+}
+
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-row .task-list-item-checkbox {
+    flex: 0 0 auto;
+    margin: 0;
+    pointer-events: none;
+}
+
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-row.is-disabled,
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-row.is-disabled:hover {
+    background: transparent;
+    cursor: default;
+}
+
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-search-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-search-count {
+    flex: 0 0 auto;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    white-space: nowrap;
+}
+
+.ioto-dashboard-modal--chart-bucket .ioto-chart-bucket-label mark {
+    border-radius: 2px;
+    background: var(--text-highlight-bg);
+    color: inherit;
+}
+
 /* Component picker */
 .ioto-picker-search {
     width: 100%;
