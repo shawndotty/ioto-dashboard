@@ -1030,10 +1030,12 @@ test('duplicateDashboard regenerates every page/component id and deep-copies con
 	const host = makeHost();
 	const repository = new DashboardRepository(host);
 	await repository.load();
-	await repository.addPage(DEFAULT_DASHBOARD_ID, page({ id: 'page:a' }));
+	await repository.addPage(
+		DEFAULT_DASHBOARD_ID,
+		page({ id: 'page:a', columns: 24, rowHeight: 96 }),
+	);
 	await repository.addComponent('page:a', component({ id: 'component:a' }));
 	await repository.setLastPage(DEFAULT_DASHBOARD_ID, 'page:a');
-
 	const store = await repository.duplicateDashboard(DEFAULT_DASHBOARD_ID, 'Copy');
 	assert.equal(store.dashboards.length, 2);
 	const copy = store.dashboards[1];
@@ -1042,6 +1044,8 @@ test('duplicateDashboard regenerates every page/component id and deep-copies con
 	assert.equal(copy.pages.length, 2);
 	assert.notEqual(copy.pages[0].id, DEFAULT_PAGE_ID);
 	assert.notEqual(copy.pages[1].id, 'page:a');
+	assert.equal(copy.pages[1].columns, 24);
+	assert.equal(copy.pages[1].rowHeight, 96);
 	assert.equal(copy.lastPageId, copy.pages[1].id);
 	const copyComponent = copy.pages[1].components[0];
 	assert.notEqual(copyComponent.id, 'component:a');
@@ -1247,6 +1251,196 @@ test('duplicateComponent returns null for unknown ids but still writes once', as
 		['component:a'],
 	);
 	assert.equal(host.writes, writesBefore + 2);
+});
+
+test('duplicatePage inserts a copy right after the source and returns its id', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			lastPageId: 'page:b',
+			pages: [
+				page({
+					id: 'page:a',
+					components: [component({ id: 'component:a' })],
+				}),
+				page({ id: 'page:b' }),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const result = await repository.duplicatePage('page:a', 'A copy');
+
+	assert.ok(result);
+	const store = activeDashboard(result.store);
+	assert.deepEqual(
+		store.pages.map((item) => item.id),
+		['page:a', result.pageId, 'page:b'],
+	);
+	assert.equal(store.pages[1].name, 'A copy');
+	assert.equal(store.lastPageId, 'page:b');
+	assert.equal(host.writes, 1);
+});
+
+test('duplicatePage rebuilds every id but keeps the shared queryId', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [
+				page({
+					id: DEFAULT_PAGE_ID,
+					components: [
+						component({ id: 'component:a', queryId: 'user:1' }),
+					],
+				}),
+			],
+		}),
+		dashboard({
+			id: 'dashboard:two',
+			name: 'Two',
+			pages: [page({ id: 'page:two' })],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const result = await repository.duplicatePage(DEFAULT_PAGE_ID);
+	assert.ok(result);
+	assert.notEqual(result.pageId, DEFAULT_PAGE_ID);
+	assert.equal(result.store.activeDashboardId, DEFAULT_DASHBOARD_ID);
+
+	const copy = activeDashboard(result.store).pages.find(
+		(item) => item.id === result.pageId,
+	);
+	assert.ok(copy);
+	assert.notEqual(copy.components[0].id, 'component:a');
+	assert.equal(copy.components[0].queryId, 'user:1');
+});
+
+test('duplicatePage preserves page layout and deep-copies components', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [
+				page({
+					id: DEFAULT_PAGE_ID,
+					columns: 24,
+					rowHeight: 96,
+					components: [
+						component({
+							id: 'component:a',
+							title: 'Tasks',
+							options: { accent: '#fff' },
+						}),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const result = await repository.duplicatePage(DEFAULT_PAGE_ID);
+	assert.ok(result);
+	const pages = activeDashboard(result.store).pages;
+	const source = pages.find((item) => item.id === DEFAULT_PAGE_ID);
+	const copy = pages.find((item) => item.id === result.pageId);
+	assert.ok(source && copy);
+	assert.equal(copy.columns, 24);
+	assert.equal(copy.rowHeight, 96);
+
+	copy.components[0].title = 'changed';
+	copy.components[0].options.accent = '#000';
+	assert.equal(source.components[0].title, 'Tasks');
+	assert.equal(source.components[0].options.accent, '#fff');
+});
+
+test('duplicatePage avoids page and component ids used in other dashboards', async () => {
+	const originalNow = Date.now;
+	Date.now = () => 4321;
+	try {
+		const host = v4({}, [
+			dashboard({
+				id: DEFAULT_DASHBOARD_ID,
+				pages: [
+					page({
+						id: DEFAULT_PAGE_ID,
+						components: [component({ id: 'component:x' })],
+					}),
+				],
+			}),
+			dashboard({
+				id: 'dashboard:two',
+				name: 'Two',
+				pages: [
+					page({
+						id: 'page:4321',
+						components: [component({ id: 'component:4321' })],
+					}),
+				],
+			}),
+		]);
+		const repository = new DashboardRepository(host);
+		await repository.load();
+
+		const result = await repository.duplicatePage(DEFAULT_PAGE_ID);
+		assert.ok(result);
+		assert.equal(result.pageId, 'page:4321-2');
+		const copy = activeDashboard(result.store).pages.find(
+			(item) => item.id === result.pageId,
+		);
+		assert.ok(copy);
+		assert.equal(copy.components[0].id, 'component:4321-2');
+	} finally {
+		Date.now = originalNow;
+	}
+});
+
+test('duplicatePage keeps the source name unless a non-blank name is given', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [page({ id: DEFAULT_PAGE_ID, name: 'Page 1' })],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const omitted = await repository.duplicatePage(DEFAULT_PAGE_ID);
+	const trimmed = await repository.duplicatePage(DEFAULT_PAGE_ID, '  X  ');
+	const blank = await repository.duplicatePage(DEFAULT_PAGE_ID, '   ');
+	assert.ok(omitted && trimmed && blank);
+
+	const nameOf = (result) =>
+		activeDashboard(result.store).pages.find(
+			(item) => item.id === result.pageId,
+		).name;
+	assert.equal(nameOf(omitted), 'Page 1');
+	assert.equal(nameOf(trimmed), 'X');
+	assert.equal(nameOf(blank), 'Page 1');
+});
+
+test('duplicatePage returns null for unknown ids but still writes once', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [page({ id: DEFAULT_PAGE_ID })],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+	const writesBefore = host.writes;
+
+	const result = await repository.duplicatePage('page:missing');
+
+	assert.equal(result, null);
+	const { store } = await repository.load();
+	assert.deepEqual(
+		store.dashboards[0].pages.map((item) => item.id),
+		[DEFAULT_PAGE_ID],
+	);
+	assert.equal(host.writes, writesBefore + 1);
 });
 
 test('findDashboardForPage resolves the owning dashboard', async () => {

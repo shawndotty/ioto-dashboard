@@ -269,6 +269,8 @@ export default {
 	// Pages
 	PAGE_TABS_ADD: "新增頁面",
 	PAGE_RENAME: "重新命名頁面",
+	PAGE_DUPLICATE: "複製頁面",
+	PAGE_DUPLICATED: "已複製頁面：{0}",
 	PAGE_DELETE: "刪除頁面",
 	PAGE_DELETE_TITLE: "刪除頁面",
 	PAGE_DELETE_MSG: "刪除「{0}」及其 {1} 個元件？不會影響筆記內容。",

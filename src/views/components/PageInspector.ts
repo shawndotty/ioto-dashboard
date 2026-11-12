@@ -4,6 +4,7 @@ import type { PageInspectorState } from "../../dashboard/inspector-service";
 
 export interface PageInspectorDeps {
 	rename(name: string): void;
+	duplicate(): void;
 	setLayout(columns: 12 | 24, rowHeight: number): void;
 	remove(): void;
 }
@@ -157,6 +158,15 @@ export class PageInspector {
 		const pageId = state.target.pageId;
 		const canDelete = state.target.canDelete;
 		const menu = new Menu();
+		menu.addItem((item) => {
+			item.setTitle(t("PAGE_DUPLICATE"))
+				.setIcon("copy")
+				.onClick(() => {
+					if (this.state?.target.pageId !== pageId) return;
+					this.deps.duplicate();
+				});
+		});
+		menu.addSeparator();
 		menu.addItem((item) => {
 			item.setTitle(
 				canDelete

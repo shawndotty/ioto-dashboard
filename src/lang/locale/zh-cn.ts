@@ -270,6 +270,8 @@ export default {
 	// Pages
 	PAGE_TABS_ADD: "新建页面",
 	PAGE_RENAME: "重命名页面",
+	PAGE_DUPLICATE: "复制页面",
+	PAGE_DUPLICATED: "已复制页面：{0}",
 	PAGE_DELETE: "删除页面",
 	PAGE_DELETE_TITLE: "删除页面",
 	PAGE_DELETE_MSG: "删除「{0}」及其 {1} 个组件？不会影响笔记内容。",

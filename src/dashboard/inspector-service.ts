@@ -66,6 +66,7 @@ export interface PageInspectorController extends InspectorControllerBase {
 	kind: "page";
 	getTarget(): PageInspectorTarget | null;
 	renamePage(name: string): void;
+	duplicatePage(): void;
 	setPageLayout(columns: 12 | 24, rowHeight: number): void;
 	removePage(): void;
 }

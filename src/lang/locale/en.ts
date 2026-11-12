@@ -269,6 +269,8 @@ export default {
 	// Pages
 	PAGE_TABS_ADD: "Add page",
 	PAGE_RENAME: "Rename page",
+	PAGE_DUPLICATE: "Duplicate page",
+	PAGE_DUPLICATED: "Copied page: {0}",
 	PAGE_DELETE: "Delete page",
 	PAGE_DELETE_TITLE: "Delete page",
 	PAGE_DELETE_MSG:

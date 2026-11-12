@@ -540,6 +540,59 @@ export class DashboardRepository {
 		return newId ? { store, componentId: newId } : null;
 	}
 
+	/**
+	 * Copies a page (layout + components) right after the source. Page-level
+	 * `columns` / `rowHeight` ride along via `structuredClone`, and every page /
+	 * component id is regenerated against the whole store. `lastPageId` is left
+	 * untouched on purpose: the caller switches pages itself.
+	 */
+	async duplicatePage(
+		pageId: string,
+		name?: string,
+	): Promise<{ store: DashboardStoreData; pageId: string } | null> {
+		let newPageId: string | null = null;
+		const store = await this.mutate((data) => {
+			const hit = this.findPage(data, pageId);
+			if (!hit) return;
+			const { dashboard, page } = hit;
+			const index = dashboard.pages.indexOf(page);
+
+			const takenPageIds = new Set(
+				data.dashboards.flatMap((item) =>
+					item.pages.map((p) => p.id),
+				),
+			);
+			const takenComponentIds = new Set(
+				data.dashboards.flatMap((item) =>
+					item.pages.flatMap((p) =>
+						p.components.map((c) => c.id),
+					),
+				),
+			);
+
+			const pageBase = `page:${Date.now()}`;
+			newPageId = uniqueId(pageBase, takenPageIds);
+			takenPageIds.add(newPageId);
+			const components = page.components.map((component) => {
+				const componentId = uniqueId(
+					`component:${Date.now()}`,
+					takenComponentIds,
+				);
+				takenComponentIds.add(componentId);
+				return { ...structuredClone(component), id: componentId };
+			});
+			const copy: DashboardPage = {
+				...structuredClone(page),
+				id: newPageId,
+				components,
+			};
+			const trimmed = name?.trim();
+			if (trimmed) copy.name = trimmed;
+			dashboard.pages.splice(index + 1, 0, copy);
+		});
+		return newPageId ? { store, pageId: newPageId } : null;
+	}
+
 	async addPage(
 		dashboardId: string,
 		page: DashboardPage,
@@ -703,7 +756,7 @@ export class DashboardRepository {
 							};
 						},
 					);
-					return { id: pageId, name: page.name, components };
+					return { ...structuredClone(page), id: pageId, components };
 				},
 			);
 

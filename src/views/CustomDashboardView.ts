@@ -58,7 +58,10 @@ import { QueryRepository } from "../query/repository";
 import type { QueryDefinition, QueryTarget } from "../query/types";
 import { ComponentPickerModal } from "../ui/component-picker";
 import { ConfirmModal } from "../ui/ConfirmModal";
-import { DashboardManagerModal } from "../ui/dashboard-manager";
+import {
+	DashboardManagerModal,
+	uniqueDashboardName,
+} from "../ui/dashboard-manager";
 import { PageLayoutModal } from "../ui/page-layout-modal";
 import { PageNameModal } from "../ui/page-name-modal";
 import { PagePickerModal, type PageTarget } from "../ui/page-picker";
@@ -661,6 +664,18 @@ export class CustomDashboardView extends ItemView {
 				event.stopPropagation();
 				this.openRenamePage(page);
 			});
+			const duplicate = tab.createEl("button", {
+				cls: "ioto-dashboard-page-close",
+				attr: {
+					"aria-label": t("PAGE_DUPLICATE"),
+					title: t("PAGE_DUPLICATE"),
+				},
+				text: "⧉",
+			});
+			duplicate.onClickEvent((event) => {
+				event.stopPropagation();
+				void this.duplicatePage(page);
+			});
 		}
 		const remove = tab.createEl("button", {
 			cls: "ioto-dashboard-page-close",
@@ -726,6 +741,27 @@ export class CustomDashboardView extends ItemView {
 		this.leafPageId = id;
 		this.render();
 		this.app.workspace.requestSaveLayout();
+	}
+
+	private async duplicatePage(page: DashboardPage): Promise<void> {
+		const dashboard = this.activeDashboard;
+		if (!dashboard) return;
+		const suffix = t("DASHBOARD_COMPONENT_COPY_SUFFIX");
+		const base = page.name.endsWith(suffix.trim())
+			? page.name
+			: `${page.name}${suffix}`;
+		const name = uniqueDashboardName(
+			base,
+			dashboard.pages.map((item) => item.name),
+		);
+		const result = await this.plugin.dashboardRepository.duplicatePage(
+			page.id,
+			name,
+		);
+		if (!result) return;
+		this.store = result.store;
+		this.switchPage(result.pageId);
+		new Notice(t("PAGE_DUPLICATED", [name]));
 	}
 
 	private openRenamePage(page: DashboardPage): void {
@@ -1357,6 +1393,12 @@ export class CustomDashboardView extends ItemView {
 							controller.renamePage(name);
 						}
 					},
+					duplicate: () => {
+						const controller = service.current()?.controller;
+						if (controller?.kind === "page") {
+							controller.duplicatePage();
+						}
+					},
 					setLayout: (columns, rowHeight) => {
 						const controller = service.current()?.controller;
 						if (controller?.kind === "page") {
@@ -1450,6 +1492,12 @@ export class CustomDashboardView extends ItemView {
 			leafId: this.leafId,
 			isEditable: () => this.editMode,
 			getTarget: () => this.pageInspectorTarget(pageId),
+			duplicatePage: () => {
+				const page = this.activeDashboard?.pages.find(
+					(item) => item.id === pageId,
+				);
+				if (page) void this.duplicatePage(page);
+			},
 			renamePage: (name) => {
 				void (async () => {
 					this.store = await this.plugin.dashboardRepository.renamePage(

@@ -74,6 +74,7 @@ export class CustomInspectorView extends ItemView {
 			},
 			page: {
 				rename: (name) => page()?.renamePage(name),
+				duplicate: () => page()?.duplicatePage(),
 				setLayout: (columns, rowHeight) =>
 					page()?.setPageLayout(columns, rowHeight),
 				remove: () => page()?.removePage(),
