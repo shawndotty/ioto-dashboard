@@ -13,7 +13,8 @@ export type ModalKind =
 	| "page-layout"
 	| "dashboard-manager"
 	| "project-tasks"
-	| "folder-contents";
+	| "folder-contents"
+	| "chart-bucket";
 
 export interface ModalShellOptions {
 	kind: ModalKind;

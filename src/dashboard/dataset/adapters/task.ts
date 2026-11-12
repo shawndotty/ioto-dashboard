@@ -51,6 +51,11 @@ export const taskAdapter: DatasetAdapter = (input): Dataset => {
 			mtime: task.noteMtime,
 			completed: task.marker === "done" ? 1 : 0,
 			open: task.marker === "open" ? 1 : 0,
+			path: task.path,
+			line: task.line,
+			text: task.text,
+			kind: "task",
+			marker: task.marker,
 		}));
 		const timeline = buildTimelineRows(
 			records,

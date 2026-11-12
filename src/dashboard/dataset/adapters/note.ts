@@ -46,6 +46,9 @@ export const noteAdapter: DatasetAdapter = (input): Dataset => {
 			size: note.size,
 			tasks: note.fileTaskCount,
 			completed: note.fileCompletedCount,
+			path: note.path,
+			text: note.basename,
+			kind: "note",
 		}));
 		const timeline = buildTimelineRows(
 			records,

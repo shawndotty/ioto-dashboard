@@ -18,7 +18,28 @@ export interface TimelineRecord {
 	tasks?: number;
 	completed?: number;
 	open?: number;
+	/** Source file backing the record (enables the bucket detail list). */
+	path?: string;
+	line?: number;
+	/** Row text; falls back to the basename. */
+	text?: string;
+	kind?: TimelineSourceRef["kind"];
+	marker?: string;
 }
+
+/** One original record behind a timeline bucket. */
+export interface TimelineSourceRef {
+	path: string;
+	line?: number;
+	label: string;
+	kind: "task" | "note" | "file";
+	marker?: string;
+	/** Local day used to group month buckets. */
+	date?: string;
+}
+
+/** Hard cap per bucket so a month bucket cannot freeze the modal. */
+export const MAX_BUCKET_ITEMS = 500;
 
 export interface TimelineSeriesOptions {
 	bucket: TimelineBucket;
@@ -154,6 +175,8 @@ export function buildTimelineRows(
 		.filter((key) => key !== "date");
 	const totals = new Map<string, number>();
 	const sums = new Map<string, Record<string, number>>();
+	const refsByBucket = new Map<string, TimelineSourceRef[]>();
+	const relatedTotals = new Map<string, number>();
 	for (const key of bucketKeys) {
 		totals.set(key, 0);
 		sums.set(key, {});
@@ -168,6 +191,19 @@ export function buildTimelineRows(
 		if (!known.has(key)) continue;
 		sourceTotal += 1;
 		totals.set(key, (totals.get(key) ?? 0) + 1);
+		relatedTotals.set(key, (relatedTotals.get(key) ?? 0) + 1);
+		const refs = refsByBucket.get(key) ?? [];
+		if (refs.length < MAX_BUCKET_ITEMS) {
+			refs.push({
+				path: record.path ?? "",
+				line: record.line,
+				label: record.text ?? record.basename,
+				kind: record.kind ?? "file",
+				marker: record.marker,
+				date: localDay(new Date(timestamp)),
+			});
+			refsByBucket.set(key, refs);
+		}
 		const bucketSums = sums.get(key) ?? {};
 		for (const valueKey of valueKeys) {
 			if (valueKey === "total") continue;
@@ -200,7 +236,14 @@ export function buildTimelineRows(
 					? cell(formatSize(value), { sortValue: value })
 					: cell(String(value), { sortValue: value });
 		}
-		return { id: key, cells };
+		const refs = refsByBucket.get(key);
+		if (!refs || refs.length === 0) return { id: key, cells };
+		return {
+			id: key,
+			cells,
+			related: refs,
+			relatedTotal: relatedTotals.get(key) ?? refs.length,
+		};
 	});
 
 	return { rows, columns, sourceTotal };

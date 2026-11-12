@@ -34,6 +34,8 @@ export interface ChartTick {
 	/** Full text for the tooltip. */
 	fullLabel?: string;
 	position: number;
+	/** Overrides the default middle/end anchor for edge labels. */
+	anchor?: "start" | "middle" | "end";
 }
 
 export interface ChartAxisSpec {
@@ -48,6 +50,10 @@ export interface ChartPoint {
 	y: number;
 	label: string;
 	value: number;
+	/** Dataset row id backing this point (timeline bucket key). */
+	bucketKey?: string;
+	/** Column key of the series this point belongs to. */
+	seriesKey?: string;
 }
 
 export interface ChartBar {
@@ -57,6 +63,8 @@ export interface ChartBar {
 	h: number;
 	label: string;
 	value: number;
+	/** Reserved for the upcoming bar click-through; not wired yet. */
+	ref?: { path?: string; line?: number; bucketKey?: string };
 }
 
 export interface ChartSeries {
@@ -88,9 +96,11 @@ export interface ChartSpec {
 	showValueLabels: boolean;
 	valueList: Array<{ label: string; text: string }> | null;
 	xRotate: 0 | 45 | 90;
+	/** Only line charts opt into the hover/click layer. */
+	interactive?: boolean;
 }
 
-const LABEL_FONT = 10;
+const LABEL_FONT = 11;
 const PAD_TOP = 6;
 const PAD_RIGHT = 6;
 
@@ -131,6 +141,8 @@ interface YAxisResult {
 interface BarDatum {
 	label: string;
 	value: number;
+	path?: string;
+	rowId?: string;
 }
 
 function optionString(
@@ -314,6 +326,7 @@ function computeLayout(
 	options: ChartOptions,
 	rotate: 0 | 45 | 90,
 	yLabels: string[],
+	xLabels: string[],
 	xShowRequested: boolean,
 	xTitleRaw: string,
 	yTitleRaw: string,
@@ -337,15 +350,53 @@ function computeLayout(
 	// tick text instead of shrinking the data area further.
 	if (yShow && maxLabelWidth + 8 > size.w * 0.28) yShow = false;
 
-	let bottom = 8;
-	if (xShow) bottom += rotate === 0 ? 12 : rotate === 45 ? 24 : 36;
+	let maxXLabelWidth = 0;
+	for (const label of xLabels) {
+		maxXLabelWidth = Math.max(
+			maxXLabelWidth,
+			estimateTextWidth(label, LABEL_FONT),
+		);
+	}
+
+	const bottomBase = 8;
+	const availHeight = size.h - PAD_TOP - bottomBase;
+	let bottom = bottomBase;
+	if (xShow) {
+		if (rotate === 0) {
+			bottom += 12;
+		} else {
+			// Rotated labels extend by roughly their text width, not a fixed step.
+			const reserve = rotate === 45 ? maxXLabelWidth * 0.72 : maxXLabelWidth;
+			bottom += Math.min(Math.ceil(reserve), Math.ceil(availHeight * 0.35));
+		}
+	}
 	if (xTitle) bottom += 14;
 	let left = yShow
 		? Math.min(Math.ceil(maxLabelWidth) + 8, Math.round(size.w * 0.28))
 		: 8;
 	if (yTitle) left += 14;
 
-	let plotWidth = size.w - left - PAD_RIGHT;
+	let rightPad = PAD_RIGHT;
+	if (xShow) {
+		const lastLabelWidth = estimateTextWidth(
+			xLabels[xLabels.length - 1] ?? "",
+			LABEL_FONT,
+		);
+		rightPad = Math.max(PAD_RIGHT, Math.ceil(lastLabelWidth / 2) + 4);
+		// Never let a single huge label eat the canvas; the anchor fallback
+		// handles whatever still sticks out.
+		rightPad = Math.min(
+			rightPad,
+			Math.max(PAD_RIGHT, Math.round(size.w * 0.3)),
+		);
+		// Only grow the left gutter while the plot keeps a usable width; long
+		// edge labels otherwise fall back to the tick anchor degradation.
+		const firstLabelWidth = estimateTextWidth(xLabels[0] ?? "", LABEL_FONT);
+		const protectedLeft = Math.max(left, Math.ceil(firstLabelWidth / 2) + 2);
+		if (size.w - protectedLeft - rightPad >= 40) left = protectedLeft;
+	}
+
+	let plotWidth = size.w - left - rightPad;
 	let plotHeight = size.h - PAD_TOP - bottom;
 	if (plotWidth < 40 || plotHeight < 30) {
 		yShow = false;
@@ -354,7 +405,7 @@ function computeLayout(
 		yTitle = "";
 		left = 8;
 		bottom = xShow ? 16 : 4;
-		plotWidth = size.w - left - PAD_RIGHT;
+		plotWidth = size.w - left - rightPad;
 		plotHeight = size.h - PAD_TOP - bottom;
 	}
 	if (plotWidth <= 0 || plotHeight <= 0) return null;
@@ -474,6 +525,7 @@ export function buildLineSpec(
 		options,
 		rotate,
 		yAxis.labels,
+		displayLabels,
 		optionBoolean(options, "xShowLabels", true),
 		optionString(options, "xTitle", ""),
 		optionString(options, "yTitle", ""),
@@ -529,6 +581,23 @@ export function buildLineSpec(
 			fullLabel: fullLabels[index] ?? "",
 			position: xPosition(index),
 		}));
+		if (rotate === 0 && xTicks.length > 0) {
+			const first = xTicks[0];
+			const last = xTicks[xTicks.length - 1];
+			if (
+				first &&
+				first.position - estimateTextWidth(first.label, LABEL_FONT) / 2 < 0
+			) {
+				first.anchor = "start";
+			}
+			if (
+				last &&
+				last.position + estimateTextWidth(last.label, LABEL_FONT) / 2 >
+					size.w
+			) {
+				last.anchor = "end";
+			}
+		}
 	}
 
 	const series: ChartSeries[] = seriesData.map((data, index) => ({
@@ -545,6 +614,8 @@ export function buildLineSpec(
 			y: plot.top + point.y,
 			label: fullLabels[pointIndex] ?? "",
 			value: data.values[pointIndex] ?? 0,
+			bucketKey: rows[pointIndex]?.id,
+			seriesKey: data.key,
 		})),
 	}));
 
@@ -579,6 +650,7 @@ export function buildLineSpec(
 		showValueLabels: false,
 		valueList: null,
 		xRotate: rotate,
+		interactive: true,
 	};
 }
 
@@ -608,6 +680,8 @@ export function buildBarSpec(
 	const entries: BarDatum[] = rows.map((row, index) => ({
 		label: cellText(row, xColumn.key) || String(index + 1),
 		value: cellValue(row, yColumn.key),
+		path: row.cells[xColumn.key]?.path ?? row.cells[yColumn.key]?.path,
+		rowId: row.id,
 	}));
 	const sorted = sortEntries(entries, optionString(options, "xSort", "dataset"));
 	const topN = Math.max(0, Math.round(optionNumber(options, "topN") ?? 0));
@@ -631,6 +705,9 @@ export function buildBarSpec(
 		options,
 		rotate,
 		yAxis.labels,
+		shown.map((entry) =>
+			truncateText(entry.label, rotate === 0 ? 34 : 80, LABEL_FONT),
+		),
 		optionBoolean(options, "xShowLabels", true),
 		optionString(options, "xTitle", ""),
 		optionString(options, "yTitle", ""),
@@ -676,6 +753,10 @@ export function buildBarSpec(
 			h: rawHeight < 1 ? 1 : rawHeight,
 			label: entry.label,
 			value: entry.value,
+			ref: {
+				path: entry.path,
+				bucketKey: entry.rowId,
+			},
 		};
 	});
 

@@ -56,6 +56,9 @@ export const fileAdapter: DatasetAdapter = (input): Dataset => {
 			ctime: file.ctime,
 			mtime: file.mtime,
 			size: file.size,
+			path: file.path,
+			text: file.basename,
+			kind: "file",
 		}));
 		const timeline = buildTimelineRows(
 			records,

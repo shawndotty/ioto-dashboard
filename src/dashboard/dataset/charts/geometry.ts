@@ -196,6 +196,20 @@ export function truncateText(
 	return result.length > 0 ? `${result}${ellipsis}` : ellipsis;
 }
 
+/** Nearest category index for a pointer position; O(1), no DOM or dots needed. */
+export function nearestIndex(
+	px: number,
+	left: number,
+	width: number,
+	count: number,
+): number {
+	if (count <= 0) return -1;
+	if (count === 1) return 0;
+	if (!(width > 0)) return 0;
+	const ratio = (px - left) / width;
+	return Math.max(0, Math.min(count - 1, Math.round(ratio * (count - 1))));
+}
+
 export function arcRatio(value: number, total: number): number {
 	if (!Number.isFinite(total) || total <= 0) return 0;
 	return Math.min(1, Math.max(0, value / total));

@@ -156,3 +156,114 @@ test('an empty source turns into empty rows instead of a zero line', () => {
 	assert.equal(result.sourceTotal, 0);
 	assert.deepEqual(result.rows, []);
 });
+
+test('timeline buckets keep the original records that produced them', () => {
+	const records = [
+		record({
+			basename: '2026-11-10-a',
+			path: '3-任务/a.md',
+			line: 4,
+			text: 'write report',
+			kind: 'task',
+			marker: 'done',
+		}),
+		record({
+			basename: '2026-11-10-b',
+			path: '3-任务/b.md',
+			line: 9,
+			text: 'review plan',
+			kind: 'task',
+			marker: 'open',
+		}),
+		record({
+			basename: '2026-11-10-c',
+			path: '3-任务/c.md',
+			line: 2,
+			text: 'ship change',
+			kind: 'task',
+			marker: 'open',
+		}),
+	];
+	const result = buildTimelineRows(
+		records,
+		{ bucket: 'day', dateField: 'filename', range: 7, now: () => NOW },
+		TIMELINE_COLUMNS.task,
+	);
+	const row = result.rows.find((entry) => entry.id === '2026-11-10');
+	assert.equal(row.related.length, 3);
+	assert.equal(row.relatedTotal, 3);
+	assert.deepEqual(
+		row.related.map((ref) => ref.label),
+		['write report', 'review plan', 'ship change'],
+	);
+	assert.equal(row.related[0].line, 4);
+	assert.equal(row.related[0].kind, 'task');
+	assert.equal(row.related[0].date, '2026-11-10');
+	assert.equal(row.related[0].marker, 'done');
+});
+
+test('bucket refs are capped at 500 while the total keeps counting', () => {
+	const records = Array.from({ length: 501 }, (_, index) =>
+		record({
+			basename: `2026-11-10-${index}`,
+			path: `3-任务/${index}.md`,
+			line: index,
+			text: `task ${index}`,
+			kind: 'task',
+		}),
+	);
+	const result = buildTimelineRows(
+		records,
+		{ bucket: 'day', dateField: 'filename', range: 7, now: () => NOW },
+		TIMELINE_COLUMNS.task,
+	);
+	const row = result.rows.find((entry) => entry.id === '2026-11-10');
+	assert.equal(row.related.length, 500);
+	assert.equal(row.relatedTotal, 501);
+	assert.equal(row.cells.total.sortValue, 501);
+});
+
+test('note and file timelines label refs with basenames and local days', () => {
+	const notes = buildTimelineRows(
+		[
+			record({
+				basename: '2026-11-10-journal',
+				path: '2-输出/2026-11-10-journal.md',
+				kind: 'note',
+			}),
+		],
+		{ bucket: 'week', dateField: 'filename', range: 7, now: () => NOW },
+		TIMELINE_COLUMNS.note,
+	);
+	const noteRow = notes.rows.find(
+		(entry) => entry.id === '2026-11-09',
+	);
+	assert.equal(noteRow.related.length, 1);
+	assert.equal(noteRow.related[0].kind, 'note');
+	assert.equal(noteRow.related[0].label, '2026-11-10-journal');
+	assert.equal(noteRow.related[0].date, '2026-11-10');
+
+	const files = buildTimelineRows(
+		[
+			record({
+				basename: '2026-11-10-image',
+				path: '0-辅助/img.png',
+				kind: 'file',
+			}),
+		],
+		{ bucket: 'day', dateField: 'filename', range: 7, now: () => NOW },
+		TIMELINE_COLUMNS.file,
+	);
+	const fileRow = files.rows.find((entry) => entry.id === '2026-11-10');
+	assert.equal(fileRow.related[0].kind, 'file');
+	assert.equal(fileRow.related[0].label, '2026-11-10-image');
+});
+
+test('empty windows expose no bucket refs', () => {
+	const result = buildTimelineRows(
+		[],
+		{ bucket: 'day', dateField: 'filename', range: 7, now: () => NOW },
+		TIMELINE_COLUMNS.task,
+	);
+	assert.deepEqual(result.rows, []);
+});

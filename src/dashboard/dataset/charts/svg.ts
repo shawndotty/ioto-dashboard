@@ -1,7 +1,13 @@
 import { t } from "../../../lang/helpers";
+import { nearestIndex } from "./geometry";
 import type { ChartSeries, ChartSpec } from "./spec";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+
+export interface ChartInteractions {
+	onActivate?(target: { bucketKey: string; seriesKey?: string }): void;
+	isEnabled?(): boolean;
+}
 
 function svgEl<K extends keyof SVGElementTagNameMap>(
 	doc: Document,
@@ -90,7 +96,8 @@ function renderAxes(
 			const text = svgEl(doc, "text", {
 				x: tick.position,
 				y: labelY,
-				"text-anchor": spec.xRotate === 0 ? "middle" : "end",
+				"text-anchor":
+					tick.anchor ?? (spec.xRotate === 0 ? "middle" : "end"),
 				class: "ioto-chart-label",
 			});
 			if (spec.xRotate !== 0) {
@@ -136,6 +143,7 @@ function renderLineSeries(
 	svg: SVGElement,
 	doc: Document,
 	spec: ChartSpec,
+	nativeTitles: boolean,
 ): void {
 	const showDots = spec.series.every((series) => series.points.length <= 60);
 	for (const series of spec.series) {
@@ -156,9 +164,11 @@ function renderLineSeries(
 				r: 2,
 				class: `ioto-chart-dot ${seriesClass(series)}`,
 			});
-			const title = svgEl(doc, "title");
-			title.textContent = `${point.label}: ${spec.y.format(point.value)}`;
-			circle.appendChild(title);
+			if (nativeTitles) {
+				const title = svgEl(doc, "title");
+				title.textContent = `${point.label}: ${spec.y.format(point.value)}`;
+				circle.appendChild(title);
+			}
 			svg.appendChild(circle);
 		}
 	}
@@ -236,8 +246,204 @@ function renderValueList(el: HTMLElement, spec: ChartSpec): void {
 	}
 }
 
-export function renderChart(el: HTMLElement, spec: ChartSpec): void {
+function renderTooltipContent(
+	tooltip: HTMLElement,
+	spec: ChartSpec,
+	index: number,
+	clickable: boolean,
+): void {
+	tooltip.empty();
+	const anchor = spec.series[0]?.points[index];
+	tooltip.createDiv({
+		cls: "ioto-chart-tooltip-date",
+		text: anchor?.label ?? "",
+	});
+	for (const series of spec.series) {
+		const point = series.points[index];
+		if (!point) continue;
+		const row = tooltip.createDiv({ cls: "ioto-chart-tooltip-row" });
+		row.createSpan({
+			cls: `ioto-chart-tooltip-swatch ${seriesClass(series)}`,
+		});
+		row.createSpan({
+			cls: "ioto-chart-tooltip-name",
+			text: label(series.label),
+		});
+		row.createSpan({
+			cls: "ioto-chart-tooltip-value",
+			text: spec.y.format(point.value),
+		});
+	}
+	if (clickable) {
+		tooltip.createDiv({
+			cls: "ioto-chart-tooltip-hint",
+			text: label("CHART_TOOLTIP_CLICK_HINT"),
+		});
+	}
+}
+
+function appendInteractionLayer(
+	el: HTMLElement,
+	svg: SVGElement,
+	doc: Document,
+	spec: ChartSpec,
+	interactions: ChartInteractions,
+): void {
+	const { plot } = spec;
+	const bottom = plot.top + plot.height;
+	const count = spec.series[0]?.points.length ?? 0;
+	if (count === 0) return;
+
+	const hit = svgEl(doc, "rect", {
+		x: plot.left,
+		y: plot.top,
+		width: plot.width,
+		height: plot.height,
+		class: "ioto-chart-hit",
+	});
+	hit.setAttribute("fill", "transparent");
+
+	const crosshair = svgEl(doc, "line", {
+		x1: plot.left,
+		y1: plot.top,
+		x2: plot.left,
+		y2: bottom,
+		class: "ioto-chart-crosshair",
+	});
+	const setHidden = (node: Element, hidden: boolean): void => {
+		node.classList.toggle("ioto-chart-hidden", hidden);
+	};
+	setHidden(crosshair, true);
+
+	const dots = svgEl(doc, "g", { class: "ioto-chart-hover-dot" });
+	const dotEls = spec.series.map((series) => {
+		const circle = svgEl(doc, "circle", {
+			cx: 0,
+			cy: 0,
+			r: 3.5,
+			class: seriesClass(series),
+		});
+		setHidden(circle, true);
+		dots.appendChild(circle);
+		return circle;
+	});
+
+	svg.appendChild(hit);
+	svg.appendChild(crosshair);
+	svg.appendChild(dots);
+
+	const tooltip = el.createDiv({ cls: "ioto-chart-tooltip" });
+	setHidden(tooltip, true);
+
+	let activeIndex = -1;
+	let lastTouchKey: string | null = null;
+
+	const indexAt = (event: PointerEvent): number => {
+		const rect = svg.getBoundingClientRect();
+		if (rect.width <= 0) return -1;
+		const px = ((event.clientX - rect.left) * spec.width) / rect.width;
+		return nearestIndex(px, plot.left, plot.width, count);
+	};
+
+	const hide = (): void => {
+		activeIndex = -1;
+		setHidden(crosshair, true);
+		for (const circle of dotEls) setHidden(circle, true);
+		setHidden(tooltip, true);
+	};
+
+	const showAt = (index: number): void => {
+		if (index < 0) return;
+		activeIndex = index;
+		const x = spec.series[0]?.points[index]?.x ?? plot.left;
+		crosshair.setAttribute("x1", String(x));
+		crosshair.setAttribute("x2", String(x));
+		setHidden(crosshair, false);
+		spec.series.forEach((series, seriesIndex) => {
+			const circle = dotEls[seriesIndex];
+			const point = series.points[index];
+			if (!circle) return;
+			if (!point) {
+				setHidden(circle, true);
+				return;
+			}
+			circle.setAttribute("cx", String(point.x));
+			circle.setAttribute("cy", String(point.y));
+			setHidden(circle, false);
+		});
+
+		renderTooltipContent(
+			tooltip,
+			spec,
+			index,
+			typeof interactions.onActivate === "function",
+		);
+		setHidden(tooltip, false);
+
+		// Convert viewBox units to the host's pixel space before clamping.
+		const svgRect = svg.getBoundingClientRect();
+		const rootRect = el.getBoundingClientRect();
+		const scaleX = svgRect.width > 0 ? svgRect.width / spec.width : 1;
+		const scaleY = svgRect.height > 0 ? svgRect.height / spec.height : 1;
+		const anchorPoint = spec.series[0]?.points[index];
+		const localX =
+			svgRect.left - rootRect.left + (anchorPoint?.x ?? 0) * scaleX;
+		const localY =
+			svgRect.top - rootRect.top + (anchorPoint?.y ?? 0) * scaleY;
+		const width = tooltip.offsetWidth;
+		const height = tooltip.offsetHeight;
+		const maxLeft = Math.max(2, rootRect.width - width - 2);
+		tooltip.style.left = `${Math.round(
+			Math.max(2, Math.min(maxLeft, localX - width / 2)),
+		)}px`;
+		const above = localY - height - 10;
+		tooltip.style.top = `${Math.round(
+			above >= 2 ? above : Math.min(localY + 12, rootRect.height - height),
+		)}px`;
+	};
+
+	const activate = (index: number): void => {
+		if (index < 0 || !interactions.onActivate) return;
+		const point = spec.series[0]?.points[index];
+		const bucketKey = point?.bucketKey;
+		if (!bucketKey) return;
+		interactions.onActivate({ bucketKey, seriesKey: point?.seriesKey });
+	};
+
+	hit.addEventListener("pointermove", (event) => {
+		if (event.pointerType === "touch") return;
+		showAt(indexAt(event));
+	});
+	hit.addEventListener("pointerdown", (event) => {
+		const index = indexAt(event);
+		if (event.pointerType !== "touch") return;
+		const bucketKey = spec.series[0]?.points[index]?.bucketKey ?? null;
+		if (activeIndex !== index) {
+			showAt(index);
+			lastTouchKey = bucketKey;
+			return;
+		}
+		if (bucketKey && bucketKey === lastTouchKey) {
+			activate(index);
+			lastTouchKey = null;
+		}
+	});
+	hit.addEventListener("click", (event) => {
+		if ((event as PointerEvent).pointerType === "touch") return;
+		activate(indexAt(event as PointerEvent));
+	});
+	hit.addEventListener("pointerleave", hide);
+	hit.addEventListener("pointercancel", hide);
+}
+
+export function renderChart(
+	el: HTMLElement,
+	spec: ChartSpec,
+	interactions?: ChartInteractions,
+): void {
 	const doc = el.ownerDocument;
+	const interactive =
+		Boolean(spec.interactive) && interactions?.isEnabled?.() !== false;
 	const svg = svgEl(doc, "svg", {
 		viewBox: `0 0 ${spec.width} ${spec.height}`,
 		width: "100%",
@@ -252,7 +458,10 @@ export function renderChart(el: HTMLElement, spec: ChartSpec): void {
 
 	renderAxes(svg, doc, spec);
 	if (spec.kind === "line") {
-		renderLineSeries(svg, doc, spec);
+		renderLineSeries(svg, doc, spec, !interactive);
+		if (interactive && interactions) {
+			appendInteractionLayer(el, svg, doc, spec, interactions);
+		}
 	} else {
 		renderBarSeries(svg, doc, spec);
 	}

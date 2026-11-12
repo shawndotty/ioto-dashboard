@@ -13,6 +13,7 @@ const {
 	estimateTextWidth,
 	truncateText,
 	arcRatio,
+	nearestIndex,
 } = await load('../../src/dashboard/dataset/charts/geometry.ts');
 
 test('scaleLinear maps a domain onto a range', () => {
@@ -120,4 +121,16 @@ test('arcRatio clamps to [0, 1] and guards a zero total', () => {
 	assert.equal(arcRatio(-1, 10), 0);
 	assert.equal(arcRatio(1, 0), 0);
 	assert.equal(arcRatio(1, Number.NaN), 0);
+});
+
+test('nearestIndex resolves the closest bucket and clamps to the plot', () => {
+	assert.equal(nearestIndex(50, 0, 100, 0), -1);
+	assert.equal(nearestIndex(50, 0, 100, 1), 0);
+	assert.equal(nearestIndex(0, 10, 100, 5), 0);
+	assert.equal(nearestIndex(110, 10, 100, 5), 4);
+	assert.equal(nearestIndex(60, 10, 100, 5), 2);
+	assert.equal(nearestIndex(-500, 10, 100, 5), 0);
+	assert.equal(nearestIndex(5000, 10, 100, 5), 4);
+	assert.equal(nearestIndex(50, 0, 0, 5), 0);
+	assert.equal(nearestIndex(50, 0, 100, 2), 1);
 });

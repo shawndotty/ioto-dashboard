@@ -10,11 +10,24 @@ import type {
 	DatasetRequest,
 	DataObject,
 	MeasureId,
+	TimelineBucket,
 	ViewId,
 } from "./dataset/types";
+import type { TimelineSourceRef } from "./dataset/timeline";
 import type { DashboardComponentConfig } from "./types";
 
 export type ComponentStatus = "loading" | "ready" | "empty" | "error";
+
+/** Everything the bucket detail modal needs; assembled by the line chart. */
+export interface ChartBucketPayload {
+	bucketKey: string;
+	object: "task" | "note" | "file";
+	cumulative: boolean;
+	series: Array<{ key: string; label: string; value: number }>;
+	refs: TimelineSourceRef[];
+	relatedTotal: number;
+	bucket: TimelineBucket;
+}
 
 export type ComponentSettingGroup =
 	| "data"
@@ -149,6 +162,8 @@ export interface ComponentRenderContext {
 	revealInExplorer(path: string): void;
 	/** 按 Vault 实际节点类型分流：文件→新标签、文件夹→内容弹窗、缺失→Notice。 */
 	openLink?(path: string, line: number | undefined, newTab: boolean): void;
+	/** Opens the per-bucket detail list for a line chart point. */
+	openChartBucket?(payload: ChartBucketPayload): void;
 	/** Renders Markdown owned by the current view, so it unloads with the card. */
 	renderMarkdown(el: HTMLElement, path: string): Promise<void>;
 	/** Renders a fragment of Markdown owned by the current view (inline task text). */

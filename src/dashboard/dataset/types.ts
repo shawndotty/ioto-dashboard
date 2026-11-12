@@ -1,6 +1,7 @@
 import type { CustomFilterDef, IndexSnapshot } from "../../data/types";
 import type { DailyPoint, MetricResult } from "../../metrics/types";
 import type { QueryDefinition } from "../../query/types";
+import type { TimelineSourceRef } from "./timeline";
 
 export type DataObject = "task" | "note" | "file" | "folder" | "project";
 
@@ -87,6 +88,9 @@ export interface DatasetCell {
 export interface DatasetRow {
 	id: string;
 	cells: Record<string, DatasetCell>;
+	/** Timeline only: original records behind this bucket (capped at 500). */
+	related?: TimelineSourceRef[];
+	relatedTotal?: number;
 }
 
 export interface DatasetSummaryItem {

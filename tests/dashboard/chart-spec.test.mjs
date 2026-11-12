@@ -5,6 +5,11 @@ import { load } from '../data/helpers.mjs';
 const { buildLineSpec, buildBarSpec } = await load(
 	'../../src/dashboard/dataset/charts/spec.ts',
 );
+const { estimateTextWidth } = await load(
+	'../../src/dashboard/dataset/charts/geometry.ts',
+);
+
+const LABEL_FONT = 11;
 
 function cell(text, sortValue) {
 	return sortValue === undefined ? { text } : { text, sortValue };
@@ -578,4 +583,147 @@ test('cumulative sums each series across the visible buckets', () => {
 		[1, 3],
 	);
 	assert.equal(plain.showLegend, false);
+});
+
+function dailyEntries(days, startYear = 2026, startMonth = 9) {
+	return Array.from({ length: days }, (_, index) => {
+		const date = new Date(startYear, startMonth, index + 1);
+		const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+		return [key, index + 1, index, 1];
+	});
+}
+
+test('30-day iso labels never overflow either edge at 0°', () => {
+	const data = taskDataset(dailyEntries(30));
+	const spec = buildLineSpec(
+		data,
+		{ xLabelFormat: 'iso', xRotate: '0' },
+		{ w: 600, h: 300 },
+		'task',
+	);
+	const first = spec.x.ticks[0];
+	const last = spec.x.ticks[spec.x.ticks.length - 1];
+	assert.ok(
+		first.position - estimateTextWidth(first.label, LABEL_FONT) / 2 >= 0,
+		'first label stays inside the canvas',
+	);
+	assert.ok(
+		last.position + estimateTextWidth(last.label, LABEL_FONT) / 2 <=
+			spec.width,
+		'last label stays inside the canvas',
+	);
+});
+
+test('180-day rotated labels reserve their text width at 90°', () => {
+	const data = taskDataset(dailyEntries(180, 2026, 3));
+	const spec = buildLineSpec(
+		data,
+		{ xLabelFormat: 'iso', xRotate: '90' },
+		{ w: 600, h: 300 },
+		'task',
+	);
+	assert.ok(spec.plot.height >= 30);
+	const gap = spec.height - (spec.plot.top + spec.plot.height);
+	const labelWidth = estimateTextWidth('2026-04-01', LABEL_FONT);
+	assert.ok(
+		gap >= Math.min(Math.ceil(labelWidth), Math.ceil((spec.height - 14) * 0.35)),
+		'rotated labels get a bottom gutter based on text width',
+	);
+	assert.ok(spec.plot.top + spec.plot.height <= spec.height);
+});
+
+test('a narrow card with one point still yields a valid plot', () => {
+	const data = taskDataset([['2026-11-08', 5, 2, 3]]);
+	const spec = buildLineSpec(
+		data,
+		{ xLabelFormat: 'iso' },
+		{ w: 200, h: 120 },
+		'task',
+	);
+	assert.ok(spec);
+	assert.ok(spec.plot.width > 0);
+	assert.ok(spec.plot.height > 0);
+	assert.ok(spec.plot.left + spec.plot.width <= spec.width);
+});
+
+test('hidden Y labels keep the first X label inside the canvas', () => {
+	const data = taskDataset(dailyEntries(7));
+	const spec = buildLineSpec(
+		data,
+		{ xLabelFormat: 'iso', yShowLabels: false },
+		{ w: 400, h: 240 },
+		'task',
+	);
+	const first = spec.x.ticks[0];
+	assert.ok(
+		first.position - estimateTextWidth(first.label, LABEL_FONT) / 2 >= 0,
+	);
+});
+
+test('oversized edge labels fall back to start/end anchors', () => {
+	const label = 'abcdefghijklmn';
+	const data = dataset(
+		'task',
+		[
+			{ key: 'label', labelKey: 'DATASET_COL_DATE', type: 'text' },
+			{ key: 'total', labelKey: 'DATASET_COL_TASKS', type: 'number' },
+		],
+		[
+			{ label: cell(label), total: cell('1', 1) },
+			{ label: cell(label), total: cell('2', 2) },
+		],
+	);
+	const spec = buildLineSpec(data, {}, { w: 60, h: 200 }, 'task');
+	assert.equal(spec.x.ticks[0].anchor, 'start');
+	assert.equal(spec.x.ticks[spec.x.ticks.length - 1].anchor, 'end');
+});
+
+test('line points map to their dataset row ids and series keys', () => {
+	const data = taskDataset([
+		['2026-11-08', 5, 2, 3],
+		['2026-11-09', 7, 4, 3],
+	]);
+	const spec = buildLineSpec(
+		data,
+		{ ySeriesCompleted: true },
+		{ w: 600, h: 300 },
+		'task',
+	);
+	assert.equal(spec.interactive, true);
+	assert.equal(spec.series[0].key, 'total');
+	assert.deepEqual(
+		spec.series[0].points.map((point) => point.bucketKey),
+		data.rows.map((row) => row.id),
+	);
+	assert.deepEqual(
+		spec.series[1].points.map((point) => point.seriesKey),
+		['completed', 'completed'],
+	);
+});
+
+test('bars carry the row path for the reserved click-through', () => {
+	const data = {
+		object: 'project',
+		measure: 'count',
+		columns: [
+			{ key: 'name', labelKey: 'DATASET_COL_NAME', type: 'text' },
+			{ key: 'completed', labelKey: 'DATASET_COL_COMPLETED', type: 'number' },
+		],
+		rows: [
+			{
+				id: 'project:alpha',
+				cells: {
+					name: { text: 'Alpha', path: '3-任务/Alpha.md' },
+					completed: { text: '4', sortValue: 4 },
+				},
+			},
+		],
+		total: 1,
+		truncated: false,
+	};
+	const spec = buildBarSpec(data, {}, { w: 600, h: 300 }, 'project');
+	assert.deepEqual(spec.series[0].bars[0].ref, {
+		path: '3-任务/Alpha.md',
+		bucketKey: 'project:alpha',
+	});
 });

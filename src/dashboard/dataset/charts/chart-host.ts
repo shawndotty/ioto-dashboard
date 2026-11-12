@@ -1,6 +1,6 @@
 import { t } from "../../../lang/helpers";
 import type { ChartSize, ChartSpec } from "./spec";
-import { renderChart } from "./svg";
+import { renderChart, type ChartInteractions } from "./svg";
 
 /** Height consumed by the HTML legend / value list rendered below the SVG. */
 function extrasHeight(spec: ChartSpec): number {
@@ -22,6 +22,7 @@ export function renderResponsiveChart(
 	el: HTMLElement,
 	build: (size: ChartSize) => ChartSpec | null,
 	minHeight = 80,
+	interactions?: ChartInteractions,
 ): void {
 	const root = el.createDiv({ cls: "ioto-chart-host" });
 	let frame = 0;
@@ -58,7 +59,7 @@ export function renderResponsiveChart(
 			spec = build({ w: width, h: height - reserved }) ?? spec;
 		}
 		root.empty();
-		renderChart(root, spec);
+		renderChart(root, spec, interactions);
 	};
 
 	const schedule = (): void => {

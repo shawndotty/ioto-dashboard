@@ -1,5 +1,5 @@
 import { renderResponsiveChart } from "../dataset/charts/chart-host";
-import { buildLineSpec } from "../dataset/charts/spec";
+import { buildLineSpec, type ChartSpec } from "../dataset/charts/spec";
 import { objectForQuery } from "../dataset/object";
 import type { TimelineBucket, TimelineDateField } from "../dataset/types";
 import type {
@@ -316,8 +316,50 @@ export const lineChartComponent: ComponentDefinition = {
 		const dataset = ctx.dataset;
 		if (!dataset) return;
 		const object = objectForQuery(ctx.query, "task");
-		renderResponsiveChart(el, (size) =>
-			buildLineSpec(dataset, ctx.config.options ?? {}, size, object),
+		const chartObject =
+			object === "note" || object === "file" ? object : "task";
+		let lastSpec: ChartSpec | null = null;
+		renderResponsiveChart(
+			el,
+			(size) => {
+				lastSpec = buildLineSpec(
+					dataset,
+					ctx.config.options ?? {},
+					size,
+					object,
+				);
+				return lastSpec;
+			},
+			80,
+			{
+				isEnabled: () => !ctx.editMode,
+				onActivate: ({ bucketKey }) => {
+					const index = dataset.rows.findIndex(
+						(row) => row.id === bucketKey,
+					);
+					if (index < 0) return;
+					const row = dataset.rows[index];
+					const refs = row?.related ?? [];
+					const relatedTotal = row?.relatedTotal ?? refs.length;
+					const cumulative = ctx.config.options?.yCumulative === true;
+					// A cumulative chart still explains "no new records" per bucket.
+					if (refs.length === 0 && !cumulative) return;
+					const series = (lastSpec?.series ?? []).map((entry) => ({
+						key: entry.key,
+						label: entry.label,
+						value: entry.points[index]?.value ?? 0,
+					}));
+					ctx.openChartBucket?.({
+						bucketKey,
+						object: chartObject,
+						cumulative,
+						series,
+						refs,
+						relatedTotal,
+						bucket: bucketOf(ctx.config.options?.bucket),
+					});
+				},
+			},
 		);
 	},
 };

@@ -39,6 +39,7 @@ import {
 	boundsForType,
 	clampSize,
 	queryTargetsFor,
+	type ChartBucketPayload,
 	type ComponentDefinition,
 	type ComponentRenderContext,
 	type ComponentStatus,
@@ -57,6 +58,7 @@ import {
 import { metricKey, type MetricRequest, type MetricResult, type ProjectProgressGroup } from "../metrics/types";
 import { QueryRepository } from "../query/repository";
 import type { QueryDefinition, QueryTarget } from "../query/types";
+import { ChartBucketModal } from "../ui/chart-bucket-modal";
 import { ComponentPickerModal } from "../ui/component-picker";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import {
@@ -1103,6 +1105,7 @@ export class CustomDashboardView extends ItemView {
 			revealInExplorer: (path) => void this.revealInExplorer(path),
 			openLink: (path, line, newTab) =>
 				void this.openVaultTarget(path, line, newTab),
+			openChartBucket: (payload) => this.openChartBucket(payload),
 			renderMarkdown: (el, path) => this.renderMarkdown(el, path),
 			renderInlineMarkdown: (el, markdown, sourcePath) =>
 				MarkdownRenderer.render(this.app, markdown, el, sourcePath, this),
@@ -2634,6 +2637,15 @@ export class CustomDashboardView extends ItemView {
 			rootPath: path,
 			openFile: (filePath) => void this.openNote(filePath, undefined, true),
 			reveal: (target) => void this.revealInExplorer(target),
+		}).open();
+	}
+
+	private openChartBucket(payload: ChartBucketPayload): void {
+		new ChartBucketModal(this.app, {
+			payload,
+			openTask: (path, line, newTab) =>
+				void this.openVaultTarget(path, line, newTab ?? true),
+			reveal: (path) => void this.revealInExplorer(path),
 		}).open();
 	}
 
