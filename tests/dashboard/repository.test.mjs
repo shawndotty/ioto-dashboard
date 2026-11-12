@@ -682,6 +682,270 @@ test('moveComponent keeps the store intact for unknown ids but still writes once
 	assert.equal(host.writes, writesBefore + 2);
 });
 
+test('transferComponent moves a component across pages and keeps every field', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			lastPageId: 'page:one',
+			pages: [
+				page({
+					id: 'page:one',
+					components: [
+						component({
+							id: 'component:a',
+							type: 'kpi',
+							queryId: 'builtin:tasks-all',
+							title: 'Tasks',
+							basis: 'section',
+							view: 'list',
+							measure: 'count',
+							options: { accent: '#fff' },
+							w: 6,
+							h: 3,
+							x: 1,
+							y: 2,
+						}),
+					],
+				}),
+				page({
+					id: 'page:two',
+					components: [component({ id: 'component:b' })],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const result = await repository.transferComponent(
+		'page:one',
+		'component:a',
+		'page:two',
+	);
+
+	assert.ok(result);
+	assert.equal(result.componentId, 'component:a');
+	const [first, second] = result.store.dashboards[0].pages;
+	assert.deepEqual(first.components, []);
+	const [, moved] = second.components;
+	assert.deepEqual(
+		second.components.map((item) => item.id),
+		['component:b', 'component:a'],
+	);
+	assert.equal(moved.id, 'component:a');
+	assert.equal(moved.type, 'kpi');
+	assert.equal(moved.queryId, 'builtin:tasks-all');
+	assert.equal(moved.title, 'Tasks');
+	assert.equal(moved.basis, 'section');
+	assert.equal(moved.view, 'list');
+	assert.equal(moved.measure, 'count');
+	assert.deepEqual(moved.options, { accent: '#fff' });
+	assert.equal(moved.w, 6);
+	assert.equal(moved.h, 3);
+	assert.equal(moved.x, 1);
+	assert.equal(moved.y, 2);
+	assert.equal(host.writes, 1);
+});
+
+test('transferComponent honours toIndex with clamping and defaults to the end', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [
+				page({
+					id: 'page:one',
+					components: ['a', 'd'].map((id) =>
+						component({ id: `component:${id}` }),
+					),
+				}),
+				page({
+					id: 'page:two',
+					components: ['x', 'y', 'z'].map((id) =>
+						component({ id: `component:${id}` }),
+					),
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const ids = async () =>
+		(await repository.load()).store.dashboards[0].pages[1].components.map(
+			(item) => item.id,
+		);
+
+	await repository.transferComponent(
+		'page:one',
+		'component:a',
+		'page:two',
+		-5,
+	);
+	assert.deepEqual(await ids(), [
+		'component:a',
+		'component:x',
+		'component:y',
+		'component:z',
+	]);
+
+	await repository.transferComponent(
+		'page:one',
+		'component:d',
+		'page:two',
+		99,
+	);
+	assert.deepEqual(await ids(), [
+		'component:a',
+		'component:x',
+		'component:y',
+		'component:z',
+		'component:d',
+	]);
+
+	await repository.transferComponent('page:two', 'component:a', 'page:one');
+	assert.deepEqual(
+		(await repository.load()).store.dashboards[0].pages[0].components.map(
+			(item) => item.id,
+		),
+		['component:a'],
+	);
+});
+
+test('transferComponent refuses same-page, unknown ids and id collisions', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			lastPageId: 'page:one',
+			pages: [
+				page({
+					id: 'page:one',
+					components: [component({ id: 'component:a' })],
+				}),
+				page({
+					id: 'page:two',
+					components: [component({ id: 'component:b' })],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+	const writesBefore = host.writes;
+
+	assert.equal(
+		await repository.transferComponent(
+			'page:one',
+			'component:a',
+			'page:one',
+		),
+		null,
+	);
+	assert.equal(
+		await repository.transferComponent(
+			'page:nope',
+			'component:a',
+			'page:two',
+		),
+		null,
+	);
+	assert.equal(
+		await repository.transferComponent(
+			'page:one',
+			'component:missing',
+			'page:two',
+			0,
+		),
+		null,
+	);
+
+	const { store } = await repository.load();
+	assert.deepEqual(
+		store.dashboards[0].pages.map((item) =>
+			item.components.map((c) => c.id),
+		),
+		[['component:a'], ['component:b']],
+	);
+	assert.equal(store.dashboards[0].lastPageId, 'page:one');
+	assert.equal(store.activeDashboardId, DEFAULT_DASHBOARD_ID);
+	assert.equal(store.schemaVersion, DASHBOARD_SCHEMA_VERSION);
+	assert.ok(host.writes > writesBefore);
+});
+
+test('transferComponent cannot collide when the target page already has the id', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [
+				page({
+					id: 'page:one',
+					components: [component({ id: 'component:a' })],
+				}),
+				page({
+					id: 'page:two',
+					components: [component({ id: 'component:a' })],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const result = await repository.transferComponent(
+		'page:one',
+		'component:a',
+		'page:two',
+	);
+
+	assert.equal(result, null);
+	const { store } = await repository.load();
+	assert.deepEqual(
+		store.dashboards[0].pages.map((item) =>
+			item.components.map((c) => c.id),
+		),
+		[['component:a'], ['component:a']],
+	);
+});
+
+test('transferComponent moves across dashboards and leaves queries shared', async () => {
+	const host = v4(
+		{},
+		[
+			dashboard({
+				id: DEFAULT_DASHBOARD_ID,
+				pages: [
+					page({
+						id: DEFAULT_PAGE_ID,
+						components: [component({ id: 'component:a' })],
+					}),
+				],
+			}),
+			dashboard({
+				id: 'dashboard:two',
+				name: 'Two',
+				pages: [page({ id: 'page:two' })],
+			}),
+		],
+		{ queries: [query()] },
+	);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const result = await repository.transferComponent(
+		DEFAULT_PAGE_ID,
+		'component:a',
+		'page:two',
+	);
+	assert.ok(result);
+	assert.deepEqual(result.store.dashboards[0].pages[0].components, []);
+	assert.deepEqual(
+		result.store.dashboards[1].pages[0].components.map((item) => item.id),
+		['component:a'],
+	);
+	assert.equal(result.store.dashboards[1].pages[0].components[0].queryId, 'builtin:tasks-all');
+	assert.deepEqual(result.store.queries, [query()]);
+	assert.equal(result.store.activeDashboardId, DEFAULT_DASHBOARD_ID);
+});
+
 test('addDashboard appends, rejects duplicate ids and becomes active', async () => {
 	const host = makeHost();
 	const repository = new DashboardRepository(host);

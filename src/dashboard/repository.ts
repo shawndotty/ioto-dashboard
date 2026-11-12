@@ -458,6 +458,45 @@ export class DashboardRepository {
 		});
 	}
 
+	/**
+	 * Cross-page relocation: unlike `moveComponent` (index reorder inside one
+	 * page), this removes the component from `fromPageId` and inserts it into
+	 * `toPageId` in a single write. The id and all configuration are preserved.
+	 * Returns `null` for same-page requests, unknown pages, a missing component
+	 * or an id already present on the target page.
+	 */
+	async transferComponent(
+		fromPageId: string,
+		componentId: string,
+		toPageId: string,
+		toIndex?: number,
+	): Promise<{ store: DashboardStoreData; componentId: string } | null> {
+		if (fromPageId === toPageId) return null;
+		let moved = false;
+		const store = await this.mutate((data) => {
+			const source = this.findPage(data, fromPageId)?.page;
+			const target = this.findPage(data, toPageId)?.page;
+			if (!source || !target) return;
+			const index = source.components.findIndex(
+				(item) => item.id === componentId,
+			);
+			if (index < 0) return;
+			if (target.components.some((item) => item.id === componentId)) return;
+			const [component] = source.components.splice(index, 1);
+			if (!component) return;
+			const at =
+				toIndex === undefined
+					? target.components.length
+					: Math.min(
+							target.components.length,
+							Math.max(0, Math.trunc(toIndex)),
+						);
+			target.components.splice(at, 0, component);
+			moved = true;
+		});
+		return moved ? { store, componentId } : null;
+	}
+
 	async removeComponent(
 		pageId: string,
 		componentId: string,
