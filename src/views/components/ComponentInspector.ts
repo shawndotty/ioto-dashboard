@@ -46,6 +46,32 @@ type LabelKey = Parameters<typeof t>[0];
 /** Placeholder shown while a color option is unset; the value is never stored. */
 const COLOR_PLACEHOLDER = "#5772ff";
 
+function readSettingValue(
+	config: DashboardComponentConfig,
+	setting: ComponentSetting,
+): string | number | boolean | undefined {
+	if ("target" in setting && setting.target === "options") {
+		return config.options?.[setting.key];
+	}
+	return (config as unknown as Record<string, unknown>)[setting.key] as
+		| string
+		| number
+		| boolean
+		| undefined;
+}
+
+function writeSettingValue(
+	patch: Partial<DashboardComponentConfig>,
+	setting: ComponentSetting,
+	value: string,
+): void {
+	if ("target" in setting && setting.target === "options") {
+		patch.options = { ...(patch.options ?? {}), [setting.key]: value };
+		return;
+	}
+	(patch as Record<string, unknown>)[setting.key] = value;
+}
+
 /**
  * Settings panel for one selected component. Reads everything from the passed
  * state and writes only through `deps` (never touches the repository directly).
@@ -134,22 +160,27 @@ export class ComponentInspector {
 		const query = state.queries.find(
 			(item) => item.id === config.queryId,
 		);
+		const context = { query, config };
 		return [
 			state.target.config.id,
 			state.target.config.queryId,
 			definition?.type ?? "__unknown__",
 			state.editable ? "edit" : "view",
 			(definition ? settingsOf(definition) : [])
-				.map(
-					(setting) =>
-						`${setting.group}:${setting.kind}:${setting.key}:${
-							setting.when
-								? setting.when(config, { query })
-									? "1"
-									: "0"
-								: "2"
-						}`,
-				)
+				.map((setting) => {
+					const shown = setting.when
+						? setting.when(config, context)
+							? "1"
+							: "0"
+						: "2";
+					const deps = (setting.refreshOn ?? [])
+						.map(
+							(key) =>
+								`${key}=${String(config.options?.[key] ?? "")}`,
+						)
+						.join("&");
+					return `${setting.group}:${setting.kind}:${setting.key}:${shown}:${deps}`;
+				})
 				.join(","),
 			String(state.queriesVersion),
 		].join("|");
@@ -200,9 +231,10 @@ export class ComponentInspector {
 		const query = state.queries.find(
 			(item) => item.id === state.target.config.queryId,
 		);
+		const context = { query, config: state.target.config };
 		const settings = settingsOf(definition).filter(
 			(setting) =>
-				!setting.when || setting.when(state.target.config, { query }),
+				!setting.when || setting.when(state.target.config, context),
 		);
 		const dataSettings = settings.filter(
 			(setting) => setting.group === "data",
@@ -210,6 +242,24 @@ export class ComponentInspector {
 		if (dataSettings.length > 0) {
 			const section = this.createSection("INSPECTOR_SECTION_DATA");
 			for (const setting of dataSettings) {
+				this.buildSetting(section, setting, state);
+			}
+		}
+		const axesXSettings = settings.filter(
+			(setting) => setting.group === "axesX",
+		);
+		if (axesXSettings.length > 0) {
+			const section = this.createSection("INSPECTOR_SECTION_AXIS_X");
+			for (const setting of axesXSettings) {
+				this.buildSetting(section, setting, state);
+			}
+		}
+		const axesYSettings = settings.filter(
+			(setting) => setting.group === "axesY",
+		);
+		if (axesYSettings.length > 0) {
+			const section = this.createSection("INSPECTOR_SECTION_AXIS_Y");
+			for (const setting of axesYSettings) {
 				this.buildSetting(section, setting, state);
 			}
 		}
@@ -469,13 +519,27 @@ export class ComponentInspector {
 				const queryIds = new Set(
 					state.queries.map((query) => query.id),
 				);
+				// 存量列可能不存在于新查询对象下：打开检查器时回写合法列。
+				if (state.editable && typeof stored === "string" && stored !== current) {
+					const patch = coerceSettingValue(
+						setting,
+						current,
+						queryIds,
+						undefined,
+						state.target.config,
+					);
+					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+				}
 				select.addEventListener("change", () => {
 					const patch = coerceSettingValue(
 						setting,
 						select.value,
 						queryIds,
+						undefined,
+						state.target.config,
 					);
-					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+					if (Object.keys(patch).length === 0) return;
+					this.deps.patch(this.withDependentFallbacks(state, patch));
 				});
 				return;
 			}
@@ -485,7 +549,10 @@ export class ComponentInspector {
 				const query = state.queries.find(
 					(item) => item.id === state.target.config.queryId,
 				);
-				const options = resolveSettingOptions(setting, { query });
+				const options = resolveSettingOptions(setting, {
+					query,
+					config: state.target.config,
+				});
 				const stored = this.storedSettingValue(state, setting);
 				const desired =
 					typeof stored === "string" ? stored : setting.fallback;
@@ -512,6 +579,7 @@ export class ComponentInspector {
 						current,
 						queryIds,
 						query,
+						state.target.config,
 					);
 					if (Object.keys(patch).length > 0) this.deps.patch(patch);
 				}
@@ -520,16 +588,11 @@ export class ComponentInspector {
 						setting,
 						select.value,
 						queryIds,
+						query,
+						state.target.config,
 					);
 					if (Object.keys(patch).length === 0) return;
-					const nextQuery = state.queries.find(
-						(item) => item.id === select.value,
-					);
-					this.deps.patch(
-						nextQuery
-							? this.withMeasureFallback(state, nextQuery, patch)
-							: patch,
-					);
+					this.deps.patch(this.withDependentFallbacks(state, patch));
 				});
 				return;
 			}
@@ -673,9 +736,20 @@ export class ComponentInspector {
 		const query = state.queries.find(
 			(item) => item.id === state.target.config.queryId,
 		);
+		return this.fieldOptionsFor(
+			query,
+			state.target.definition?.type,
+			setting,
+		);
+	}
+
+	private fieldOptionsFor(
+		query: QueryDefinition | undefined,
+		type: string | undefined,
+		setting: Extract<ComponentSetting, { kind: "field" }>,
+	): Array<{ value: string; labelKey: string }> {
 		// Bars aggregate task/note queries per project; other components read the
 		// query's own object. Line charts read time-series columns, not detail rows.
-		const type = state.target.definition?.type;
 		const object =
 			type === "bar-chart" ? barObjectForQuery(query) : objectForQuery(query);
 		const columns =
@@ -780,7 +854,7 @@ export class ComponentInspector {
 			this.activeQueryTarget = nextTarget;
 			this.populateQueryOptions(select, nextTarget, groups, state, null);
 			select.value = next.id;
-			this.deps.patch(this.withMeasureFallback(state, next, patch));
+			this.deps.patch(this.withDependentFallbacks(state, patch));
 		});
 
 		select.addEventListener("change", () => {
@@ -790,7 +864,7 @@ export class ComponentInspector {
 				this.activeQueryTarget ?? activeTarget,
 				select.value,
 			);
-			this.deps.patch(patch);
+			this.deps.patch(this.withDependentFallbacks(state, patch));
 		});
 
 		this.querySelect = select;
@@ -820,37 +894,46 @@ export class ComponentInspector {
 	}
 
 	/**
-	 * Switching query type can leave a stored measure the new object cannot
-	 * produce; reset it in the same patch so the dropdown never goes blank.
+	 * Keeps dependent rows valid in the same patch: switching query, range or
+	 * Y field can leave a stored select/field value the new context cannot offer.
+	 * One merged patch avoids consecutive re-renders; unset values and hidden
+	 * rows are skipped so defaults never get written into the config.
 	 */
-	private withMeasureFallback(
+	private withDependentFallbacks(
 		state: InspectorState,
-		query: QueryDefinition,
 		patch: Partial<DashboardComponentConfig>,
 	): Partial<DashboardComponentConfig> {
 		const definition = state.target.definition;
-		const setting = definition?.settings?.find(
-			(item) => item.key === "measure" && item.kind === "select",
-		);
-		if (!setting || setting.kind !== "select") return patch;
-		const options = resolveSettingOptions(setting, { query });
-		const stored = this.storedSettingValue(state, setting);
-		if (options.some((option) => option.value === stored)) return patch;
-		const value = definition?.measureDefault ?? options[0]?.value;
-		if (value === undefined) return patch;
-		return {
+		if (!definition) return patch;
+		const config = state.target.config;
+		const merged = {
+			...config,
 			...patch,
-			...(setting.target === "options"
-				? {
-						options: {
-							...(patch.options ?? {}),
-							[setting.key]: value,
-						},
-					}
-				: ({
-						[setting.key]: value,
-					} as Partial<DashboardComponentConfig>)),
-		};
+			options: { ...(config.options ?? {}), ...(patch.options ?? {}) },
+		} as DashboardComponentConfig;
+		const query = state.queries.find((item) => item.id === merged.queryId);
+		const context = { query, config: merged };
+		const result: Partial<DashboardComponentConfig> = { ...patch };
+		for (const setting of settingsOf(definition)) {
+			if (setting.when && !setting.when(merged, context)) continue;
+			if (setting.kind !== "select" && setting.kind !== "field") continue;
+			const stored = readSettingValue(merged, setting);
+			if (typeof stored !== "string") continue;
+			const options =
+				setting.kind === "select"
+					? resolveSettingOptions(setting, context)
+					: this.fieldOptionsFor(query, definition.type, setting);
+			if (options.some((option) => option.value === stored)) continue;
+			const preferred =
+				setting.kind === "select" && setting.key === "measure"
+					? (definition.measureDefault ?? setting.fallback)
+					: setting.fallback;
+			const fallback = options.some((option) => option.value === preferred)
+				? preferred
+				: options[0]?.value;
+			if (fallback) writeSettingValue(result, setting, fallback);
+		}
+		return result;
 	}
 
 	private populateQueryOptions(
@@ -1170,15 +1253,7 @@ export class ComponentInspector {
 		state: InspectorState,
 		setting: ComponentSetting,
 	): string | number | boolean | undefined {
-		const config = state.target.config;
-		if ("target" in setting && setting.target === "options") {
-			return config.options?.[setting.key];
-		}
-		return (config as unknown as Record<string, unknown>)[setting.key] as
-			| string
-			| number
-			| boolean
-			| undefined;
+		return readSettingValue(state.target.config, setting);
 	}
 
 	private buildBreadcrumb(

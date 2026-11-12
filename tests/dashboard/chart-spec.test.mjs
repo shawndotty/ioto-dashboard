@@ -379,7 +379,7 @@ test('line charts default to the timeline date/total columns for notes and files
 	assert.equal(sizeSpec.series[0].points[0].value, 1024);
 });
 
-test('month buckets render their labels verbatim and as categories', () => {
+test('month buckets format iso, short and md labels as categories', () => {
 	const data = dataset(
 		'note',
 		NOTE_TIMELINE_COLUMNS,
@@ -400,16 +400,34 @@ test('month buckets render their labels verbatim and as categories', () => {
 			},
 		],
 	);
-	const spec = buildLineSpec(data, { xLabelFormat: 'md' }, { w: 600, h: 300 }, 'note');
-	assert.equal(spec.x.type, 'category');
+	const iso = buildLineSpec(data, { xLabelFormat: 'iso' }, { w: 600, h: 300 }, 'note');
+	assert.equal(iso.x.type, 'category');
 	assert.deepEqual(
-		spec.x.ticks.map((tick) => tick.label),
+		iso.x.ticks.map((tick) => tick.label),
 		['2026-10', '2026-11'],
 	);
+
+	const short = buildLineSpec(
+		data,
+		{ xLabelFormat: 'short' },
+		{ w: 600, h: 300 },
+		'note',
+	);
 	assert.deepEqual(
-		spec.series[0].points.map((point) => point.value),
+		short.x.ticks.map((tick) => tick.label),
+		['26-10', '26-11'],
+	);
+
+	const md = buildLineSpec(data, { xLabelFormat: 'md' }, { w: 600, h: 300 }, 'note');
+	assert.deepEqual(
+		md.x.ticks.map((tick) => tick.label),
+		['10', '11'],
+	);
+	assert.deepEqual(
+		md.series[0].points.map((point) => point.value),
 		[1, 4],
 	);
+	assert.equal(md.x.type, 'category');
 });
 
 test('a single month bucket still produces a centred point', () => {
@@ -432,4 +450,132 @@ test('a single month bucket still produces a centred point', () => {
 		spec.series[0].points[0].x,
 		spec.plot.left + spec.plot.width / 2,
 	);
+});
+
+test('series toggles only add columns the object really has', () => {
+	const files = dataset(
+		'file',
+		FILE_TIMELINE_COLUMNS,
+		[
+			{
+				date: cell('2026-11-08', '2026-11-08'),
+				total: cell('3', 3),
+				size: cell('1 KB', 1024),
+			},
+		],
+	);
+	const fileSpec = buildLineSpec(
+		files,
+		{ ySeriesCompleted: true, ySeriesOpen: true },
+		{ w: 600, h: 300 },
+		'file',
+	);
+	assert.deepEqual(
+		fileSpec.series.map((series) => series.key),
+		['total'],
+	);
+
+	const notes = dataset(
+		'note',
+		NOTE_TIMELINE_COLUMNS,
+		[
+			{
+				date: cell('2026-11-08', '2026-11-08'),
+				total: cell('2', 2),
+				tasks: cell('5', 5),
+				completed: cell('3', 3),
+				size: cell('2 KB', 2048),
+			},
+		],
+	);
+	const noteSpec = buildLineSpec(
+		notes,
+		{ ySeriesOpen: true },
+		{ w: 600, h: 300 },
+		'note',
+	);
+	assert.deepEqual(
+		noteSpec.series.map((series) => series.key),
+		['total'],
+	);
+});
+
+test('stacked series must share the primary column unit', () => {
+	const data = dataset(
+		'note',
+		NOTE_TIMELINE_COLUMNS,
+		[
+			{
+				date: cell('2026-11-08', '2026-11-08'),
+				total: cell('2', 2),
+				tasks: cell('5', 5),
+				completed: cell('3', 3),
+				size: cell('2 KB', 2048),
+			},
+		],
+	);
+	const spec = buildLineSpec(
+		data,
+		{ yField: 'size', ySeriesCompleted: true },
+		{ w: 600, h: 300 },
+		'note',
+	);
+	assert.deepEqual(
+		spec.series.map((series) => series.key),
+		['size'],
+	);
+});
+
+test('size columns always format as KB/MB regardless of yFormat', () => {
+	const files = dataset(
+		'file',
+		FILE_TIMELINE_COLUMNS,
+		[
+			{
+				date: cell('2026-11-08', '2026-11-08'),
+				total: cell('3', 3),
+				size: cell('2 KB', 2048),
+			},
+		],
+	);
+	const spec = buildLineSpec(
+		files,
+		{ yField: 'size', yFormat: 'number' },
+		{ w: 600, h: 300 },
+		'file',
+	);
+	assert.equal(spec.y.format(2048), '2 KB');
+	assert.equal(spec.y.format(1024 * 1024), '1.0 MB');
+});
+
+test('cumulative sums each series across the visible buckets', () => {
+	const data = taskDataset([
+		['2026-11-08', 1, 0, 1],
+		['2026-11-09', 3, 1, 2],
+	]);
+	const cumulative = buildLineSpec(
+		data,
+		{ yCumulative: true },
+		{ w: 600, h: 300 },
+		'task',
+	);
+	assert.equal(cumulative.cumulative, true);
+	assert.deepEqual(
+		cumulative.series[0].points.map((point) => point.value),
+		[1, 4],
+	);
+	assert.equal(cumulative.showLegend, true);
+
+	const plain = buildLineSpec(
+		data,
+		{ yCumulative: false },
+		{ w: 600, h: 300 },
+		'task',
+	);
+	assert.equal(plain.cumulative, false);
+	assert.deepEqual(
+		plain.series[0].points.map((point) => point.value),
+		[1, 3],
+	);
+	assert.equal(plain.showLegend, false);
 });

@@ -84,6 +84,7 @@ export interface ChartSpec {
 	plot: { left: number; top: number; width: number; height: number };
 	hiddenCount: number;
 	showLegend: boolean;
+	cumulative?: boolean;
 	showValueLabels: boolean;
 	valueList: Array<{ label: string; text: string }> | null;
 	xRotate: 0 | 45 | 90;
@@ -231,22 +232,33 @@ function formatterFor(
 	type: DatasetCellType,
 	mode: string,
 ): (value: number) => string {
+	// Sizes never fall back to raw byte counts, whatever a stale config stored.
+	if (type === "size") return formatSize;
 	if (mode === "compact") return formatCompact;
 	if (mode === "number") return formatNumber;
 	if (type === "percent") return (value) => formatPercent(value);
-	if (type === "size") return formatSize;
 	return formatNumber;
 }
 
 function dateLabel(text: string, format: string): string {
-	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
-	if (!match) return text;
-	const year = match[1] ?? "";
-	const month = match[2] ?? "";
-	const day = match[3] ?? "";
-	if (format === "iso") return `${year}-${month}-${day}`;
-	if (format === "short") return `${Number(month)}/${Number(day)}`;
-	return `${month}-${day}`;
+	const dayMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+	if (dayMatch) {
+		const year = dayMatch[1] ?? "";
+		const month = dayMatch[2] ?? "";
+		const day = dayMatch[3] ?? "";
+		if (format === "iso") return `${year}-${month}-${day}`;
+		if (format === "short") return `${Number(month)}/${Number(day)}`;
+		return `${month}-${day}`;
+	}
+	const monthMatch = /^(\d{4})-(\d{2})$/.exec(text);
+	if (monthMatch) {
+		const year = monthMatch[1] ?? "";
+		const month = monthMatch[2] ?? "";
+		if (format === "iso") return `${year}-${month}`;
+		if (format === "short") return `${year.slice(2)}-${month}`;
+		return `${Number(month)}`;
+	}
+	return text;
 }
 
 function rotateOf(options: ChartOptions): 0 | 45 | 90 {
@@ -401,19 +413,42 @@ export function buildLineSpec(
 		type: DatasetCellType;
 		values: number[];
 	}> = [];
-	for (const requestedKey of requestedKeys) {
-		const column = resolveColumn(dataset, requestedKey, "y", defaults.y);
-		const key = column?.key ?? requestedKey;
-		if (used.has(key)) continue;
-		used.add(key);
+	const primary = resolveColumn(
+		dataset,
+		requestedKeys[0] ?? defaults.y,
+		"y",
+		defaults.y,
+	);
+	requestedKeys.forEach((requestedKey, index) => {
+		// The primary series may fall back so the chart always draws something;
+		// stacked series must exist as real numeric columns of the same unit.
+		const direct = dataset.columns.find((column) => column.key === requestedKey);
+		const column =
+			index === 0
+				? primary
+				: direct && columnMatches(direct, "y")
+					? direct
+					: undefined;
+		if (!column) return;
+		if (primary && column.type !== primary.type) return;
+		if (used.has(column.key)) return;
+		used.add(column.key);
 		seriesData.push({
-			key,
-			label: column?.labelKey ?? key,
-			type: column?.type ?? "number",
-			values: rows.map((row) => cellValue(row, key)),
+			key: column.key,
+			label: column.labelKey,
+			type: column.type,
+			values: rows.map((row) => cellValue(row, column.key)),
 		});
-	}
+	});
 	if (seriesData.length === 0) return null;
+
+	const cumulative = optionBoolean(options, "yCumulative", false);
+	if (cumulative) {
+		for (const data of seriesData) {
+			let running = 0;
+			data.values = data.values.map((value) => (running += value));
+		}
+	}
 
 	const fullLabels = rows.map(
 		(row, index) => cellText(row, xColumn.key) || String(index + 1),
@@ -538,7 +573,9 @@ export function buildLineSpec(
 		plot,
 		hiddenCount: 0,
 		showLegend:
-			optionBoolean(options, "showLegend", true) && series.length > 1,
+			optionBoolean(options, "showLegend", true) &&
+			(series.length > 1 || cumulative),
+		cumulative,
 		showValueLabels: false,
 		valueList: null,
 		xRotate: rotate,

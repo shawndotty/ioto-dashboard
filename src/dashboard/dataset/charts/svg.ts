@@ -210,12 +210,18 @@ function renderBarSeries(
 function renderLegend(el: HTMLElement, spec: ChartSpec): void {
 	if (!spec.showLegend || spec.series.length === 0) return;
 	const legend = el.createDiv({ cls: "ioto-chart-legend" });
+	const suffix = spec.cumulative
+		? ` · ${label("CHART_LEGEND_CUMULATIVE")}`
+		: "";
 	for (const series of spec.series) {
 		const item = legend.createDiv({ cls: "ioto-chart-legend-item" });
 		item.createSpan({
 			cls: `ioto-chart-legend-swatch ${seriesClass(series)}`,
 		});
-		item.createSpan({ cls: "ioto-chart-legend-label", text: label(series.label) });
+		item.createSpan({
+			cls: "ioto-chart-legend-label",
+			text: `${label(series.label)}${suffix}`,
+		});
 	}
 }
 

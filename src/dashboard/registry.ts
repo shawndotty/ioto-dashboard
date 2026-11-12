@@ -16,7 +16,13 @@ import type { DashboardComponentConfig } from "./types";
 
 export type ComponentStatus = "loading" | "ready" | "empty" | "error";
 
-export type ComponentSettingGroup = "data" | "axes" | "display" | "style";
+export type ComponentSettingGroup =
+	| "data"
+	| "axes"
+	| "axesX"
+	| "axesY"
+	| "display"
+	| "style";
 
 export type ComponentCategory =
 	| "overview"
@@ -27,6 +33,7 @@ export type ComponentCategory =
 /** Inspector state a setting may depend on; absent means "no query resolved". */
 export interface SettingContext {
 	query?: QueryDefinition;
+	config?: DashboardComponentConfig;
 }
 
 export interface SettingOption {
@@ -37,6 +44,8 @@ export interface SettingOption {
 interface SettingBase {
 	/** Hides the row when the predicate returns false. */
 	when?(config: DashboardComponentConfig, context?: SettingContext): boolean;
+	/** Option keys whose values affect this row's options; drives inspector rebuilds. */
+	refreshOn?: string[];
 	/** Optional explanatory line rendered under the control. */
 	hintKey?: string;
 }
@@ -250,6 +259,7 @@ export function coerceSettingValue(
 	raw: unknown,
 	queryIds: ReadonlySet<string>,
 	query?: QueryDefinition,
+	config?: DashboardComponentConfig,
 ): Partial<DashboardComponentConfig> {
 	switch (setting.kind) {
 		case "query":
@@ -291,7 +301,7 @@ export function coerceSettingValue(
 		}
 		case "select": {
 			if (typeof raw !== "string") return {};
-			const options = resolveSettingOptions(setting, { query });
+			const options = resolveSettingOptions(setting, { query, config });
 			if (!options.some((option) => option.value === raw)) return {};
 			return setting.target === "options"
 				? { options: { [setting.key]: raw } }
