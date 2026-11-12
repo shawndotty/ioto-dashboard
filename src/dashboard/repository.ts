@@ -89,12 +89,17 @@ function toOptions(
 	return Object.keys(options).length > 0 ? options : undefined;
 }
 
+const LEGACY_COMPONENT_TYPES: Record<string, string> = {
+	"unfinished-tasks": "task-list",
+};
+
 /** Whitelists stored fields so unknown/dirty keys never survive a load. */
 function toComponent(value: unknown): DashboardComponentConfig | null {
 	if (!isComponent(value)) return null;
+	const legacyType = LEGACY_COMPONENT_TYPES[value.type];
 	const component: DashboardComponentConfig = {
 		id: value.id,
-		type: value.type,
+		type: legacyType ?? value.type,
 		queryId: value.queryId,
 	};
 	if (value.basis === "file" || value.basis === "section") {
@@ -107,7 +112,11 @@ function toComponent(value: unknown): DashboardComponentConfig | null {
 	if (typeof value.view === "string" && VIEW_SET.has(value.view)) {
 		component.view = value.view as DashboardComponentConfig["view"];
 	}
-	if (typeof value.measure === "string" && MEASURE_SET.has(value.measure)) {
+	if (
+		!legacyType &&
+		typeof value.measure === "string" &&
+		MEASURE_SET.has(value.measure)
+	) {
 		component.measure = value.measure as DashboardComponentConfig["measure"];
 	}
 	const options = toOptions(value.options);

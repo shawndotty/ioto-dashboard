@@ -271,6 +271,28 @@ test('every adapter returns an empty dataset without a snapshot', () => {
 	}
 });
 
+test('task adapter orders rows by note mtime desc, then path and line', () => {
+	const snapshot = {
+		notes: [],
+		tasks: [
+			task({ path: 'b.md', line: 1, noteMtime: 5, text: 'b1' }),
+			task({ path: 'a.md', line: 4, noteMtime: 20, text: 'a4-newest' }),
+			task({ path: 'a.md', line: 2, noteMtime: 5, text: 'a2' }),
+			task({ path: 'a.md', line: 1, noteMtime: 5, text: 'a1' }),
+		],
+	};
+	const dataset = taskAdapter(
+		adapterInput(
+			{ object: 'task', measure: 'count', queryId: 'q' },
+			{ snapshot },
+		),
+	);
+	assert.deepEqual(
+		dataset.rows.map((row) => row.cells.text.text),
+		['a4-newest', 'a1', 'a2', 'b1'],
+	);
+});
+
 const TIMELINE_NOW = new Date(2026, 10, 11, 12, 0, 0).getTime();
 
 function timelineRequest(object, overrides = {}) {

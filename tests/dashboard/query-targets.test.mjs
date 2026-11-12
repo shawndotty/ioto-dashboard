@@ -5,8 +5,8 @@ import { load } from '../data/helpers.mjs';
 const { queryTargetsFor } = await load('../../src/dashboard/registry.ts');
 const { QUERY_TARGETS } = await load('../../src/query/types.ts');
 const { kpiComponent } = await load('../../src/dashboard/components/kpi.ts');
-const { unfinishedTasksComponent } = await load(
-	'../../src/dashboard/components/unfinished-tasks.ts',
+const { taskListComponent } = await load(
+	'../../src/dashboard/components/task-list.ts',
 );
 const { lineChartComponent } = await load(
 	'../../src/dashboard/components/line-chart.ts',
@@ -33,7 +33,7 @@ function definition(fields) {
 }
 
 test('registration components declare explicit query targets', () => {
-	assert.deepEqual(queryTargetsFor(unfinishedTasksComponent), ['task']);
+	assert.deepEqual(queryTargetsFor(taskListComponent), ['task']);
 	assert.deepEqual(queryTargetsFor(lineChartComponent), [
 		'task',
 		'note',

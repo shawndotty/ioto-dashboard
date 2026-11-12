@@ -130,6 +130,12 @@ export interface ComponentRenderContext {
 	revealInExplorer(path: string): void;
 	/** Renders Markdown owned by the current view, so it unloads with the card. */
 	renderMarkdown(el: HTMLElement, path: string): Promise<void>;
+	/** Renders a fragment of Markdown owned by the current view (inline task text). */
+	renderInlineMarkdown?(
+		el: HTMLElement,
+		markdown: string,
+		sourcePath: string,
+	): Promise<void>;
 }
 
 export interface SizeBounds {

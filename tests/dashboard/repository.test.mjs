@@ -1013,3 +1013,52 @@ test('onChange fires once per write and stops after unsubscribe', async () => {
 	await repository.addComponent(DEFAULT_PAGE_ID, component({ id: 'component:2' }));
 	assert.equal(seen.length, 1);
 });
+
+test('legacy unfinished-tasks components migrate to task-list and drop measure', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [
+				page({
+					id: DEFAULT_PAGE_ID,
+					components: [
+						component({
+							id: 'component:legacy',
+							type: 'unfinished-tasks',
+							measure: 'open',
+							queryId: 'builtin:tasks-unfinished',
+							basis: 'section',
+							limit: 15,
+							w: 6,
+							h: 3,
+						}),
+						component({
+							id: 'component:plain',
+							type: 'unfinished-tasks',
+							queryId: 'user:1',
+						}),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+
+	const { store } = await repository.load();
+	const [legacy, plain] = currentPage(store).components;
+
+	assert.equal(legacy.type, 'task-list');
+	assert.equal(legacy.measure, undefined);
+	assert.equal('measure' in legacy, false, 'legacy measure must be dropped');
+	assert.equal(legacy.queryId, 'builtin:tasks-unfinished');
+	assert.equal(legacy.basis, 'section');
+	assert.equal(legacy.limit, 15);
+	assert.equal(legacy.w, 6);
+	assert.equal(legacy.h, 3);
+
+	assert.equal(plain.type, 'task-list');
+	assert.equal(plain.queryId, 'user:1');
+	assert.equal('measure' in plain, false);
+
+	assert.equal(host.writes, 0, 'migration happens in memory only');
+});

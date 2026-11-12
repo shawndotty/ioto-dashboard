@@ -173,7 +173,7 @@ export default {
 	DASHBOARD_VIEW_MODE: "完成",
 	DASHBOARD_EMPTY_TITLE: "还没有组件",
 	DASHBOARD_EMPTY_DESC:
-		"向此页面添加 KPI、项目进度或未完成任务组件，并绑定到一个查询。",
+		"向此页面添加 KPI、项目进度或任务列表组件，并绑定到一个查询。",
 	DASHBOARD_LOADING: "加载中…",
 	DASHBOARD_ERROR_CONFIG: "查询不存在，请重新选择。",
 	DASHBOARD_EMPTY_RESULT: "暂无内容。",
@@ -284,15 +284,16 @@ export default {
 	COMPONENT_KPI_DESC: "显示查询结果中的单个数字（任务数）。",
 	COMPONENT_PROJECT_PROGRESS_NAME: "项目进度",
 	COMPONENT_PROJECT_PROGRESS_DESC: "按项目显示完成率、未完成与已取消数量。",
-	COMPONENT_UNFINISHED_NAME: "未完成任务",
-	COMPONENT_UNFINISHED_DESC: "按笔记修改时间倒序展示未完成任务。",
+	COMPONENT_TASK_LIST_NAME: "任务列表",
+	COMPONENT_TASK_LIST_DESC:
+		"按所选任务查询展示任务列表，最近修改的笔记在前，点击可跳转到对应任务。",
 	KPI_BASIS_FILE: "整个文件",
 	KPI_BASIS_SECTION: "限定分节",
 	PROJECT_PROGRESS_EMPTY: "当前范围内没有项目。",
 	PROJECT_PROGRESS_OPEN: "未完成",
 	PROJECT_PROGRESS_CANCELLED: "已取消",
 	PROJECT_PROGRESS_FILES: "文件",
-	UNFINISHED_EMPTY: "没有未完成任务。",
+	TASK_LIST_EMPTY: "没有匹配的任务。",
 
 	// Queries
 	QUERY_MANAGER_TITLE: "管理查询",

@@ -42,5 +42,5 @@ test('built-in components resolve the expected height caps', () => {
 
 	assert.equal(boundsForType(registry, 'kpi').maxH, 6);
 	assert.equal(boundsForType(registry, 'project-progress').maxH, DEFAULT_SIZE_BOUNDS.maxH);
-	assert.equal(boundsForType(registry, 'unfinished-tasks').maxH, 24);
+	assert.equal(boundsForType(registry, 'task-list').maxH, 24);
 });

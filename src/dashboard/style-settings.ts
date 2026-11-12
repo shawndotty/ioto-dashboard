@@ -40,7 +40,9 @@ export const STYLE_SETTINGS: ComponentSetting[] = [
 		fallback: "left",
 		target: "options",
 		when: (config) =>
-			config.type !== "line-chart" && config.type !== "bar-chart",
+			config.type !== "line-chart" &&
+			config.type !== "bar-chart" &&
+			config.type !== "task-list",
 	},
 	{
 		key: "textColor",

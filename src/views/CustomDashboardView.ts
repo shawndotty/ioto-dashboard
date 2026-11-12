@@ -1014,6 +1014,8 @@ export class CustomDashboardView extends ItemView {
 			openFolder: (path) => void this.openFolder(path),
 			revealInExplorer: (path) => void this.revealInExplorer(path),
 			renderMarkdown: (el, path) => this.renderMarkdown(el, path),
+			renderInlineMarkdown: (el, markdown, sourcePath) =>
+				MarkdownRenderer.render(this.app, markdown, el, sourcePath, this),
 		});
 		return card;
 	}

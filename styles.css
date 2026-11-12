@@ -749,39 +749,110 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* Unfinished tasks */
-.ioto-custom-dashboard-view .ioto-unfinished-list {
+/* Task list */
+.ioto-custom-dashboard-view .ioto-task-list-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
+    text-align: start;
 }
 
-.ioto-custom-dashboard-view .ioto-unfinished-row {
+/* Transparent status bar on every row keeps the box model stable when the status changes */
+.ioto-custom-dashboard-view .ioto-task-list-item {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 6px 8px;
-    border-bottom: 1px solid var(--background-modifier-border-hover);
-    border-radius: 4px;
+    align-items: flex-start;
+    gap: 10px;
+    padding-block: 6px;
+    padding-inline: 8px 10px;
+    border-inline-start: 2px solid transparent;
+    border-bottom: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
     cursor: pointer;
+    transition: background-color 120ms ease;
 }
 
-.ioto-custom-dashboard-view .ioto-unfinished-row:last-child {
+.ioto-custom-dashboard-view .ioto-task-list-item[data-task="/"] {
+    border-inline-start-color: var(--interactive-accent);
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-item[data-task=">"] {
+    border-inline-start-color: var(--text-faint);
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-item:last-child {
     border-bottom: none;
 }
 
-.ioto-custom-dashboard-view .ioto-unfinished-row:hover,
-.ioto-custom-dashboard-view .ioto-unfinished-row:focus-visible {
+.ioto-custom-dashboard-view .ioto-task-list-item:hover {
     background: var(--background-modifier-hover);
-    outline: none;
 }
 
-.ioto-custom-dashboard-view .ioto-unfinished-text {
-    font-size: 0.9em;
+.ioto-custom-dashboard-view .ioto-task-list-item:focus-visible {
+    background: var(--background-modifier-hover);
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--interactive-accent);
+}
+
+/* Obsidian core pulls task checkboxes left by 1.5×checkbox-size; reset it so the box stays inside the card padding */
+.ioto-custom-dashboard-view .ioto-task-list-item > .task-list-item-checkbox {
+    flex: 0 0 auto;
+    margin-inline: 0;
+    margin-block: 2px 0;
+    pointer-events: none;
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-text {
+    font-size: var(--font-ui-small);
+    line-height: 1.4;
     color: var(--text-normal);
 }
 
-.ioto-custom-dashboard-view .ioto-unfinished-meta {
-    font-size: 0.78em;
+.ioto-custom-dashboard-view .ioto-task-list-text p {
+    margin: 0;
+}
+
+/* Done/cancelled tasks keep a muted tone but drop the strikethrough for readability */
+.ioto-custom-dashboard-view .ioto-task-list-item[data-task="x"],
+.ioto-custom-dashboard-view .ioto-task-list-item[data-task="-"] {
+    text-decoration: none;
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-item[data-task="x"] .ioto-task-list-text,
+.ioto-custom-dashboard-view .ioto-task-list-item[data-task="-"] .ioto-task-list-text {
+    color: var(--text-muted);
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-meta {
+    font-size: var(--font-ui-smaller);
+    line-height: 1.3;
+    color: var(--text-faint);
+    overflow-wrap: anywhere;
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-project {
+    display: inline-block;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--tag-background, var(--background-modifier-hover));
+    color: var(--tag-color, var(--text-muted));
+    line-height: 1.6;
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-footer {
+    border-top: 1px solid var(--background-modifier-border);
+    margin-top: 6px;
+    padding: 8px 10px 0;
+    font-size: var(--font-ui-smaller);
     color: var(--text-faint);
 }
 

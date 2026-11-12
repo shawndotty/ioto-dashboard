@@ -172,7 +172,7 @@ export default {
 	DASHBOARD_VIEW_MODE: "完成",
 	DASHBOARD_EMPTY_TITLE: "還沒有元件",
 	DASHBOARD_EMPTY_DESC:
-		"向此頁面新增 KPI、專案進度或未完成任務元件，並綁定到一個查詢。",
+		"向此頁面新增 KPI、專案進度或任務列表元件，並綁定到一個查詢。",
 	DASHBOARD_LOADING: "載入中…",
 	DASHBOARD_ERROR_CONFIG: "查詢不存在，請重新選擇。",
 	DASHBOARD_EMPTY_RESULT: "暫無內容。",
@@ -283,15 +283,16 @@ export default {
 	COMPONENT_KPI_DESC: "顯示查詢結果中的單一數字（任務數）。",
 	COMPONENT_PROJECT_PROGRESS_NAME: "專案進度",
 	COMPONENT_PROJECT_PROGRESS_DESC: "依專案顯示完成率、未完成與已取消數量。",
-	COMPONENT_UNFINISHED_NAME: "未完成任務",
-	COMPONENT_UNFINISHED_DESC: "依筆記修改時間倒序顯示未完成任務。",
+	COMPONENT_TASK_LIST_NAME: "任務列表",
+	COMPONENT_TASK_LIST_DESC:
+		"依所選任務查詢展示任務列表，最近修改的筆記在前，點擊可跳轉到對應任務。",
 	KPI_BASIS_FILE: "整個檔案",
 	KPI_BASIS_SECTION: "限定分節",
 	PROJECT_PROGRESS_EMPTY: "目前範圍內沒有專案。",
 	PROJECT_PROGRESS_OPEN: "未完成",
 	PROJECT_PROGRESS_CANCELLED: "已取消",
 	PROJECT_PROGRESS_FILES: "檔案",
-	UNFINISHED_EMPTY: "沒有未完成任務。",
+	TASK_LIST_EMPTY: "沒有符合的任務。",
 
 	// Queries
 	QUERY_MANAGER_TITLE: "管理查詢",

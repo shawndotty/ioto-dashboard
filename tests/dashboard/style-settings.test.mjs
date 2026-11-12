@@ -13,8 +13,8 @@ const { kpiComponent } = await load('../../src/dashboard/components/kpi.ts');
 const { projectProgressComponent } = await load(
 	'../../src/dashboard/components/project-progress.ts',
 );
-const { unfinishedTasksComponent } = await load(
-	'../../src/dashboard/components/unfinished-tasks.ts',
+const { taskListComponent } = await load(
+	'../../src/dashboard/components/task-list.ts',
 );
 const { tableComponent } = await load(
 	'../../src/dashboard/components/table.ts',
@@ -29,7 +29,7 @@ const { barChartComponent } = await load(
 const COMPONENTS = [
 	kpiComponent,
 	projectProgressComponent,
-	unfinishedTasksComponent,
+	taskListComponent,
 	tableComponent,
 	lineChartComponent,
 	barChartComponent,
@@ -118,7 +118,8 @@ test('cardStyleVars returns only valid values', () => {
 	);
 });
 
-test('settingsOf appends style settings and keeps chart alignment hidden', () => {
+test('settingsOf appends style settings and hides alignment where unsupported', () => {
+	const alignmentHidden = new Set(['line-chart', 'bar-chart', 'task-list']);
 	for (const component of COMPONENTS) {
 		const merged = settingsOf(component);
 		const own = component.settings ?? [];
@@ -127,8 +128,10 @@ test('settingsOf appends style settings and keeps chart alignment hidden', () =>
 
 		const align = merged.find((setting) => setting.key === 'textAlign');
 		const visible = !align.when || align.when({ type: component.type });
-		const isChart =
-			component.type === 'line-chart' || component.type === 'bar-chart';
-		assert.equal(visible, !isChart, `${component.type} alignment visibility`);
+		assert.equal(
+			visible,
+			!alignmentHidden.has(component.type),
+			`${component.type} alignment visibility`,
+		);
 	}
 });

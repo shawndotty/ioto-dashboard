@@ -171,7 +171,7 @@ export default {
 	DASHBOARD_VIEW_MODE: "Done",
 	DASHBOARD_EMPTY_TITLE: "No components yet",
 	DASHBOARD_EMPTY_DESC:
-		"Add a KPI, project progress or unfinished-task component to this page and bind it to a query.",
+		"Add a KPI, project progress or task list component to this page and bind it to a query.",
 	DASHBOARD_LOADING: "Loading…",
 	DASHBOARD_ERROR_CONFIG: "Query missing — pick another query.",
 	DASHBOARD_EMPTY_RESULT: "Nothing to show.",
@@ -285,16 +285,16 @@ export default {
 	COMPONENT_PROJECT_PROGRESS_NAME: "Project progress",
 	COMPONENT_PROJECT_PROGRESS_DESC:
 		"Completion per project with open and cancelled counts.",
-	COMPONENT_UNFINISHED_NAME: "Unfinished tasks",
-	COMPONENT_UNFINISHED_DESC:
-		"Open tasks ordered by note modification time.",
+	COMPONENT_TASK_LIST_NAME: "Task list",
+	COMPONENT_TASK_LIST_DESC:
+		"Lists tasks from the selected task query, newest-modified notes first. Click one to jump to it.",
 	KPI_BASIS_FILE: "Whole file",
 	KPI_BASIS_SECTION: "Scoped sections",
 	PROJECT_PROGRESS_EMPTY: "No projects in scope.",
 	PROJECT_PROGRESS_OPEN: "Open",
 	PROJECT_PROGRESS_CANCELLED: "Cancelled",
 	PROJECT_PROGRESS_FILES: "Files",
-	UNFINISHED_EMPTY: "No unfinished tasks.",
+	TASK_LIST_EMPTY: "No matching tasks.",
 
 	// Queries
 	QUERY_MANAGER_TITLE: "Manage queries",

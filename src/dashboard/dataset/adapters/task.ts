@@ -100,7 +100,13 @@ export const taskAdapter: DatasetAdapter = (input): Dataset => {
 		sections: request.basis === "file" ? ALL_SECTION_ROLES : undefined,
 		now: input.now,
 	});
-	let tasks = resolved.tasks;
+	const sortedTasks = [...resolved.tasks].sort(
+		(a, b) =>
+			b.noteMtime - a.noteMtime ||
+			a.path.localeCompare(b.path) ||
+			a.line - b.line,
+	);
+	let tasks = sortedTasks;
 	if (request.measure === "completed") {
 		tasks = tasks.filter((task) => task.marker === "done");
 	} else if (request.measure === "open") {
