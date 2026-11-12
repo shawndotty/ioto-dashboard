@@ -228,3 +228,65 @@ test('rebuild reuses untouched cache entries but re-reads changed files', async 
 		['changed', 'stable'],
 	);
 });
+
+test('a transient read failure is retried within the same load', async () => {
+	const file = makeFile('3-任务/a.md', '# 任务\n- [ ] one\n');
+	file.failuresLeft = 1;
+	const tree = {
+		input: makeFolder('1-输入'),
+		output: makeFolder('2-输出'),
+		task: makeFolder('3-任务', [file]),
+		outcome: makeFolder('4-成果'),
+	};
+	const app = makeApp(tree);
+	const read = app.vault.cachedRead;
+	app.vault.cachedRead = async (target) => {
+		if (target.failuresLeft > 0) {
+			target.failuresLeft -= 1;
+			throw new Error('read failed');
+		}
+		return read(target);
+	};
+	const index = new VaultIndex(app, () => makeConfig());
+
+	const snapshot = await index.getSnapshot();
+	assert.deepEqual(
+		snapshot.notes.map((note) => note.path),
+		['3-任务/a.md'],
+	);
+});
+
+test('a persistent read failure skips the file and retries next snapshot', async () => {
+	const bad = makeFile('3-任务/bad.md', '# 任务\n- [ ] bad\n');
+	bad.failuresLeft = Number.POSITIVE_INFINITY;
+	const good = makeFile('3-任务/good.md', '# 任务\n- [ ] good\n');
+	const tree = {
+		input: makeFolder('1-输入'),
+		output: makeFolder('2-输出'),
+		task: makeFolder('3-任务', [bad, good]),
+		outcome: makeFolder('4-成果'),
+	};
+	const app = makeApp(tree);
+	const read = app.vault.cachedRead;
+	app.vault.cachedRead = async (target) => {
+		if (target.failuresLeft > 0) {
+			target.failuresLeft -= 1;
+			throw new Error('read failed');
+		}
+		return read(target);
+	};
+	const index = new VaultIndex(app, () => makeConfig());
+
+	const first = await index.getSnapshot();
+	assert.deepEqual(
+		first.notes.map((note) => note.path),
+		['3-任务/good.md'],
+	);
+
+	bad.failuresLeft = 0;
+	const second = await index.getSnapshot();
+	assert.deepEqual(
+		second.notes.map((note) => note.path).sort(),
+		['3-任务/bad.md', '3-任务/good.md'],
+	);
+});

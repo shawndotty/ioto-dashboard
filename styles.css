@@ -655,8 +655,25 @@
 }
 
 .ioto-custom-dashboard-view .ioto-error-state {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
     color: var(--text-error);
     font-size: 0.9em;
+}
+
+.ioto-custom-dashboard-view .ioto-error-retry {
+    color: var(--text-error);
+    border: 1px solid var(--background-modifier-border);
+    background: transparent;
+    border-radius: var(--radius-s);
+    padding: 2px 8px;
+    cursor: pointer;
+}
+
+.ioto-custom-dashboard-view .ioto-error-retry:hover {
+    background: var(--background-modifier-hover);
 }
 
 .ioto-custom-dashboard-view .ioto-empty-state {

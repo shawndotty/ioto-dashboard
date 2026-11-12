@@ -536,6 +536,8 @@ export default {
 	CHART_ARIA_BAR: "柱状图",
 	DASHBOARD_TRUNCATED: "已显示 {0} / 共 {1}",
 	DASHBOARD_RETRY: "重试",
+	DASHBOARD_REFRESH_FAILED: "刷新失败 — {0}",
+	DASHBOARD_REFRESH_ALL: "刷新全部组件",
 	DASHBOARD_UNSUPPORTED_QUERY: "该组件不支持此查询目标。",
 	DASHBOARD_NO_SNAPSHOT: "暂无快照",
 	SETTING_RANGE_7: "7 天",

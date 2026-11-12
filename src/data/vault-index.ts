@@ -73,6 +73,7 @@ export class VaultIndex {
 	private built = false;
 	private listeners = new Set<() => void>();
 	private eventRefs: EventRef[] = [];
+	private warnedAt = new Map<string, number>();
 
 	constructor(
 		private app: App,
@@ -279,8 +280,15 @@ export class VaultIndex {
 				next.set(file.path, cached);
 				return;
 			}
-			const entry = await this.loadFile(file, config, signature);
-			if (entry) next.set(file.path, entry);
+			try {
+				const entry = await this.loadFile(file, config, signature);
+				if (entry) next.set(file.path, entry);
+				else if (cached) next.set(file.path, cached);
+			} catch (error) {
+				if (cached) next.set(file.path, cached);
+				this.dirty.add(file.path);
+				this.warnOnce(`build:${file.path}`, error);
+			}
 		});
 
 		this.records = next;
@@ -299,17 +307,41 @@ export class VaultIndex {
 				return;
 			}
 			const file = node;
-			const signature = this.signatureOf(file);
-			const cached = this.records.get(path);
-			if (cached && cached.signature === signature) return;
-			const entry = await this.loadFile(file, config, signature);
-			if (entry) this.records.set(path, entry);
-			else this.records.delete(path);
+			try {
+				const signature = this.signatureOf(file);
+				const cached = this.records.get(path);
+				if (cached && cached.signature === signature) return;
+				const entry = await this.loadFile(file, config, signature);
+				if (entry) this.records.set(path, entry);
+				else this.records.delete(path);
+			} catch (error) {
+				// Keep the last good record and retry on the next snapshot.
+				this.dirty.add(path);
+				this.warnOnce(`flush:${path}`, error);
+			}
 		});
+	}
+
+	private warnOnce(key: string, error: unknown): void {
+		const now = Date.now();
+		const last = this.warnedAt.get(key) ?? 0;
+		if (now - last < 1000) return;
+		this.warnedAt.set(key, now);
+		console.warn("IOTO Dashboard: index read failed", key, error);
 	}
 
 	private signatureOf(file: TFile): string {
 		return `${file.stat.mtime}:${file.stat.size}`;
+	}
+
+	private async readWithRetry(file: TFile): Promise<string> {
+		try {
+			return await this.app.vault.cachedRead(file);
+		} catch {
+			// Sync folders can briefly expose placeholder/unavailable files.
+			await new Promise((resolve) => window.setTimeout(resolve, 100));
+			return this.app.vault.cachedRead(file);
+		}
 	}
 
 	private async loadFile(
@@ -321,7 +353,7 @@ export class VaultIndex {
 		const frontmatter = cache?.frontmatter as
 			| Record<string, unknown>
 			| undefined;
-		const content = await this.app.vault.cachedRead(file);
+		const content = await this.readWithRetry(file);
 		const ioType = resolveIoType(file.path, config);
 		const projectValue = frontmatter?.["Project"] ?? frontmatter?.["project"];
 		const statusValue = frontmatter?.["Status"] ?? frontmatter?.["status"];

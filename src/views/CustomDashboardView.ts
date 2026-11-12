@@ -110,6 +110,9 @@ export class CustomDashboardView extends ItemView {
 	private toolbarSignature = "";
 	private pagesSignature = "";
 	private dragGhost: HTMLElement | null = null;
+	private autoRepairKeys = new Set<string>();
+	private renderFailures = new Set<string>();
+	private visibilityTimer: number | null = null;
 	private resizeOverlays: {
 		ghost: HTMLElement;
 		snap: HTMLElement;
@@ -168,9 +171,15 @@ export class CustomDashboardView extends ItemView {
 		this.registerEvent(
 			this.app.workspace.on("layout-change", () => this.updateVisibility()),
 		);
+		this.registerEvent(
+			this.app.workspace.on("active-leaf-change", () =>
+				this.updateVisibility(),
+			),
+		);
 		this.registerDomEvent(document, "visibilitychange", () =>
 			this.updateVisibility(),
 		);
+		this.registerDomEvent(window, "focus", () => this.updateVisibility());
 		this.observeContainerWidth();
 		this.controller = this.createInspectorController();
 		this.registerDomEvent(this.contentEl, "keydown", (event) => {
@@ -188,6 +197,10 @@ export class CustomDashboardView extends ItemView {
 		this.plugin.inspectorService.clear(this.leafId);
 		for (const unsubscribe of this.unsubscribers) unsubscribe();
 		this.unsubscribers = [];
+		if (this.visibilityTimer !== null) {
+			window.clearTimeout(this.visibilityTimer);
+			this.visibilityTimer = null;
+		}
 		this.resizeObserver?.disconnect();
 		this.resizeObserver = null;
 		this.removeDragGhost();
@@ -199,6 +212,12 @@ export class CustomDashboardView extends ItemView {
 	private updateVisibility(): void {
 		const visible = this.containerEl.isShown();
 		this.hub?.setVisible(visible);
+		if (visible || this.visibilityTimer !== null) return;
+		// Layout events can fire before the element is attached; recheck once.
+		this.visibilityTimer = window.setTimeout(() => {
+			this.visibilityTimer = null;
+			if (this.containerEl.isShown()) this.hub?.setVisible(true);
+		}, 1500);
 	}
 
 	private async loadStore(): Promise<void> {
@@ -870,6 +889,12 @@ export class CustomDashboardView extends ItemView {
 		const menu = new Menu();
 		menu.addItem((item) =>
 			item
+				.setTitle(t("DASHBOARD_REFRESH_ALL"))
+				.setIcon("refresh-cw")
+				.onClick(() => this.hub?.refreshNow()),
+		);
+		menu.addItem((item) =>
+			item
 				.setTitle(t("DASHBOARD_MANAGE_QUERIES"))
 				.setIcon("list-filter")
 				.onClick(() => this.openQueryManager()),
@@ -919,7 +944,21 @@ export class CustomDashboardView extends ItemView {
 			const signature = this.cardSignature(config);
 			let element = existing.get(config.id);
 			if (!element || element.dataset.cardSignature !== signature) {
-				const next = this.createCard(grid, config, queries);
+				let next: HTMLElement;
+				try {
+					next = this.createCard(grid, config, queries);
+					this.renderFailures.delete(config.id);
+				} catch (error) {
+					if (!this.renderFailures.has(config.id)) {
+						this.renderFailures.add(config.id);
+						console.error(
+							"IOTO Dashboard: card render failed",
+							config.id,
+							error,
+						);
+					}
+					next = this.renderCardFallback(grid, config, error);
+				}
 				next.dataset.cardSignature = signature;
 				if (element) element.replaceWith(next);
 				else grid.appendChild(next);
@@ -1022,7 +1061,7 @@ export class CustomDashboardView extends ItemView {
 		const dataset = datasetRequest
 			? this.hub?.getDataset(datasetKey(datasetRequest))
 			: undefined;
-		const { status, messageKey } = this.statusOf(
+		const { status, messageKey, message } = this.statusOf(
 			definition,
 			query,
 			result,
@@ -1034,6 +1073,10 @@ export class CustomDashboardView extends ItemView {
 			return card;
 		}
 		if (status === "error") {
+			if (message) {
+				this.renderCardError(body, message);
+				return card;
+			}
 			body.createDiv({
 				cls: "ioto-error-state",
 				text: t(
@@ -1064,7 +1107,21 @@ export class CustomDashboardView extends ItemView {
 			renderInlineMarkdown: (el, markdown, sourcePath) =>
 				MarkdownRenderer.render(this.app, markdown, el, sourcePath, this),
 		};
-		definition.render(body, ctx);
+		try {
+			definition.render(body, ctx);
+		} catch (error) {
+			console.error(
+				"IOTO Dashboard: component render failed",
+				config.id,
+				config.type,
+				error,
+			);
+			this.renderCardError(
+				body,
+				error instanceof Error ? error.message : String(error),
+			);
+			return card;
+		}
 		// `render` 先执行，头部钩子才能拿到已创建的列表句柄恢复过滤态。
 		if (!this.editMode && (status === "ready" || status === "empty")) {
 			definition.renderHeaderActions?.(header, ctx);
@@ -1078,20 +1135,75 @@ export class CustomDashboardView extends ItemView {
 		result: MetricResult | undefined,
 		dataset: import("../dashboard/dataset/types").Dataset | undefined,
 		config: DashboardComponentConfig,
-	): { status: ComponentStatus; messageKey?: string } {
+	): { status: ComponentStatus; messageKey?: string; message?: string } {
 		if (!query) return { status: "error", messageKey: "DASHBOARD_ERROR_CONFIG" };
 		if (definition.toDatasetRequest) {
-			if (!dataset) return { status: "loading" };
-			const empty = definition.isEmptyDataset
-				? definition.isEmptyDataset(dataset)
-				: dataset.total === 0;
-			if (empty) return { status: "empty" };
+			if (dataset) {
+				const empty = definition.isEmptyDataset
+					? definition.isEmptyDataset(dataset)
+					: dataset.total === 0;
+				return empty ? { status: "empty" } : { status: "ready" };
+			}
+			const key = datasetKey(definition.toDatasetRequest(config, query));
+			const error = this.hub?.getDatasetError(key);
+			if (error) return { status: "error", message: error };
+			if (!this.hub?.isDatasetPending(key)) this.requestAutoRepair(key);
+			return { status: "loading" };
+		}
+		if (result) {
+			if (definition.isEmpty(result, config)) return { status: "empty" };
 			return { status: "ready" };
 		}
-		if (this.hub?.isLoading() && !result) return { status: "loading" };
-		if (!result) return { status: "loading" };
-		if (definition.isEmpty(result, config)) return { status: "empty" };
-		return { status: "ready" };
+		const key = this.metricKeyOf(config);
+		const error = this.hub?.getMetricError(key);
+		if (error) return { status: "error", message: error };
+		if (!this.hub?.isMetricPending(key)) this.requestAutoRepair(key);
+		return { status: "loading" };
+	}
+
+	/** A key missing from both results and pending means a refresh never ran for it. */
+	private requestAutoRepair(key: string): void {
+		if (!key || this.autoRepairKeys.has(key)) return;
+		this.autoRepairKeys.add(key);
+		this.hub?.scheduleRefresh(0);
+	}
+
+	private renderCardError(body: HTMLElement, message: string): void {
+		body.empty();
+		const state = body.createDiv({ cls: "ioto-error-state" });
+		state.createSpan({
+			text: t("DASHBOARD_REFRESH_FAILED", [message]),
+			attr: { title: message },
+		});
+		const retry = state.createEl("button", {
+			cls: "ioto-error-retry",
+			text: t("DASHBOARD_RETRY"),
+		});
+		retry.addEventListener("click", () => this.hub?.refreshNow());
+	}
+
+	private renderCardFallback(
+		grid: HTMLElement,
+		config: DashboardComponentConfig,
+		error: unknown,
+	): HTMLElement {
+		const card = grid.ownerDocument.createElement("div");
+		card.addClass("ioto-dashboard-card");
+		card.setAttr("data-component-id", config.id);
+		const size = clampSize(config.w, config.h, this.boundsFor(config));
+		card.style.gridColumn = `span ${size.w}`;
+		card.style.gridRow = `span ${size.h}`;
+		const header = card.createDiv({ cls: "ioto-dashboard-card-header" });
+		header.createDiv({
+			cls: "ioto-dashboard-card-title",
+			text: config.title ?? config.type,
+		});
+		const body = card.createDiv({ cls: "ioto-dashboard-card-body" });
+		this.renderCardError(
+			body,
+			error instanceof Error ? error.message : String(error),
+		);
+		return card;
 	}
 
 	private renderDragHandle(

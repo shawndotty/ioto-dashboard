@@ -542,6 +542,8 @@ export default {
 	CHART_ARIA_BAR: "Bar chart",
 	DASHBOARD_TRUNCATED: "Showing {0} of {1}",
 	DASHBOARD_RETRY: "Retry",
+	DASHBOARD_REFRESH_FAILED: "Refresh failed — {0}",
+	DASHBOARD_REFRESH_ALL: "Refresh all components",
 	DASHBOARD_UNSUPPORTED_QUERY:
 		"This component does not support the query target.",
 	DASHBOARD_NO_SNAPSHOT: "No snapshot yet",

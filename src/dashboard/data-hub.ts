@@ -48,6 +48,10 @@ function sameDatasetRequests(
 	});
 }
 
+function readableError(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * The metric an adapter needs internally. `MetricRequest` stays an
  * implementation detail of the adapter layer.
@@ -97,7 +101,11 @@ export interface DataHubOptions {
 	getCustomFilters: () => CustomFilterDef[];
 	snapshotStore?: SnapshotStore;
 	now?: () => number;
+	/** Backoff schedule for automatic retries; injectable for tests. */
+	retryDelaysMs?: number[];
 }
+
+const DEFAULT_RETRY_DELAYS_MS = [500, 1500];
 
 /**
  * One snapshot per refresh, batched metric evaluation, debounced refresh.
@@ -117,6 +125,12 @@ export class DataHub {
 	private listeners = new Set<() => void>();
 	private lastCollectDate = "";
 	private lastCollectAt = 0;
+	private runId = 0;
+	private lastError: string | null = null;
+	private retryAttempt = 0;
+	private retryTimer: number | null = null;
+	private pendingKeys = new Set<string>();
+	private failedKeys = new Map<string, string>();
 
 	constructor(private options: DataHubOptions) {}
 
@@ -145,6 +159,26 @@ export class DataHub {
 
 	isLoading(): boolean {
 		return this.loading;
+	}
+
+	getLastError(): string | null {
+		return this.lastError;
+	}
+
+	isDatasetPending(key: string): boolean {
+		return this.pendingKeys.has(key);
+	}
+
+	getDatasetError(key: string): string | undefined {
+		return this.failedKeys.get(key);
+	}
+
+	isMetricPending(key: string): boolean {
+		return this.pendingKeys.has(key);
+	}
+
+	getMetricError(key: string): string | undefined {
+		return this.failedKeys.get(key);
 	}
 
 	setRequests(requests: MetricRequest[]): void {
@@ -180,32 +214,92 @@ export class DataHub {
 			return;
 		}
 		this.dirty = false;
+
+		const runId = ++this.runId;
+		const derived = this.derivedMetricRequests();
+		const metricRequests = [...this.requests, ...derived];
+		this.pendingKeys = new Set([
+			...metricRequests.map(metricKey),
+			...this.datasetRequests.map(datasetKey),
+		]);
+		this.pruneFailedKeys();
 		this.loading = true;
+		this.lastError = null;
 		this.notify();
 
-		const config = this.options.getIndexConfig();
-		const snapshot = await this.options.index.getSnapshot({
-			withTree: this.needsTree(),
-		});
-		if (this.needsSeries()) {
-			this.points = await this.loadPoints();
+		try {
+			const config = this.options.getIndexConfig();
+			const snapshot = await this.options.index.getSnapshot({
+				withTree: this.needsTree(),
+			});
+			if (runId !== this.runId) return;
+			if (this.needsSeries()) {
+				this.points = await this.loadPoints();
+				if (runId !== this.runId) return;
+			}
+			const queries = this.options.getQueries();
+			const ctx = {
+				snapshot,
+				taskFolder: config.taskFolder,
+				getQuery: (id: string) => queries.get(id),
+				customFilters: this.options.getCustomFilters(),
+				now: this.options.now,
+				dailySeries: (limit: number) => this.points.slice(-limit),
+			};
+			this.results = evaluateMetrics(metricRequests, ctx);
+			for (const request of metricRequests) {
+				this.failedKeys.delete(metricKey(request));
+			}
+			this.datasets = this.evaluateDatasets(snapshot, queries);
+			this.snapshot = snapshot;
+			this.retryAttempt = 0;
+			void this.collect(snapshot, config).catch((error) => {
+				console.warn("IOTO Dashboard: snapshot collect failed", error);
+			});
+		} catch (error) {
+			if (runId !== this.runId) return;
+			const message = readableError(error);
+			this.lastError = message;
+			console.error("IOTO Dashboard: refresh failed", error);
+			for (const key of this.pendingKeys) this.failedKeys.set(key, message);
+			this.scheduleRetry();
+		} finally {
+			if (runId === this.runId) {
+				this.pendingKeys.clear();
+				this.loading = false;
+				this.notify();
+			}
 		}
-		const queries = this.options.getQueries();
-		const derived = this.derivedMetricRequests();
-		const ctx = {
-			snapshot,
-			taskFolder: config.taskFolder,
-			getQuery: (id: string) => queries.get(id),
-			customFilters: this.options.getCustomFilters(),
-			now: this.options.now,
-			dailySeries: (limit: number) => this.points.slice(-limit),
-		};
-		this.results = evaluateMetrics([...this.requests, ...derived], ctx);
-		this.datasets = this.evaluateDatasets(snapshot, queries);
-		this.snapshot = snapshot;
-		this.loading = false;
-		this.notify();
-		void this.collect(snapshot, config);
+	}
+
+	/** Manual retry: forget failure records and rerun immediately. */
+	refreshNow(): void {
+		if (this.retryTimer !== null) {
+			window.clearTimeout(this.retryTimer);
+			this.retryTimer = null;
+		}
+		this.retryAttempt = 0;
+		this.failedKeys.clear();
+		this.dirty = false;
+		void this.refresh();
+	}
+
+	private pruneFailedKeys(): void {
+		for (const key of [...this.failedKeys.keys()]) {
+			if (!this.pendingKeys.has(key)) this.failedKeys.delete(key);
+		}
+	}
+
+	private scheduleRetry(): void {
+		const delays = this.options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
+		if (this.retryAttempt >= delays.length || !this.visible) return;
+		const delay = delays[this.retryAttempt] ?? 0;
+		this.retryAttempt += 1;
+		if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
+		this.retryTimer = window.setTimeout(() => {
+			this.retryTimer = null;
+			void this.refresh();
+		}, delay);
 	}
 
 	private derivedMetricRequests(): MetricRequest[] {
@@ -229,18 +323,29 @@ export class DataHub {
 			const metric = metricRequest
 				? this.results.get(metricKey(metricRequest))
 				: undefined;
-			datasets.set(
-				key,
-				adapterFor(request.object)({
-					request,
-					query: queries.get(request.queryId),
-					snapshot,
-					metric,
-					dailySeries: (limit) => this.points.slice(-limit),
-					customFilters: this.options.getCustomFilters(),
-					now: this.options.now,
-				}),
-			);
+			try {
+				datasets.set(
+					key,
+					adapterFor(request.object)({
+						request,
+						query: queries.get(request.queryId),
+						snapshot,
+						metric,
+						dailySeries: (limit) => this.points.slice(-limit),
+						customFilters: this.options.getCustomFilters(),
+						now: this.options.now,
+					}),
+				);
+				this.failedKeys.delete(key);
+			} catch (error) {
+				const message = readableError(error);
+				this.failedKeys.set(key, message);
+				console.error(
+					"IOTO Dashboard: dataset evaluation failed",
+					key,
+					error,
+				);
+			}
 		}
 		return datasets;
 	}
@@ -298,6 +403,10 @@ export class DataHub {
 		if (this.timer !== null) {
 			window.clearTimeout(this.timer);
 			this.timer = null;
+		}
+		if (this.retryTimer !== null) {
+			window.clearTimeout(this.retryTimer);
+			this.retryTimer = null;
 		}
 		this.listeners.clear();
 	}
