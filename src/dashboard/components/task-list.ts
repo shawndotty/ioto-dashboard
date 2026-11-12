@@ -1,7 +1,13 @@
+import { setIcon } from "obsidian";
 import { t } from "../../lang/helpers";
+import type { DatasetRow } from "../dataset/types";
 import type { ComponentDefinition } from "../registry";
 import type { DashboardComponentConfig } from "../types";
-import { renderPagedList, type PagerLabels } from "../ui/pager";
+import {
+	renderPagedList,
+	type PagedListHandle,
+	type PagerLabels,
+} from "../ui/pager";
 
 const TASK_STATUS_MARKERS: Record<string, string> = {
 	open: " ",
@@ -18,6 +24,26 @@ const pageMemory = new WeakMap<
 	{ queryId: string; page: number }
 >();
 
+interface TaskCardState {
+	queryId: string;
+	text: string;
+	open: boolean;
+	rows: readonly DatasetRow[];
+	handle?: PagedListHandle<DatasetRow>;
+	emptyEl?: HTMLElement;
+}
+
+const cardStates = new WeakMap<DashboardComponentConfig, TaskCardState>();
+
+function stateOf(config: DashboardComponentConfig): TaskCardState {
+	let state = cardStates.get(config);
+	if (!state || state.queryId !== config.queryId) {
+		state = { queryId: config.queryId, text: "", open: false, rows: [] };
+		cardStates.set(config, state);
+	}
+	return state;
+}
+
 function rememberedPage(config: DashboardComponentConfig): number {
 	const memory = pageMemory.get(config);
 	return memory && memory.queryId === config.queryId ? memory.page : 1;
@@ -25,6 +51,34 @@ function rememberedPage(config: DashboardComponentConfig): number {
 
 function markerOf(status: string | undefined): string {
 	return TASK_STATUS_MARKERS[status ?? "open"] ?? " ";
+}
+
+/** 任务正文、笔记名或项目名任一命中即保留；空关键词视为全部命中。 */
+export function matchesTaskRow(row: DatasetRow, query: string): boolean {
+	const needle = query.trim().toLocaleLowerCase();
+	if (needle.length === 0) return true;
+	return [row.cells.text?.text, row.cells.note?.text, row.cells.project?.text].some(
+		(value) => (value ?? "").toLocaleLowerCase().includes(needle),
+	);
+}
+
+function applyFilter(
+	state: TaskCardState,
+	config: DashboardComponentConfig,
+): void {
+	const query = state.text.trim();
+	const isFiltering = query.length > 0;
+	const filtered = isFiltering
+		? state.rows.filter((row) => matchesTaskRow(row, state.text))
+		: state.rows;
+	if (state.emptyEl) {
+		state.emptyEl.toggle(isFiltering && filtered.length === 0);
+		if (isFiltering) state.emptyEl.setText(t("TASK_LIST_NO_MATCH", [query]));
+	}
+	state.handle?.setItems(filtered, { resetPage: true });
+	if (isFiltering) {
+		pageMemory.set(config, { queryId: config.queryId, page: 1 });
+	}
 }
 
 export const taskListComponent: ComponentDefinition = {
@@ -73,6 +127,8 @@ export const taskListComponent: ComponentDefinition = {
 	render: (el, ctx) => {
 		el.addClass("ioto-task-list");
 		const rows = ctx.dataset?.rows ?? [];
+		const state = stateOf(ctx.config);
+		state.rows = rows;
 		if (rows.length === 0) {
 			el.createDiv({ cls: "ioto-empty-state", text: t("TASK_LIST_EMPTY") });
 			return;
@@ -87,7 +143,7 @@ export const taskListComponent: ComponentDefinition = {
 			range: (from, to, total) =>
 				t("PAGINATION_RANGE", [String(from), String(to), String(total)]),
 		};
-		renderPagedList({
+		state.handle = renderPagedList({
 			host: el,
 			items: rows,
 			pageSize,
@@ -159,5 +215,99 @@ export const taskListComponent: ComponentDefinition = {
 			onPageChange: (page) =>
 				pageMemory.set(ctx.config, { queryId: ctx.config.queryId, page }),
 		});
+		state.emptyEl = el.createDiv({
+			cls: "ioto-empty-state ioto-task-list-no-match",
+		});
+		state.emptyEl.hide();
+		if (state.text.length > 0) applyFilter(state, ctx.config);
+	},
+	renderHeaderActions: (header, ctx) => {
+		const rows = ctx.dataset?.rows ?? [];
+		// 空数据集时列表本身就是空态，没有内容可过滤。
+		if (rows.length === 0) return;
+		const config = ctx.config;
+		const state = stateOf(config);
+
+		const toggle = header.createEl("button", {
+			cls: "clickable-icon ioto-task-list-search-toggle",
+			attr: {
+				type: "button",
+				"aria-label": t("TASK_LIST_SEARCH_TOGGLE"),
+				title: t("TASK_LIST_SEARCH_TOGGLE"),
+				"aria-expanded": String(state.open),
+			},
+		});
+		setIcon(toggle, "search");
+
+		const search = header.createDiv({
+			cls: "ioto-task-list-search",
+			attr: { role: "search" },
+		});
+		const searchIcon = search.createDiv({ cls: "ioto-task-list-search-icon" });
+		searchIcon.setAttr("aria-hidden", "true");
+		setIcon(searchIcon, "search");
+		const input = search.createEl("input", {
+			cls: "ioto-task-list-search-input",
+			type: "search",
+			attr: {
+				"aria-label": t("TASK_LIST_SEARCH_PLACEHOLDER"),
+				placeholder: t("TASK_LIST_SEARCH_PLACEHOLDER"),
+			},
+		});
+		const exit = search.createEl("button", {
+			cls: "clickable-icon ioto-task-list-search-exit",
+			attr: {
+				type: "button",
+				"aria-label": t("TASK_LIST_SEARCH_CLOSE"),
+				title: t("TASK_LIST_SEARCH_CLOSE"),
+			},
+		});
+		setIcon(exit, "x");
+
+		const setOpen = (open: boolean): void => {
+			state.open = open;
+			header.toggleClass("is-searching", open);
+			search.toggleClass("is-open", open);
+			toggle.setAttr("aria-expanded", String(open));
+		};
+		const filter = (): void => applyFilter(state, config);
+		const clearText = (): void => {
+			input.value = "";
+			state.text = "";
+			filter();
+		};
+		const closeSearch = (): void => {
+			clearText();
+			setOpen(false);
+			// 必须在收起之后聚焦，否则按钮仍为 display:none。
+			toggle.focus();
+		};
+
+		// 恢复上次状态，但不抢焦点（数据刷新可能重建卡片）。
+		input.value = state.text;
+		if (state.open) setOpen(true);
+
+		toggle.addEventListener("click", () => {
+			setOpen(true);
+			input.focus();
+			input.select();
+		});
+
+		input.addEventListener("input", (event) => {
+			state.text = (event.target as HTMLInputElement).value;
+			if ((event as InputEvent).isComposing) return;
+			filter();
+		});
+		input.addEventListener("compositionend", () => {
+			state.text = input.value;
+			filter();
+		});
+		input.addEventListener("keydown", (event) => {
+			if (event.key !== "Escape") return;
+			event.stopPropagation();
+			closeSearch();
+		});
+
+		exit.addEventListener("click", closeSearch);
 	},
 };

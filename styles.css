@@ -880,15 +880,113 @@
     font-variant-numeric: tabular-nums;
 }
 
-.ioto-custom-dashboard-view .ioto-card-pager button {
-    flex: 0 0 auto;
-    padding: 2px 8px;
-    line-height: 1.4;
+.ioto-custom-dashboard-view .ioto-card-pager.is-hidden {
+    display: none;
 }
 
-.ioto-custom-dashboard-view .ioto-card-pager button:disabled {
-    opacity: 0.45;
+.ioto-custom-dashboard-view .ioto-card-pager .ioto-card-pager-btn {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.ioto-custom-dashboard-view .ioto-card-pager .ioto-card-pager-btn:hover:not(:disabled) {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.ioto-custom-dashboard-view .ioto-card-pager .ioto-card-pager-btn:disabled {
+    opacity: 0.35;
     cursor: default;
+}
+
+/* ---- Task list header search ---- */
+.ioto-custom-dashboard-view .ioto-dashboard-card-header.is-searching .ioto-dashboard-card-title {
+    display: none;
+}
+
+.ioto-custom-dashboard-view
+    .ioto-dashboard-card-header.is-searching
+    .ioto-task-list-search-toggle {
+    display: none;
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-search {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-search.is-open {
+    display: flex;
+    animation: ioto-task-search-in 120ms ease-out;
+}
+
+@keyframes ioto-task-search-in {
+    from {
+        opacity: 0;
+        transform: translateX(4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ioto-custom-dashboard-view .ioto-task-list-search.is-open {
+        animation: none;
+    }
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-search-icon {
+    flex: 0 0 auto;
+    display: flex;
+    color: var(--text-faint);
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-search-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-search input[type="search"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 26px;
+    padding-inline: 8px;
+    background: var(--background-modifier-form-field);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    appearance: none;
+}
+
+.ioto-custom-dashboard-view
+    .ioto-task-list-search
+    input[type="search"]::-webkit-search-cancel-button {
+    display: none;
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-search input[type="search"]:focus {
+    border-color: var(--interactive-accent);
+}
+
+.ioto-custom-dashboard-view .ioto-task-list-search-exit {
+    --icon-size: 16px;
+    width: 20px;
+    height: 20px;
 }
 
 /* ---- Modal shell (shared) ---- */

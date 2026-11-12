@@ -297,6 +297,10 @@ export default {
 	PROJECT_PROGRESS_CANCELLED: "Cancelled",
 	PROJECT_PROGRESS_FILES: "Files",
 	TASK_LIST_EMPTY: "No matching tasks.",
+	TASK_LIST_SEARCH_TOGGLE: "Search tasks",
+	TASK_LIST_SEARCH_PLACEHOLDER: "Search tasks…",
+	TASK_LIST_SEARCH_CLOSE: "Exit search (Esc)",
+	TASK_LIST_NO_MATCH: "No tasks match “{0}”.",
 
 	// Queries
 	QUERY_MANAGER_TITLE: "Manage queries",

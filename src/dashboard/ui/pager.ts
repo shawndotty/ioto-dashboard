@@ -1,3 +1,5 @@
+import { setIcon } from "obsidian";
+
 export interface PagerLabels {
 	prev: string;
 	next: string;
@@ -6,13 +8,14 @@ export interface PagerLabels {
 }
 
 export interface PagerControls {
-	update(page: number, pageCount: number): void;
+	update(page: number, pageCount: number, total: number): void;
 }
 
-export interface PagedListHandle {
+export interface PagedListHandle<T> {
 	readonly page: number;
 	readonly pageCount: number;
 	goTo(page: number): void;
+	setItems(items: readonly T[], options?: { resetPage?: boolean }): void;
 }
 
 /** 空列表也按 1 页处理，避免调用方除零；非法每页条数视为不分页。 */
@@ -39,38 +42,61 @@ export function pageBounds(
 	return { from, to: Math.min(total, from + size - 1) };
 }
 
+/** 数据量变化后的页码与页数；`reset` 为真时强制回到第 1 页。 */
+export function nextPagingState(
+	total: number,
+	pageSize: number,
+	currentPage: number,
+	reset: boolean,
+): { page: number; pageCount: number } {
+	const pageCount = pageCountOf(total, pageSize);
+	return {
+		page: reset ? 1 : clampPage(currentPage, pageCount),
+		pageCount,
+	};
+}
+
 export function renderPager(
 	host: HTMLElement,
 	opts: {
 		labels: PagerLabels;
-		total: number;
 		pageSize: number;
 		onGo(page: number): void;
 	},
 ): PagerControls {
 	host.addClass("ioto-card-pager");
 	let current = 1;
+	let total = 0;
 	const prev = host.createEl("button", {
-		cls: "ioto-card-pager-btn",
-		text: "‹",
-		attr: { type: "button", "aria-label": opts.labels.prev },
+		cls: "clickable-icon ioto-card-pager-btn",
+		attr: {
+			type: "button",
+			"aria-label": opts.labels.prev,
+			title: opts.labels.prev,
+		},
 	});
+	setIcon(prev, "chevron-left");
 	const info = host.createDiv({ cls: "ioto-card-pager-info" });
 	const next = host.createEl("button", {
-		cls: "ioto-card-pager-btn",
-		text: "›",
-		attr: { type: "button", "aria-label": opts.labels.next },
+		cls: "clickable-icon ioto-card-pager-btn",
+		attr: {
+			type: "button",
+			"aria-label": opts.labels.next,
+			title: opts.labels.next,
+		},
 	});
+	setIcon(next, "chevron-right");
 	prev.addEventListener("click", () => opts.onGo(current - 1));
 	next.addEventListener("click", () => opts.onGo(current + 1));
 	return {
-		update(page, pageCount) {
+		update(page, pageCount, nextTotal) {
 			current = page;
+			total = nextTotal;
 			prev.disabled = page <= 1;
 			next.disabled = page >= pageCount;
-			const { from, to } = pageBounds(page, opts.pageSize, opts.total);
+			const { from, to } = pageBounds(page, opts.pageSize, total);
 			info.setText(
-				`${opts.labels.page(page, pageCount)} · ${opts.labels.range(from, to, opts.total)}`,
+				`${opts.labels.page(page, pageCount)} · ${opts.labels.range(from, to, total)}`,
 			);
 		},
 	};
@@ -89,23 +115,31 @@ export interface PagedListOptions<T> {
 	onPageChange?(page: number): void;
 }
 
-export function renderPagedList<T>(opts: PagedListOptions<T>): PagedListHandle {
+export function renderPagedList<T>(
+	opts: PagedListOptions<T>,
+): PagedListHandle<T> {
 	const size = Math.max(1, opts.pageSize);
-	const pageCount = pageCountOf(opts.items.length, size);
+	let items = opts.items;
+	let pageCount = pageCountOf(items.length, size);
 	let page = clampPage(opts.initialPage ?? 1, pageCount);
 	const listEl = opts.host.createEl(opts.tagName ?? "ul", { cls: opts.listClass });
-	const pagerEl =
-		pageCount > 1 ? opts.host.createDiv({ cls: "ioto-card-pager" }) : null;
-	let controls: PagerControls | null = null;
+	// 分页条常驻：过滤后页数可能降到 1，再清空过滤又需要它重新出现。
+	const pagerEl = opts.host.createDiv({ cls: "ioto-card-pager" });
+	pagerEl.toggleClass("is-hidden", pageCount <= 1);
+	const controls = renderPager(pagerEl, {
+		labels: opts.labels,
+		pageSize: size,
+		onGo: (target) => goTo(target),
+	});
 	const draw = (): void => {
 		listEl.empty();
 		const start = (page - 1) * size;
-		opts.items
+		items
 			.slice(start, start + size)
 			.forEach((item, index) =>
 				listEl.appendChild(opts.renderItem(item, start + index)),
 			);
-		controls?.update(page, pageCount);
+		controls.update(page, pageCount, items.length);
 	};
 	const goTo = (target: number): void => {
 		const next = clampPage(target, pageCount);
@@ -115,20 +149,33 @@ export function renderPagedList<T>(opts: PagedListOptions<T>): PagedListHandle {
 		opts.host.scrollTop = 0;
 		opts.onPageChange?.(page);
 	};
-	if (pagerEl) {
-		controls = renderPager(pagerEl, {
-			labels: opts.labels,
-			total: opts.items.length,
-			pageSize: size,
-			onGo: goTo,
-		});
-	}
+	const setItems = (
+		next: readonly T[],
+		setOptions: { resetPage?: boolean } = {},
+	): void => {
+		items = next;
+		const sizing = nextPagingState(
+			items.length,
+			size,
+			page,
+			setOptions.resetPage ?? false,
+		);
+		page = sizing.page;
+		pageCount = sizing.pageCount;
+		pagerEl.toggleClass("is-hidden", pageCount <= 1);
+		draw();
+		opts.host.scrollTop = 0;
+		if (setOptions.resetPage) opts.onPageChange?.(page);
+	};
 	draw();
 	return {
 		get page() {
 			return page;
 		},
-		pageCount,
+		get pageCount() {
+			return pageCount;
+		},
 		goTo,
+		setItems,
 	};
 }

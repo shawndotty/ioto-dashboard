@@ -295,6 +295,10 @@ export default {
 	PROJECT_PROGRESS_CANCELLED: "已取消",
 	PROJECT_PROGRESS_FILES: "檔案",
 	TASK_LIST_EMPTY: "沒有符合的任務。",
+	TASK_LIST_SEARCH_TOGGLE: "搜尋任務",
+	TASK_LIST_SEARCH_PLACEHOLDER: "搜尋任務…",
+	TASK_LIST_SEARCH_CLOSE: "退出搜尋（Esc）",
+	TASK_LIST_NO_MATCH: "沒有符合「{0}」的任務。",
 
 	// Queries
 	QUERY_MANAGER_TITLE: "管理查詢",

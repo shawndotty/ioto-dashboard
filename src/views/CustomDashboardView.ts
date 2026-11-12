@@ -39,6 +39,7 @@ import {
 	clampSize,
 	queryTargetsFor,
 	type ComponentDefinition,
+	type ComponentRenderContext,
 	type ComponentStatus,
 	type SizeBounds,
 } from "../dashboard/registry";
@@ -1000,7 +1001,7 @@ export class CustomDashboardView extends ItemView {
 			});
 			return card;
 		}
-		definition.render(body, {
+		const ctx: ComponentRenderContext = {
 			config,
 			query,
 			result,
@@ -1016,7 +1017,12 @@ export class CustomDashboardView extends ItemView {
 			renderMarkdown: (el, path) => this.renderMarkdown(el, path),
 			renderInlineMarkdown: (el, markdown, sourcePath) =>
 				MarkdownRenderer.render(this.app, markdown, el, sourcePath, this),
-		});
+		};
+		definition.render(body, ctx);
+		// `render` 先执行，头部钩子才能拿到已创建的列表句柄恢复过滤态。
+		if (!this.editMode && (status === "ready" || status === "empty")) {
+			definition.renderHeaderActions?.(header, ctx);
+		}
 		return card;
 	}
 

@@ -296,6 +296,10 @@ export default {
 	PROJECT_PROGRESS_CANCELLED: "已取消",
 	PROJECT_PROGRESS_FILES: "文件",
 	TASK_LIST_EMPTY: "没有匹配的任务。",
+	TASK_LIST_SEARCH_TOGGLE: "搜索任务",
+	TASK_LIST_SEARCH_PLACEHOLDER: "搜索任务…",
+	TASK_LIST_SEARCH_CLOSE: "退出搜索（Esc）",
+	TASK_LIST_NO_MATCH: "没有匹配“{0}”的任务。",
 
 	// Queries
 	QUERY_MANAGER_TITLE: "管理查询",

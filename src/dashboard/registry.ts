@@ -173,6 +173,8 @@ export interface ComponentDefinition {
 	/** `true` when the metric is valid but has nothing meaningful to show. */
 	isEmpty(result: MetricResult): boolean;
 	render(el: HTMLElement, ctx: ComponentRenderContext): void;
+	/** 在卡片头部标题右侧渲染组件级操作（如搜索入口）；加载/错误态与编辑态不调用。 */
+	renderHeaderActions?(el: HTMLElement, ctx: ComponentRenderContext): void;
 	/** Extra size constraints layered on top of the registry defaults. */
 	size?: Partial<SizeBounds>;
 	/** Declarative settings rendered by the inspector panel, in display order. */
