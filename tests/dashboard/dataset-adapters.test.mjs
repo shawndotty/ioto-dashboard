@@ -7,6 +7,7 @@ const { noteAdapter } = await load('../../src/dashboard/dataset/adapters/note.ts
 const { fileAdapter } = await load('../../src/dashboard/dataset/adapters/file.ts');
 const { folderAdapter } = await load('../../src/dashboard/dataset/adapters/folder.ts');
 const { projectAdapter } = await load('../../src/dashboard/dataset/adapters/project.ts');
+const { formatDate } = await load('../../src/dashboard/dataset/types.ts');
 const { createDefaultFilterState } = await load('../../src/data/saved-query-adapter.ts');
 
 function query(target, overrides = {}) {
@@ -178,6 +179,51 @@ test('file and folder adapters read the on-demand tree records', () => {
 	);
 	assert.equal(folders.total, 1);
 	assert.equal(folders.rows[0].cells.files.text, '1');
+});
+
+test('file adapter sums size and picks the latest mtime', () => {
+	const size = fileAdapter(
+		adapterInput({ object: 'file', measure: 'size', queryId: 'q' }),
+	);
+	assert.equal(size.scalarText, '2 KB');
+
+	const mtime = fileAdapter(
+		adapterInput({ object: 'file', measure: 'mtime', queryId: 'q' }),
+	);
+	assert.equal(mtime.scalarText, formatDate(20));
+});
+
+test('folder adapter picks the latest mtime', () => {
+	const mtime = folderAdapter(
+		adapterInput({ object: 'folder', measure: 'mtime', queryId: 'q' }),
+	);
+	assert.equal(mtime.scalarText, formatDate(10));
+});
+
+test('size and mtime scalars show a dash for empty collections', () => {
+	for (const measure of ['size', 'mtime']) {
+		const files = fileAdapter(
+			adapterInput(
+				{ object: 'file', measure, queryId: 'q' },
+				{ snapshot: EMPTY },
+			),
+		);
+		assert.equal(files.scalarText, '—');
+	}
+	const folders = folderAdapter(
+		adapterInput(
+			{ object: 'folder', measure: 'mtime', queryId: 'q' },
+			{ snapshot: EMPTY },
+		),
+	);
+	assert.equal(folders.scalarText, '—');
+	const counted = fileAdapter(
+		adapterInput(
+			{ object: 'file', measure: 'count', queryId: 'q' },
+			{ snapshot: EMPTY },
+		),
+	);
+	assert.equal(counted.scalarText, '0');
 });
 
 test('project adapter maps metric groups and survives a missing metric', () => {

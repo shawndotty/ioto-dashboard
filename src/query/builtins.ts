@@ -5,6 +5,8 @@ import type { QueryDefinition } from "./types";
 export const BUILTIN_TASKS_ALL = "builtin:tasks-all";
 export const BUILTIN_NOTES_ALL = "builtin:notes-all";
 export const BUILTIN_TASKS_UNFINISHED = "builtin:tasks-unfinished";
+export const BUILTIN_FILES_ALL = "builtin:files-all";
+export const BUILTIN_FOLDERS_ALL = "builtin:folders-all";
 
 export const DEFAULT_QUERY_ID = BUILTIN_TASKS_ALL;
 
@@ -39,6 +41,22 @@ export function builtinQueries(): QueryDefinition[] {
 			name: "All notes",
 			nameKey: "QUERY_BUILTIN_NOTES_ALL",
 			target: "note",
+			scope: { folders: [], includeSubfolders: true },
+			filters: createDefaultFilterState(),
+		},
+		{
+			id: BUILTIN_FILES_ALL,
+			name: "All files",
+			nameKey: "QUERY_BUILTIN_FILES_ALL",
+			target: "file",
+			scope: { folders: [], includeSubfolders: true },
+			filters: createDefaultFilterState(),
+		},
+		{
+			id: BUILTIN_FOLDERS_ALL,
+			name: "All folders",
+			nameKey: "QUERY_BUILTIN_FOLDERS_ALL",
+			target: "folder",
 			scope: { folders: [], includeSubfolders: true },
 			filters: createDefaultFilterState(),
 		},

@@ -1,4 +1,5 @@
 import { resolveQuery } from "../../../query/resolve";
+import type { FolderRecord } from "../../../data/types";
 import {
 	emptyDataset,
 	formatDate,
@@ -7,6 +8,7 @@ import {
 	type Dataset,
 	type DatasetAdapter,
 	type DatasetColumn,
+	type MeasureId,
 } from "../types";
 import { cell } from "./shared";
 
@@ -18,6 +20,19 @@ export const FOLDER_COLUMNS: DatasetColumn[] = [
 	{ key: "size", labelKey: "DATASET_COL_SIZE", type: "size", align: "right" },
 	{ key: "mtime", labelKey: "DATASET_COL_MTIME", type: "date", align: "right" },
 ];
+
+function scalarTextFor(folders: FolderRecord[], measure: MeasureId): string {
+	if (folders.length === 0) return measure === "mtime" ? "—" : "0";
+	if (measure === "mtime") {
+		const latest = folders.reduce(
+			(max, folder) =>
+				folder.latestMtime > max ? folder.latestMtime : max,
+			folders[0]?.latestMtime ?? 0,
+		);
+		return formatDate(latest);
+	}
+	return String(folders.length);
+}
 
 export const folderAdapter: DatasetAdapter = (input): Dataset => {
 	const { request, query, snapshot } = input;
@@ -47,6 +62,6 @@ export const folderAdapter: DatasetAdapter = (input): Dataset => {
 		measure: request.measure,
 		columns: FOLDER_COLUMNS,
 		...truncated,
-		scalarText: String(folders.length),
+		scalarText: scalarTextFor(folders, request.measure),
 	};
 };

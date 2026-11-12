@@ -5,6 +5,7 @@ import {
 	clampSize,
 	coerceSettingValue,
 	queryTargetsFor,
+	resolveSettingOptions,
 	type ComponentSetting,
 } from "../../dashboard/registry";
 import { columnsForObject, timelineColumnsForObject } from "../../dashboard/dataset/columns";
@@ -125,6 +126,9 @@ export class ComponentInspector {
 	private signatureOf(state: InspectorState): string {
 		const definition = state.target.definition;
 		const config = state.target.config;
+		const query = state.queries.find(
+			(item) => item.id === config.queryId,
+		);
 		return [
 			state.target.config.id,
 			state.target.config.queryId,
@@ -134,7 +138,11 @@ export class ComponentInspector {
 				.map(
 					(setting) =>
 						`${setting.group}:${setting.kind}:${setting.key}:${
-							setting.when ? (setting.when(config) ? "1" : "0") : "2"
+							setting.when
+								? setting.when(config, { query })
+									? "1"
+									: "0"
+								: "2"
 						}`,
 				)
 				.join(","),
@@ -184,8 +192,12 @@ export class ComponentInspector {
 			});
 		}
 
+		const query = state.queries.find(
+			(item) => item.id === state.target.config.queryId,
+		);
 		const settings = settingsOf(definition).filter(
-			(setting) => !setting.when || setting.when(state.target.config),
+			(setting) =>
+				!setting.when || setting.when(state.target.config, { query }),
 		);
 		const dataSettings = settings.filter(
 			(setting) => setting.group === "data",
@@ -465,15 +477,25 @@ export class ComponentInspector {
 			case "select": {
 				field.createEl("label", { text: t(setting.labelKey as LabelKey) });
 				const select = field.createEl("select", { cls: "dropdown" });
-				for (const option of setting.options) {
+				const query = state.queries.find(
+					(item) => item.id === state.target.config.queryId,
+				);
+				const options = resolveSettingOptions(setting, { query });
+				const stored = this.storedSettingValue(state, setting);
+				const desired =
+					typeof stored === "string" ? stored : setting.fallback;
+				const current = options.some(
+					(option) => option.value === desired,
+				)
+					? desired
+					: (options[0]?.value ?? setting.fallback);
+				for (const option of options) {
 					select.createEl("option", {
 						value: option.value,
 						text: t(option.labelKey as LabelKey),
 					});
 				}
-				select.value = String(
-					this.storedSettingValue(state, setting) ?? setting.fallback,
-				);
+				select.value = current;
 				select.disabled = !state.editable;
 				const queryIds = new Set(
 					state.queries.map((query) => query.id),
@@ -483,6 +505,7 @@ export class ComponentInspector {
 						setting,
 						select.value,
 						queryIds,
+						query,
 					);
 					if (Object.keys(patch).length > 0) this.deps.patch(patch);
 				});
@@ -688,7 +711,7 @@ export class ComponentInspector {
 			this.activeQueryTarget = nextTarget;
 			this.populateQueryOptions(select, nextTarget, groups, state, null);
 			select.value = next.id;
-			this.deps.patch(patch);
+			this.deps.patch(this.withMeasureFallback(state, next, patch));
 		});
 
 		select.addEventListener("change", () => {
@@ -725,6 +748,40 @@ export class ComponentInspector {
 			);
 			this.queryHintEl = hint;
 		}
+	}
+
+	/**
+	 * Switching query type can leave a stored measure the new object cannot
+	 * produce; reset it in the same patch so the dropdown never goes blank.
+	 */
+	private withMeasureFallback(
+		state: InspectorState,
+		query: QueryDefinition,
+		patch: Partial<DashboardComponentConfig>,
+	): Partial<DashboardComponentConfig> {
+		const definition = state.target.definition;
+		const setting = definition?.settings?.find(
+			(item) => item.key === "measure" && item.kind === "select",
+		);
+		if (!setting || setting.kind !== "select") return patch;
+		const options = resolveSettingOptions(setting, { query });
+		const stored = this.storedSettingValue(state, setting);
+		if (options.some((option) => option.value === stored)) return patch;
+		const value = definition?.measureDefault ?? options[0]?.value;
+		if (value === undefined) return patch;
+		return {
+			...patch,
+			...(setting.target === "options"
+				? {
+						options: {
+							...(patch.options ?? {}),
+							[setting.key]: value,
+						},
+					}
+				: ({
+						[setting.key]: value,
+					} as Partial<DashboardComponentConfig>)),
+		};
 	}
 
 	private populateQueryOptions(

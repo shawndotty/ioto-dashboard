@@ -156,12 +156,16 @@ test('saved-query adaptation matches direct data-layer calls', () => {
 	);
 });
 
-test('builtins cover both targets with stable ids', () => {
+test('builtins cover every target with stable ids', () => {
 	const queries = builtinQueries();
 	assert.ok(queries.some((item) => item.id === 'builtin:tasks-all'));
 	assert.ok(queries.some((item) => item.id === 'builtin:notes-all'));
 	assert.ok(queries.some((item) => item.id === 'builtin:tasks-unfinished'));
-	for (const item of queries) assert.ok(['note', 'task'].includes(item.target));
+	assert.ok(queries.some((item) => item.id === 'builtin:files-all'));
+	assert.ok(queries.some((item) => item.id === 'builtin:folders-all'));
+	for (const item of queries) {
+		assert.ok(['note', 'task', 'file', 'folder'].includes(item.target));
+	}
 });
 
 test('file target filters by folder scope, file name and extension', () => {

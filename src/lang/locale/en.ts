@@ -355,6 +355,8 @@ export default {
 	QUERY_BUILTIN_TASKS_ALL: "All tasks",
 	QUERY_BUILTIN_TASKS_UNFINISHED: "Unfinished tasks",
 	QUERY_BUILTIN_NOTES_ALL: "All notes",
+	QUERY_BUILTIN_FILES_ALL: "All files",
+	QUERY_BUILTIN_FOLDERS_ALL: "All folders",
 	QUERY_UNCLASSIFIED: "Unclassified",
 	// Modal shell
 	MODAL_FULLSCREEN_ENTER: "Enter fullscreen",
@@ -379,6 +381,7 @@ export default {
 	DATASET_MEASURE_RATIO: "Completion rate",
 	DATASET_MEASURE_SIZE: "Size",
 	DATASET_MEASURE_MTIME: "Modified",
+	DATASET_MEASURE_LATEST_MTIME: "Latest modified",
 	DATASET_MEASURE_SERIES: "Trend",
 	DATASET_VIEW_SCALAR: "Metric",
 	DATASET_VIEW_LIST: "List",

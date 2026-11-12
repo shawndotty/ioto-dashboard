@@ -1,4 +1,5 @@
 import { resolveQuery } from "../../../query/resolve";
+import type { FileRecord } from "../../../data/types";
 import {
 	emptyDataset,
 	formatDate,
@@ -7,6 +8,7 @@ import {
 	type Dataset,
 	type DatasetAdapter,
 	type DatasetColumn,
+	type MeasureId,
 } from "../types";
 import { cell } from "./shared";
 import {
@@ -22,6 +24,23 @@ export const FILE_COLUMNS: DatasetColumn[] = [
 	{ key: "size", labelKey: "DATASET_COL_SIZE", type: "size", align: "right" },
 	{ key: "mtime", labelKey: "DATASET_COL_MTIME", type: "date", align: "right" },
 ];
+
+function scalarTextFor(files: FileRecord[], measure: MeasureId): string {
+	if (files.length === 0) {
+		return measure === "size" || measure === "mtime" ? "—" : "0";
+	}
+	if (measure === "size") {
+		return formatSize(files.reduce((sum, file) => sum + file.size, 0));
+	}
+	if (measure === "mtime") {
+		const latest = files.reduce(
+			(max, file) => (file.mtime > max ? file.mtime : max),
+			files[0]?.mtime ?? 0,
+		);
+		return formatDate(latest);
+	}
+	return String(files.length);
+}
 
 export const fileAdapter: DatasetAdapter = (input): Dataset => {
 	const { request, query, snapshot } = input;
@@ -78,6 +97,6 @@ export const fileAdapter: DatasetAdapter = (input): Dataset => {
 		measure: request.measure,
 		columns: FILE_COLUMNS,
 		...truncated,
-		scalarText: String(files.length),
+		scalarText: scalarTextFor(files, request.measure),
 	};
 };

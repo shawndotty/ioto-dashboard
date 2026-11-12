@@ -24,9 +24,19 @@ export type ComponentCategory =
 	| "navigation"
 	| "action";
 
+/** Inspector state a setting may depend on; absent means "no query resolved". */
+export interface SettingContext {
+	query?: QueryDefinition;
+}
+
+export interface SettingOption {
+	value: string;
+	labelKey: string;
+}
+
 interface SettingBase {
 	/** Hides the row when the predicate returns false. */
-	when?(config: DashboardComponentConfig): boolean;
+	when?(config: DashboardComponentConfig, context?: SettingContext): boolean;
 	/** Optional explanatory line rendered under the control. */
 	hintKey?: string;
 }
@@ -68,7 +78,10 @@ export type ComponentSetting = SettingBase &
 				kind: "select";
 				group: ComponentSettingGroup;
 				labelKey: string;
-				options: Array<{ value: string; labelKey: string }>;
+				/** A function defers options to the current query (e.g. measures). */
+				options:
+					| SettingOption[]
+					| ((context: SettingContext) => SettingOption[]);
 				fallback: string;
 				/** `options` keys land in `config.options`, everything else on config. */
 				target?: "config" | "options";
@@ -195,6 +208,18 @@ function optionPatch(
 	} as unknown as Partial<DashboardComponentConfig>;
 }
 
+type SelectSetting = Extract<ComponentSetting, { kind: "select" }>;
+
+/** Static arrays pass through; function options resolve against the context. */
+export function resolveSettingOptions(
+	setting: SelectSetting,
+	context: SettingContext = {},
+): SettingOption[] {
+	return typeof setting.options === "function"
+		? setting.options(context)
+		: setting.options;
+}
+
 /**
  * Normalises one inspector input into a component patch. Pure (no DOM), so the
  * settings contract can be unit-tested; empty/invalid input returns `{}` and
@@ -204,6 +229,7 @@ export function coerceSettingValue(
 	setting: ComponentSetting,
 	raw: unknown,
 	queryIds: ReadonlySet<string>,
+	query?: QueryDefinition,
 ): Partial<DashboardComponentConfig> {
 	switch (setting.kind) {
 		case "query":
@@ -245,7 +271,8 @@ export function coerceSettingValue(
 		}
 		case "select": {
 			if (typeof raw !== "string") return {};
-			if (!setting.options.some((option) => option.value === raw)) return {};
+			const options = resolveSettingOptions(setting, { query });
+			if (!options.some((option) => option.value === raw)) return {};
 			return setting.target === "options"
 				? { options: { [setting.key]: raw } }
 				: ({
