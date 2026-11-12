@@ -856,6 +856,41 @@
     color: var(--text-faint);
 }
 
+.ioto-custom-dashboard-view .ioto-card-pager {
+    position: sticky;
+    bottom: -12px;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px -12px -12px;
+    padding: 6px 12px;
+    background: var(--ioto-card-bg, var(--background-secondary));
+    border-top: 1px solid var(--background-modifier-border);
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.ioto-custom-dashboard-view .ioto-card-pager-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-custom-dashboard-view .ioto-card-pager button {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    line-height: 1.4;
+}
+
+.ioto-custom-dashboard-view .ioto-card-pager button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
 /* ---- Modal shell (shared) ---- */
 .modal.ioto-dashboard-modal {
     width: min(720px, 92vw);

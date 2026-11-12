@@ -130,6 +130,7 @@ export default {
 	PAGINATION_PREV: "Previous",
 	PAGINATION_NEXT: "Next",
 	PAGINATION_PAGE: "Page {0} of {1}",
+	PAGINATION_RANGE: "Items {0}–{1} of {2}",
 
 	// TDL Input Heading
 	TDL_INPUT_HEADING: "Input (LEARN)",
@@ -288,6 +289,7 @@ export default {
 	COMPONENT_TASK_LIST_NAME: "Task list",
 	COMPONENT_TASK_LIST_DESC:
 		"Lists tasks from the selected task query, newest-modified notes first. Click one to jump to it.",
+	COMPONENT_TASK_LIST_PAGE_SIZE: "Items per page",
 	KPI_BASIS_FILE: "Whole file",
 	KPI_BASIS_SECTION: "Scoped sections",
 	PROJECT_PROGRESS_EMPTY: "No projects in scope.",

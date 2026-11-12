@@ -131,6 +131,7 @@ export default {
 	PAGINATION_PREV: "上一頁",
 	PAGINATION_NEXT: "下一頁",
 	PAGINATION_PAGE: "第 {0} 頁 / 共 {1} 頁",
+	PAGINATION_RANGE: "第 {0}–{1} 條 / 共 {2} 條",
 
 	// TDL Input Heading
 	TDL_INPUT_HEADING: "輸入 LEARN",
@@ -286,6 +287,7 @@ export default {
 	COMPONENT_TASK_LIST_NAME: "任務列表",
 	COMPONENT_TASK_LIST_DESC:
 		"依所選任務查詢展示任務列表，最近修改的筆記在前，點擊可跳轉到對應任務。",
+	COMPONENT_TASK_LIST_PAGE_SIZE: "每頁條數",
 	KPI_BASIS_FILE: "整個檔案",
 	KPI_BASIS_SECTION: "限定分節",
 	PROJECT_PROGRESS_EMPTY: "目前範圍內沒有專案。",
