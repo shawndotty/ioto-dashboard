@@ -206,6 +206,11 @@ export default {
 	DASHBOARD_DUPLICATE_COMPONENT: "Duplicate component",
 	DASHBOARD_COMPONENT_DUPLICATED: "Copied component: {0}",
 	DASHBOARD_COMPONENT_COPY_SUFFIX: " (copy)",
+	DASHBOARD_MOVE_COMPONENT: "Move to another page…",
+	DASHBOARD_MOVE_COMPONENT_PLACEHOLDER: "Search dashboards or pages",
+	DASHBOARD_MOVE_COMPONENT_DONE: 'Moved "{0}" to "{1} / {2}"',
+	DASHBOARD_MOVE_COMPONENT_FAILED:
+		"Move failed: target page or component is no longer available",
 	DASHBOARD_DELETE: "Delete",
 	DASHBOARD_DELETE_TITLE: "Delete dashboard",
 	DASHBOARD_DELETE_MSG:

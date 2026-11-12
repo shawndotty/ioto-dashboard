@@ -68,6 +68,7 @@ export class CustomInspectorView extends ItemView {
 				resetSize: () => component()?.resetSize(),
 				move: (offset) => component()?.move(offset),
 				duplicate: () => component()?.duplicate(),
+				moveTo: () => component()?.moveTo(),
 				remove: () => this.confirmRemove(),
 				openPageSettings: () => component()?.openPageSettings(),
 			},

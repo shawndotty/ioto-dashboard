@@ -61,6 +61,7 @@ import { ConfirmModal } from "../ui/ConfirmModal";
 import { DashboardManagerModal } from "../ui/dashboard-manager";
 import { PageLayoutModal } from "../ui/page-layout-modal";
 import { PageNameModal } from "../ui/page-name-modal";
+import { PagePickerModal, type PageTarget } from "../ui/page-picker";
 import {
 	QueryEditModal,
 	QueryManagerModal,
@@ -1109,9 +1110,12 @@ export class CustomDashboardView extends ItemView {
 		});
 	}
 
-	private boundsFor(config: DashboardComponentConfig): SizeBounds {
+	private boundsFor(
+		config: DashboardComponentConfig,
+		page: DashboardPage | undefined = this.activePage,
+	): SizeBounds {
 		const bounds = boundsForType(this.registry, config.type);
-		const columns = this.activePage?.columns ?? 12;
+		const columns = page?.columns ?? 12;
 		return { ...bounds, maxW: Math.max(bounds.minW, columns) };
 	}
 
@@ -1339,6 +1343,7 @@ export class CustomDashboardView extends ItemView {
 					resetSize: () => this.controller?.resetSize(),
 					move: (offset) => this.controller?.move(offset),
 					duplicate: () => this.controller?.duplicate(),
+					moveTo: () => this.controller?.moveTo(),
 					remove: () => this.controller?.remove(),
 					openPageSettings: () => {
 						const page = this.activePage;
@@ -1428,6 +1433,7 @@ export class CustomDashboardView extends ItemView {
 				if (id) void this.nudgeComponent(id, offset);
 			},
 			duplicate: () => void this.duplicateSelectedComponent(),
+			moveTo: () => void this.moveSelectedComponent(),
 			remove: () => this.confirmRemoveSelected(),
 			openPageSettings: () => {
 				const page = this.activePage;
@@ -1551,15 +1557,8 @@ export class CustomDashboardView extends ItemView {
 			(item) => item.id === id,
 		);
 		if (!source) return;
-		const definition = this.registry.get(source.type);
 		const suffix = t("DASHBOARD_COMPONENT_COPY_SUFFIX");
-		const base =
-			(
-				source.title ??
-				(definition
-					? t(definition.labelKey as Parameters<typeof t>[0])
-					: source.type)
-			).trim() || source.type;
+		const base = this.componentDisplayName(source);
 		const title = base.endsWith(suffix.trim()) ? base : `${base}${suffix}`;
 		const result = await this.plugin.dashboardRepository.duplicateComponent(
 			pageId,
@@ -1571,6 +1570,91 @@ export class CustomDashboardView extends ItemView {
 		this.render();
 		this.selectComponent(result.componentId);
 		new Notice(t("DASHBOARD_COMPONENT_DUPLICATED", [title]));
+	}
+
+	private componentDisplayName(config: DashboardComponentConfig): string {
+		const definition = this.registry.get(config.type);
+		const name = (
+			config.title ??
+			(definition
+				? t(definition.labelKey as Parameters<typeof t>[0])
+				: config.type)
+		).trim();
+		return name || config.type;
+	}
+
+	private async moveSelectedComponent(): Promise<void> {
+		const page = this.activePage;
+		const config = page?.components.find(
+			(item) => item.id === this.selectedComponentId,
+		);
+		if (!page || !config || !this.store) return;
+		const dashboardId = this.activeDashboard?.id;
+		const targets: PageTarget[] = [];
+		const others: PageTarget[] = [];
+		for (const dashboard of this.store.dashboards) {
+			for (const target of dashboard.pages) {
+				if (target.id === page.id) continue;
+				const entry = { dashboard, page: target };
+				if (dashboard.id === dashboardId) targets.push(entry);
+				else others.push(entry);
+			}
+		}
+		targets.push(...others);
+		if (targets.length === 0) {
+			new Notice(t("DASHBOARD_MOVE_COMPONENT_FAILED"));
+			return;
+		}
+		new PagePickerModal(this.app, targets, (target) => {
+			void this.transferSelectedComponent(config, page.id, target);
+		}).open();
+	}
+
+	private async transferSelectedComponent(
+		config: DashboardComponentConfig,
+		fromPageId: string,
+		target: PageTarget,
+	): Promise<void> {
+		const repository = this.plugin.dashboardRepository;
+		const result = await repository.transferComponent(
+			fromPageId,
+			config.id,
+			target.page.id,
+		);
+		if (!result) {
+			new Notice(t("DASHBOARD_MOVE_COMPONENT_FAILED"));
+			return;
+		}
+		this.store = result.store;
+		this.selectedComponentId = null;
+		this.plugin.inspectorService.clear(this.leafId);
+
+		const targetPage = this.store.dashboards
+			.flatMap((dashboard) => dashboard.pages)
+			.find((page) => page.id === target.page.id);
+		const moved = targetPage?.components.find(
+			(item) => item.id === result.componentId,
+		);
+		if (moved && targetPage) {
+			const bounds = this.boundsFor(moved, targetPage);
+			const next = clampSize(moved.w, moved.h, bounds);
+			if (next.w !== moved.w || next.h !== moved.h) {
+				this.store = await repository.updateComponent(
+					targetPage.id,
+					result.componentId,
+					next,
+				);
+			}
+		}
+
+		this.render();
+		new Notice(
+			t("DASHBOARD_MOVE_COMPONENT_DONE", [
+				this.componentDisplayName(moved ?? config),
+				target.dashboard.name,
+				target.page.name,
+			]),
+		);
 	}
 
 	private confirmRemoveSelected(): void {
@@ -2410,14 +2494,23 @@ function uniqueCopyName(name: string, taken: Set<string>): string {
 	return `${base} ${n}`;
 }
 
-/** Ignores component content: only dashboard/page identity and names matter. */
+/**
+ * Dashboard/page identity, names and the component ids on each page. Component
+ * ids catch add/remove/duplicate/cross-page moves; content edits are ignored
+ * because the editing leaf re-renders itself.
+ */
 function signatureOf(store: DashboardStoreData | null): string {
 	if (!store) return "";
 	return store.dashboards
 		.map(
 			(dashboard) =>
 				`${dashboard.id}:${dashboard.name}[${dashboard.pages
-					.map((page) => `${page.id}:${page.name}`)
+					.map(
+						(page) =>
+							`${page.id}:${page.name}(${page.components
+								.map((component) => component.id)
+								.join(",")})`,
+					)
 					.join(",")}]`,
 		)
 		.join("|");

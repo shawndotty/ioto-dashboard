@@ -57,6 +57,7 @@ export interface ComponentInspectorController extends InspectorControllerBase {
 	resetSize(): void;
 	move(offset: -1 | 1): void;
 	duplicate(): void;
+	moveTo(): void;
 	remove(): void;
 	openPageSettings(): void;
 }

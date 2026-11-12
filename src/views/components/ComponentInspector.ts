@@ -32,6 +32,7 @@ export interface ComponentInspectorDeps {
 	resetSize(): void;
 	move(offset: -1 | 1): void;
 	duplicate(): void;
+	moveTo(): void;
 	remove(): void;
 	openPageSettings?(): void;
 }
@@ -943,6 +944,14 @@ export class ComponentInspector {
 				.onClick(() => {
 					if (this.state?.target.config.id !== componentId) return;
 					this.deps.duplicate();
+				});
+		});
+		menu.addItem((item) => {
+			item.setTitle(t("DASHBOARD_MOVE_COMPONENT"))
+				.setIcon("arrow-right-left")
+				.onClick(() => {
+					if (this.state?.target.config.id !== componentId) return;
+					this.deps.moveTo();
 				});
 		});
 		menu.addSeparator();
