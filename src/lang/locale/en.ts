@@ -290,6 +290,10 @@ export default {
 	COMPONENT_TASK_LIST_DESC:
 		"Lists tasks from the selected task query, newest-modified notes first. Click one to jump to it.",
 	COMPONENT_TASK_LIST_PAGE_SIZE: "Items per page",
+	COMPONENT_NOTE_LIST_NAME: "Note list",
+	COMPONENT_NOTE_LIST_DESC:
+		"Lists notes matching the selected note query, newest first. Click one to open it.",
+	COMPONENT_NOTE_LIST_PAGE_SIZE: "Items per page",
 	KPI_BASIS_FILE: "Whole file",
 	KPI_BASIS_SECTION: "Scoped sections",
 	PROJECT_PROGRESS_EMPTY: "No projects in scope.",
@@ -301,6 +305,11 @@ export default {
 	TASK_LIST_SEARCH_PLACEHOLDER: "Search tasks…",
 	TASK_LIST_SEARCH_CLOSE: "Exit search (Esc)",
 	TASK_LIST_NO_MATCH: "No tasks match “{0}”.",
+	NOTE_LIST_EMPTY: "No matching notes.",
+	NOTE_LIST_SEARCH_TOGGLE: "Search notes",
+	NOTE_LIST_SEARCH_PLACEHOLDER: "Search notes…",
+	NOTE_LIST_SEARCH_CLOSE: "Exit search (Esc)",
+	NOTE_LIST_NO_MATCH: "No notes match “{0}”.",
 
 	// Queries
 	QUERY_MANAGER_TITLE: "Manage queries",

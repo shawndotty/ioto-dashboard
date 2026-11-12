@@ -289,6 +289,10 @@ export default {
 	COMPONENT_TASK_LIST_DESC:
 		"按所选任务查询展示任务列表，最近修改的笔记在前，点击可跳转到对应任务。",
 	COMPONENT_TASK_LIST_PAGE_SIZE: "每页条数",
+	COMPONENT_NOTE_LIST_NAME: "笔记列表",
+	COMPONENT_NOTE_LIST_DESC:
+		"按所选笔记查询展示笔记列表，最近修改的笔记在前，点击可打开对应笔记。",
+	COMPONENT_NOTE_LIST_PAGE_SIZE: "每页条数",
 	KPI_BASIS_FILE: "整个文件",
 	KPI_BASIS_SECTION: "限定分节",
 	PROJECT_PROGRESS_EMPTY: "当前范围内没有项目。",
@@ -300,6 +304,11 @@ export default {
 	TASK_LIST_SEARCH_PLACEHOLDER: "搜索任务…",
 	TASK_LIST_SEARCH_CLOSE: "退出搜索（Esc）",
 	TASK_LIST_NO_MATCH: "没有匹配“{0}”的任务。",
+	NOTE_LIST_EMPTY: "没有匹配的笔记。",
+	NOTE_LIST_SEARCH_TOGGLE: "搜索笔记",
+	NOTE_LIST_SEARCH_PLACEHOLDER: "搜索笔记…",
+	NOTE_LIST_SEARCH_CLOSE: "退出搜索（Esc）",
+	NOTE_LIST_NO_MATCH: "没有匹配“{0}”的笔记。",
 
 	// Queries
 	QUERY_MANAGER_TITLE: "管理查询",

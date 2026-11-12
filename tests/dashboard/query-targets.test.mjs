@@ -8,6 +8,9 @@ const { kpiComponent } = await load('../../src/dashboard/components/kpi.ts');
 const { taskListComponent } = await load(
 	'../../src/dashboard/components/task-list.ts',
 );
+const { noteListComponent } = await load(
+	'../../src/dashboard/components/note-list.ts',
+);
 const { lineChartComponent } = await load(
 	'../../src/dashboard/components/line-chart.ts',
 );
@@ -34,6 +37,7 @@ function definition(fields) {
 
 test('registration components declare explicit query targets', () => {
 	assert.deepEqual(queryTargetsFor(taskListComponent), ['task']);
+	assert.deepEqual(queryTargetsFor(noteListComponent), ['note']);
 	assert.deepEqual(queryTargetsFor(lineChartComponent), [
 		'task',
 		'note',

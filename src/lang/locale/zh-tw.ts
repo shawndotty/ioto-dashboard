@@ -288,6 +288,10 @@ export default {
 	COMPONENT_TASK_LIST_DESC:
 		"依所選任務查詢展示任務列表，最近修改的筆記在前，點擊可跳轉到對應任務。",
 	COMPONENT_TASK_LIST_PAGE_SIZE: "每頁條數",
+	COMPONENT_NOTE_LIST_NAME: "筆記列表",
+	COMPONENT_NOTE_LIST_DESC:
+		"依所選筆記查詢顯示筆記列表，最近修改的筆記在前，點擊可開啟對應筆記。",
+	COMPONENT_NOTE_LIST_PAGE_SIZE: "每頁筆數",
 	KPI_BASIS_FILE: "整個檔案",
 	KPI_BASIS_SECTION: "限定分節",
 	PROJECT_PROGRESS_EMPTY: "目前範圍內沒有專案。",
@@ -299,6 +303,11 @@ export default {
 	TASK_LIST_SEARCH_PLACEHOLDER: "搜尋任務…",
 	TASK_LIST_SEARCH_CLOSE: "退出搜尋（Esc）",
 	TASK_LIST_NO_MATCH: "沒有符合「{0}」的任務。",
+	NOTE_LIST_EMPTY: "沒有符合的筆記。",
+	NOTE_LIST_SEARCH_TOGGLE: "搜尋筆記",
+	NOTE_LIST_SEARCH_PLACEHOLDER: "搜尋筆記…",
+	NOTE_LIST_SEARCH_CLOSE: "結束搜尋（Esc）",
+	NOTE_LIST_NO_MATCH: "沒有符合「{0}」的筆記。",
 
 	// Queries
 	QUERY_MANAGER_TITLE: "管理查詢",

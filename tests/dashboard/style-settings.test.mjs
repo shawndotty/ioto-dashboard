@@ -16,6 +16,9 @@ const { projectProgressComponent } = await load(
 const { taskListComponent } = await load(
 	'../../src/dashboard/components/task-list.ts',
 );
+const { noteListComponent } = await load(
+	'../../src/dashboard/components/note-list.ts',
+);
 const { tableComponent } = await load(
 	'../../src/dashboard/components/table.ts',
 );
@@ -30,6 +33,7 @@ const COMPONENTS = [
 	kpiComponent,
 	projectProgressComponent,
 	taskListComponent,
+	noteListComponent,
 	tableComponent,
 	lineChartComponent,
 	barChartComponent,
@@ -119,7 +123,12 @@ test('cardStyleVars returns only valid values', () => {
 });
 
 test('settingsOf appends style settings and hides alignment where unsupported', () => {
-	const alignmentHidden = new Set(['line-chart', 'bar-chart', 'task-list']);
+	const alignmentHidden = new Set([
+		'line-chart',
+		'bar-chart',
+		'task-list',
+		'note-list',
+	]);
 	for (const component of COMPONENTS) {
 		const merged = settingsOf(component);
 		const own = component.settings ?? [];

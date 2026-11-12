@@ -10,6 +10,9 @@ const { projectProgressComponent } = await load(
 const { taskListComponent } = await load(
 	'../../src/dashboard/components/task-list.ts',
 );
+const { noteListComponent } = await load(
+	'../../src/dashboard/components/note-list.ts',
+);
 const { tableComponent } = await load('../../src/dashboard/components/table.ts');
 const { lineChartComponent } = await load(
 	'../../src/dashboard/components/line-chart.ts',
@@ -22,6 +25,7 @@ const COMPONENTS = [
 	kpiComponent,
 	projectProgressComponent,
 	taskListComponent,
+	noteListComponent,
 	tableComponent,
 	lineChartComponent,
 	barChartComponent,

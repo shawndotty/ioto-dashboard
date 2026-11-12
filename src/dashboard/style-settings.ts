@@ -42,7 +42,8 @@ export const STYLE_SETTINGS: ComponentSetting[] = [
 		when: (config) =>
 			config.type !== "line-chart" &&
 			config.type !== "bar-chart" &&
-			config.type !== "task-list",
+			config.type !== "task-list" &&
+			config.type !== "note-list",
 	},
 	{
 		key: "textColor",

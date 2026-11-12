@@ -856,6 +856,87 @@
     color: var(--text-faint);
 }
 
+/* Note list */
+.ioto-custom-dashboard-view .ioto-note-list-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    text-align: start;
+}
+
+.ioto-custom-dashboard-view .ioto-note-list-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-block: 6px;
+    padding-inline: 10px;
+    border-inline-start: 2px solid transparent;
+    border-bottom: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+
+.ioto-custom-dashboard-view .ioto-note-list-item:last-child {
+    border-bottom: none;
+}
+
+.ioto-custom-dashboard-view .ioto-note-list-item:hover {
+    background: var(--background-modifier-hover);
+}
+
+.ioto-custom-dashboard-view .ioto-note-list-item:focus-visible {
+    background: var(--background-modifier-hover);
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--interactive-accent);
+}
+
+.ioto-custom-dashboard-view .ioto-note-list-title {
+    min-width: 0;
+    font-size: var(--font-ui-small);
+    line-height: 1.4;
+    color: var(--text-normal);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.ioto-custom-dashboard-view .ioto-note-list-title:hover {
+    text-decoration: underline;
+}
+
+.ioto-custom-dashboard-view .ioto-note-list-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.3;
+    color: var(--text-faint);
+}
+
+.ioto-custom-dashboard-view .ioto-note-list-io {
+    display: inline-block;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--tag-background, var(--background-modifier-hover));
+    color: var(--tag-color, var(--text-muted));
+    line-height: 1.6;
+}
+
+.ioto-custom-dashboard-view .ioto-note-list-folder {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.ioto-custom-dashboard-view .ioto-note-list-date {
+    margin-inline-start: auto;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 .ioto-custom-dashboard-view .ioto-card-pager {
     position: sticky;
     bottom: -12px;
@@ -910,18 +991,18 @@
     cursor: default;
 }
 
-/* ---- Task list header search ---- */
+/* ---- Card header search (task list / note list) ---- */
 .ioto-custom-dashboard-view .ioto-dashboard-card-header.is-searching .ioto-dashboard-card-title {
     display: none;
 }
 
 .ioto-custom-dashboard-view
     .ioto-dashboard-card-header.is-searching
-    .ioto-task-list-search-toggle {
+    .ioto-card-search-toggle {
     display: none;
 }
 
-.ioto-custom-dashboard-view .ioto-task-list-search {
+.ioto-custom-dashboard-view .ioto-card-search {
     flex: 1 1 auto;
     min-width: 0;
     display: none;
@@ -929,12 +1010,12 @@
     gap: 6px;
 }
 
-.ioto-custom-dashboard-view .ioto-task-list-search.is-open {
+.ioto-custom-dashboard-view .ioto-card-search.is-open {
     display: flex;
-    animation: ioto-task-search-in 120ms ease-out;
+    animation: ioto-card-search-in 120ms ease-out;
 }
 
-@keyframes ioto-task-search-in {
+@keyframes ioto-card-search-in {
     from {
         opacity: 0;
         transform: translateX(4px);
@@ -946,23 +1027,23 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .ioto-custom-dashboard-view .ioto-task-list-search.is-open {
+    .ioto-custom-dashboard-view .ioto-card-search.is-open {
         animation: none;
     }
 }
 
-.ioto-custom-dashboard-view .ioto-task-list-search-icon {
+.ioto-custom-dashboard-view .ioto-card-search-icon {
     flex: 0 0 auto;
     display: flex;
     color: var(--text-faint);
 }
 
-.ioto-custom-dashboard-view .ioto-task-list-search-icon svg {
+.ioto-custom-dashboard-view .ioto-card-search-icon svg {
     width: 14px;
     height: 14px;
 }
 
-.ioto-custom-dashboard-view .ioto-task-list-search input[type="search"] {
+.ioto-custom-dashboard-view .ioto-card-search input[type="search"] {
     flex: 1 1 auto;
     min-width: 0;
     height: 26px;
@@ -974,16 +1055,16 @@
 }
 
 .ioto-custom-dashboard-view
-    .ioto-task-list-search
+    .ioto-card-search
     input[type="search"]::-webkit-search-cancel-button {
     display: none;
 }
 
-.ioto-custom-dashboard-view .ioto-task-list-search input[type="search"]:focus {
+.ioto-custom-dashboard-view .ioto-card-search input[type="search"]:focus {
     border-color: var(--interactive-accent);
 }
 
-.ioto-custom-dashboard-view .ioto-task-list-search-exit {
+.ioto-custom-dashboard-view .ioto-card-search-exit {
     --icon-size: 16px;
     width: 20px;
     height: 20px;
