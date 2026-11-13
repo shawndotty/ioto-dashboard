@@ -1,6 +1,6 @@
 - IOTO仪表盘插件
     - **全新自定义Dashboard功能上线**
-    - 无限Dashbaord
+    - 无限Dashboard
     - 无限Page
     - 目前提供以下组件
         - KPI（KPI）
