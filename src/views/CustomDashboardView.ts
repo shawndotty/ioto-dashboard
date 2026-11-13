@@ -380,6 +380,7 @@ export class CustomDashboardView extends ItemView {
 		this.contentEl.addClass("ioto-custom-dashboard-view");
 		this.ensureShell();
 		this.contentEl.toggleClass("is-zen", this.isZenMode);
+		this.contentEl.toggleClass("is-mobile", Platform.isMobile);
 		this.syncToolbar();
 		this.syncBanner();
 		this.syncPagesBar();
@@ -412,7 +413,19 @@ export class CustomDashboardView extends ItemView {
 			});
 			this.pagesScrollEl = this.pagesEl.createDiv({
 				cls: "ioto-dashboard-pages-scroll",
+				attr: { role: "tablist" },
 			});
+			// Bound once: the scroll container persists and is only emptied.
+			this.pagesScrollEl.addEventListener("keydown", (event) =>
+				this.handlePagesKeydown(event),
+			);
+			const add = this.pagesEl.createEl("button", {
+				cls: "ioto-dashboard-page-add clickable-icon",
+				attr: { type: "button", "aria-label": t("PAGE_TABS_ADD") },
+			});
+			setIcon(add, "plus");
+			setTooltip(add, t("PAGE_TABS_ADD"));
+			add.onClickEvent(() => void this.createPage());
 			const exit = this.pagesEl.createEl("button", {
 				cls: "ioto-dashboard-zen-exit clickable-icon",
 				attr: { type: "button", "aria-label": t("ZEN_MODE_OFF") },
@@ -706,27 +719,24 @@ export class CustomDashboardView extends ItemView {
 		strip.empty();
 		for (const page of pages) {
 			const active = page.id === this.activePage?.id;
-			const tab = strip.createEl("button", {
+			const tab = strip.createDiv({
 				cls: `ioto-dashboard-page-tab${active ? " is-active" : ""}`,
-				attr: { "aria-pressed": active ? "true" : "false" },
+				attr: {
+					role: "tab",
+					tabindex: active ? "0" : "-1",
+					"aria-selected": active ? "true" : "false",
+					"data-page-id": page.id,
+				},
 			});
 			tab.createSpan({
 				cls: "ioto-dashboard-page-tab-label",
 				text: page.name,
 			});
-			tab.onClickEvent(() => {
-				if (this.editMode && !Platform.isMobile) {
-					this.openPageSettings(page);
-					return;
-				}
-				this.switchPage(page.id);
+			tab.onClickEvent(() => this.switchPage(page.id));
+			tab.addEventListener("dblclick", () => {
+				if (!this.editMode) return;
+				this.openPageSettings(page, "name");
 			});
-			if (Platform.isMobile) {
-				tab.addEventListener("dblclick", () => {
-					if (!this.editMode) return;
-					this.openPageSettings(page, "name");
-				});
-			}
 			if (this.editMode) {
 				if (!Platform.isMobile) {
 					tab.setAttr("title", t("PAGE_SETTINGS_TITLE"));
@@ -734,57 +744,89 @@ export class CustomDashboardView extends ItemView {
 				this.renderPageTabTools(tab, page);
 			}
 		}
-		if (this.editMode) {
-			const add = strip.createEl("button", {
-				cls: "ioto-dashboard-page-add clickable-icon",
-				attr: { "aria-label": t("PAGE_TABS_ADD"), title: t("PAGE_TABS_ADD") },
-				text: "+",
-			});
-			add.onClickEvent(() => void this.createPage());
+	}
+
+	private handlePagesKeydown(event: KeyboardEvent): void {
+		const pages = this.activeDashboard?.pages ?? [];
+		if (pages.length === 0) return;
+		const index = pages.findIndex(
+			(page) => page.id === this.activePage?.id,
+		);
+		if (index < 0) return;
+		let next: number;
+		switch (event.key) {
+			case "ArrowRight":
+				next = (index + 1) % pages.length;
+				break;
+			case "ArrowLeft":
+				next = (index - 1 + pages.length) % pages.length;
+				break;
+			case "Home":
+				next = 0;
+				break;
+			case "End":
+				next = pages.length - 1;
+				break;
+			default:
+				return;
 		}
+		const target = pages[next];
+		if (!target) return;
+		event.preventDefault();
+		this.switchPage(target.id);
+		this.focusPageTab(target.id);
+	}
+
+	private focusPageTab(pageId: string): void {
+		const strip = this.pagesScrollEl;
+		if (!strip) return;
+		const escaped = CSS.escape(pageId);
+		const tab = strip.querySelector<HTMLElement>(
+			`[role="tab"][data-page-id="${escaped}"]`,
+		);
+		tab?.focus();
+		tab?.scrollIntoView({ block: "nearest", inline: "nearest" });
 	}
 
 	private renderPageTabTools(tab: HTMLElement, page: DashboardPage): void {
 		if (Platform.isMobile) {
 			const layout = tab.createEl("button", {
-				cls: "ioto-dashboard-page-close",
-				attr: {
-					"aria-label": t("PAGE_LAYOUT_TITLE"),
-					title: t("PAGE_LAYOUT_TITLE"),
-				},
-				text: "▦",
+				cls: "ioto-dashboard-page-tool ioto-dashboard-page-tool--layout",
+				attr: { type: "button", "aria-label": t("PAGE_LAYOUT_TITLE") },
 			});
+			setIcon(layout, "layout-dashboard");
+			setTooltip(layout, t("PAGE_LAYOUT_TITLE"));
 			layout.onClickEvent((event) => {
 				event.stopPropagation();
 				this.openPageLayout(page);
 			});
 			const rename = tab.createEl("button", {
-				cls: "ioto-dashboard-page-close",
-				attr: { "aria-label": t("PAGE_RENAME"), title: t("PAGE_RENAME") },
-				text: "✎",
+				cls: "ioto-dashboard-page-tool ioto-dashboard-page-tool--rename",
+				attr: { type: "button", "aria-label": t("PAGE_RENAME") },
 			});
+			setIcon(rename, "pencil");
+			setTooltip(rename, t("PAGE_RENAME"));
 			rename.onClickEvent((event) => {
 				event.stopPropagation();
 				this.openRenamePage(page);
 			});
 			const duplicate = tab.createEl("button", {
-				cls: "ioto-dashboard-page-close",
-				attr: {
-					"aria-label": t("PAGE_DUPLICATE"),
-					title: t("PAGE_DUPLICATE"),
-				},
-				text: "⧉",
+				cls: "ioto-dashboard-page-tool ioto-dashboard-page-tool--duplicate",
+				attr: { type: "button", "aria-label": t("PAGE_DUPLICATE") },
 			});
+			setIcon(duplicate, "copy");
+			setTooltip(duplicate, t("PAGE_DUPLICATE"));
 			duplicate.onClickEvent((event) => {
 				event.stopPropagation();
 				void this.duplicatePage(page);
 			});
 		}
 		const remove = tab.createEl("button", {
-			cls: "ioto-dashboard-page-close",
-			attr: { "aria-label": t("PAGE_DELETE"), title: t("PAGE_DELETE") },
-			text: "×",
+			cls: "ioto-dashboard-page-tool ioto-dashboard-page-tool--delete is-danger",
+			attr: { type: "button", "aria-label": t("PAGE_DELETE") },
 		});
+		setIcon(remove, "x");
+		setTooltip(remove, t("PAGE_DELETE"));
 		remove.onClickEvent((event) => {
 			event.stopPropagation();
 			this.confirmRemovePage(page);
