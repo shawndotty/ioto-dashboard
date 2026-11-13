@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { load } from '../data/helpers.mjs';
 
-const { buttonComponent, normalizeExternalUrl } = await load(
+const { buttonComponent, normalizeExternalUrl, contrastOn } = await load(
 	'../../src/dashboard/components/button.ts',
 );
 
@@ -49,6 +49,7 @@ test('button createConfig starts on a URL action with the card title hidden', ()
 	assert.equal(created.options.openInNewTab, true);
 	assert.equal(created.options.hideTitle, true);
 	assert.equal(created.options.surface, 'plain');
+	assert.equal('buttonColor' in created.options, false);
 	assert.equal(created.w, 2);
 	assert.equal(created.h, 1);
 });
@@ -67,6 +68,33 @@ test('button settings expose title plus one target row per action type', () => {
 		assert.equal(entry.picker, picker);
 		assert.equal(entry.target, 'options');
 	}
+});
+
+test('the variant menu exposes the six button styles', () => {
+	const entry = setting('variant');
+	assert.deepEqual(
+		entry.options.map((option) => option.value),
+		['default', 'primary', 'warning', 'success', 'danger', 'custom'],
+	);
+});
+
+test('buttonColor only shows for the custom style', () => {
+	const entry = setting('buttonColor');
+	assert.equal(entry.kind, 'color');
+	assert.equal(entry.group, 'style');
+	assert.equal(entry.target, 'options');
+	for (const variant of ['default', 'primary', 'warning', 'success', 'danger']) {
+		assert.equal(entry.when({ options: { variant } }, {}), false, variant);
+	}
+	assert.equal(entry.when({ options: { variant: 'custom' } }, {}), true);
+});
+
+test('contrastOn picks the readable text color', () => {
+	assert.equal(contrastOn('#ffffff'), '#000000');
+	assert.equal(contrastOn('#000000'), '#ffffff');
+	assert.equal(contrastOn('#ffff00'), '#000000');
+	assert.equal(contrastOn('#1e3a8a'), '#ffffff');
+	assert.equal(contrastOn('not-a-color'), '#ffffff');
 });
 
 test('action-specific rows only show for their action type', () => {

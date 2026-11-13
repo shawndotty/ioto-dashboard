@@ -731,6 +731,12 @@ export default {
 	BUTTON_VARIANT_DEFAULT: "Default",
 	BUTTON_VARIANT_PRIMARY: "Accent",
 	BUTTON_VARIANT_WARNING: "Warning",
+	BUTTON_VARIANT_SUCCESS: "Success",
+	BUTTON_VARIANT_DANGER: "Danger",
+	BUTTON_VARIANT_CUSTOM: "Custom",
+	SETTING_BUTTON_COLOR: "Button color",
+	SETTING_BUTTON_COLOR_HINT:
+		"Applies to the Custom style only; the hover shade is derived automatically. Leave unset to follow the preset.",
 	INSPECTOR_TARGET_EMPTY: "Not selected",
 	INSPECTOR_TARGET_PICK: "Choose",
 	PICKER_NOTE_PLACEHOLDER: "Search notes",

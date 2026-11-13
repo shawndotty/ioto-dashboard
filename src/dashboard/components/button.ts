@@ -22,6 +22,22 @@ export function normalizeExternalUrl(raw: string): string | null {
 		: null;
 }
 
+const BUTTON_HEX = /^#[0-9a-fA-F]{6}$/;
+
+/** 在给定底色上返回可读性更高的文字色；非法输入回退白色。 */
+export function contrastOn(hex: string): "#000000" | "#ffffff" {
+	if (!BUTTON_HEX.test(hex)) return "#ffffff";
+	const channel = (start: number): number => {
+		const value = parseInt(hex.slice(start, start + 2), 16) / 255;
+		return value <= 0.03928
+			? value / 12.92
+			: Math.pow((value + 0.055) / 1.055, 2.4);
+	};
+	const luminance =
+		0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+	return luminance > 0.179 ? "#000000" : "#ffffff";
+}
+
 export const buttonComponent: ComponentDefinition = {
 	type: "button",
 	labelKey: "COMPONENT_BUTTON_NAME",
@@ -127,16 +143,36 @@ export const buttonComponent: ComponentDefinition = {
 				{ value: "default", labelKey: "BUTTON_VARIANT_DEFAULT" },
 				{ value: "primary", labelKey: "BUTTON_VARIANT_PRIMARY" },
 				{ value: "warning", labelKey: "BUTTON_VARIANT_WARNING" },
+				{ value: "success", labelKey: "BUTTON_VARIANT_SUCCESS" },
+				{ value: "danger", labelKey: "BUTTON_VARIANT_DANGER" },
+				{ value: "custom", labelKey: "BUTTON_VARIANT_CUSTOM" },
 			],
+		},
+		{
+			key: "buttonColor",
+			kind: "color",
+			group: "style",
+			target: "options",
+			labelKey: "SETTING_BUTTON_COLOR",
+			hintKey: "SETTING_BUTTON_COLOR_HINT",
+			when: (config) => config.options?.variant === "custom",
 		},
 	],
 	render: (el, ctx) => {
 		const options = ctx.config.options ?? {};
 		const actionType = String(options.actionType ?? "url");
-		const variants: Record<string, string> = {
-			primary: "mod-cta",
-			warning: "mod-warning",
-		};
+		const variant = String(options.variant ?? "default");
+		const customColor =
+			variant === "custom" &&
+			BUTTON_HEX.test(String(options.buttonColor ?? ""))
+				? String(options.buttonColor).toLowerCase()
+				: "";
+		const cls = ["ioto-dashboard-button"];
+		if (customColor) cls.push("is-colored");
+		else if (variant === "primary") cls.push("mod-cta");
+		else if (variant === "warning") cls.push("mod-warning");
+		else if (variant === "success") cls.push("ioto-btn-success");
+		else if (variant === "danger") cls.push("ioto-btn-danger");
 		const storedLabel = String(options.label ?? "").trim();
 		const fallback = (): string => {
 			if (actionType === "url") {
@@ -167,15 +203,19 @@ export const buttonComponent: ComponentDefinition = {
 		}
 		el.addClass("ioto-dashboard-button-body");
 		const button = el.createEl("button", {
-			cls: [
-				"ioto-dashboard-button",
-				variants[String(options.variant ?? "")],
-			]
-				.filter(Boolean)
-				.join(" "),
+			cls: cls.join(" "),
 			text: label,
 			attr: { type: "button" },
 		});
+		if (customColor) {
+			button.style.setProperty("--ioto-btn-color", customColor);
+			const explicitText = BUTTON_HEX.test(
+				String(options.textColor ?? ""),
+			);
+			if (!explicitText) {
+				button.style.setProperty("--text-color", contrastOn(customColor));
+			}
+		}
 		button.disabled = ctx.editMode;
 		if (ctx.editMode) return;
 		button.onClickEvent(() => {

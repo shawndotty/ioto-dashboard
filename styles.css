@@ -3722,6 +3722,11 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     justify-content: center;
     white-space: normal;
     text-align: center;
+    --ioto-btn-bg: var(--interactive-normal);
+    --ioto-btn-bg-hover: var(--interactive-hover);
+    --ioto-btn-bg-active: color-mix(in srgb, var(--ioto-btn-bg) 82%, var(--text-normal));
+    background-color: var(--ioto-btn-bg);
+    cursor: var(--cursor-link);
 }
 
 /* Card selection relies on this: clicks fall through to the card body. */
@@ -3821,11 +3826,55 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     padding: 6px 16px;
 }
 
-/* On a plain surface the custom background belongs to the button itself. */
+/* 旧入口：plain + 背景颜色 → 与自定义色共用派生路径 */
 .ioto-custom-dashboard-view
     .ioto-dashboard-card.is-surface-plain.has-custom-bg
     .ioto-dashboard-button {
-    background-color: var(--ioto-card-bg);
+    --ioto-btn-color: var(--ioto-card-bg);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-button.mod-cta {
+    --ioto-btn-bg: var(--interactive-accent);
+    --ioto-btn-bg-hover: var(--interactive-accent-hover);
+    --text-color: var(--text-on-accent);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-button.mod-warning {
+    --ioto-btn-bg: var(--background-modifier-error);
+    --ioto-btn-bg-hover: var(--background-modifier-error-hover);
+    --text-color: var(--text-on-accent);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-button.ioto-btn-success {
+    --ioto-btn-bg: var(--background-modifier-success);
+    --ioto-btn-bg-hover: color-mix(in srgb, var(--background-modifier-success) 88%, var(--text-normal));
+    --text-color: var(--text-on-accent);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-button.ioto-btn-danger {
+    --ioto-btn-bg: var(--background-modifier-error);
+    --ioto-btn-bg-hover: var(--background-modifier-error-hover);
+    --text-color: var(--text-on-accent);
+}
+
+/* 卡片背景与按钮自定义色汇入同一组变量；内联 --ioto-btn-color 优先级最高 */
+.ioto-custom-dashboard-view
+    .ioto-dashboard-card.is-surface-plain.has-custom-bg
+    .ioto-dashboard-button,
+.ioto-custom-dashboard-view .ioto-dashboard-button.is-colored {
+    --ioto-btn-bg: var(--ioto-btn-color);
+    --ioto-btn-bg-hover: color-mix(in srgb, var(--ioto-btn-color) 88%, var(--text-normal));
+    --ioto-btn-bg-active: color-mix(in srgb, var(--ioto-btn-color) 78%, var(--text-normal));
+}
+
+@media (hover: hover) {
+    .ioto-custom-dashboard-view .ioto-dashboard-button:hover:not(:disabled) {
+        background-color: var(--ioto-btn-bg-hover);
+    }
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-button:active:not(:disabled) {
+    background-color: var(--ioto-btn-bg-active);
 }
 
 /* ---- Editing skin for bare surfaces (flat + plain) ---- */
