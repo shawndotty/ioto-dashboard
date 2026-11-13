@@ -732,11 +732,19 @@ export class CustomDashboardView extends ItemView {
 				cls: "ioto-dashboard-page-tab-label",
 				text: page.name,
 			});
-			tab.onClickEvent(() => this.switchPage(page.id));
-			tab.addEventListener("dblclick", () => {
-				if (!this.editMode) return;
-				this.openPageSettings(page, "name");
+			tab.onClickEvent(() => {
+				if (this.editMode && !Platform.isMobile) {
+					this.openPageSettings(page);
+					return;
+				}
+				this.switchPage(page.id);
 			});
+			if (Platform.isMobile) {
+				tab.addEventListener("dblclick", () => {
+					if (!this.editMode) return;
+					this.openPageSettings(page, "name");
+				});
+			}
 			if (this.editMode) {
 				if (!Platform.isMobile) {
 					tab.setAttr("title", t("PAGE_SETTINGS_TITLE"));
