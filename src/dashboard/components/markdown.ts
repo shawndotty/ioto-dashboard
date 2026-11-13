@@ -15,7 +15,7 @@ export const markdownComponent: ComponentDefinition = {
 	defaultQueryId: "",
 	createConfig: () => ({
 		queryId: "",
-		options: { markdown: "", hideTitle: true },
+		options: { markdown: "", hideTitle: true, surface: "plain" },
 		w: 4,
 		h: 3,
 	}),

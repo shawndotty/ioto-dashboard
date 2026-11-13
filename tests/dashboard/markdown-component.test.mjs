@@ -18,7 +18,7 @@ test('the markdown component is queryless and never requests data', () => {
 test('markdown createConfig starts empty and hides the title', () => {
 	assert.deepEqual(markdownComponent.createConfig(''), {
 		queryId: '',
-		options: { markdown: '', hideTitle: true },
+		options: { markdown: '', hideTitle: true, surface: 'plain' },
 		w: 4,
 		h: 3,
 	});

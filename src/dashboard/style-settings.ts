@@ -1,7 +1,11 @@
 import type { ComponentDefinition, ComponentSetting } from "./registry";
 
-/** Style option keys; never written by `createConfig`, so old data stays valid. */
+/**
+ * Style option keys. `createConfig` only ever writes `surface` (and only for
+ * markdown / button); the rest stay untouched so old data remains valid.
+ */
 export const STYLE_SETTING_KEYS = [
+	"surface",
 	"textAlign",
 	"textColor",
 	"backgroundColor",
@@ -10,6 +14,24 @@ export const STYLE_SETTING_KEYS = [
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const ALIGNMENTS = ["left", "center", "right"] as const;
 type TextAlign = (typeof ALIGNMENTS)[number];
+
+export const SURFACES = ["card", "flat", "plain"] as const;
+export type CardSurface = (typeof SURFACES)[number];
+
+function isSurface(value: unknown): value is CardSurface {
+	return (
+		typeof value === "string" &&
+		(SURFACES as readonly string[]).includes(value)
+	);
+}
+
+/** `surface` 缺省按 `card` 解释，保证旧看板外观不变。 */
+export function cardSurfaceOf(
+	options: Record<string, string | number | boolean> | undefined,
+): CardSurface {
+	const value = options?.surface;
+	return isSurface(value) ? value : "card";
+}
 
 function isAlignment(value: unknown): value is TextAlign {
 	return (
@@ -27,6 +49,21 @@ function isColor(value: unknown): value is string {
  * the definition's own settings, so `createConfig()` and the schema stay intact.
  */
 export const STYLE_SETTINGS: ComponentSetting[] = [
+	{
+		key: "surface",
+		kind: "select",
+		group: "style",
+		labelKey: "SETTING_CARD_SURFACE",
+		hintKey: "SETTING_CARD_SURFACE_HINT",
+		fallback: "card",
+		target: "options",
+		options: [
+			{ value: "card", labelKey: "SURFACE_CARD" },
+			{ value: "flat", labelKey: "SURFACE_FLAT" },
+			{ value: "plain", labelKey: "SURFACE_PLAIN" },
+		],
+		when: (config) => config.type === "markdown" || config.type === "button",
+	},
 	{
 		key: "textAlign",
 		kind: "select",
@@ -64,6 +101,8 @@ export const STYLE_SETTINGS: ComponentSetting[] = [
 		labelKey: "SETTING_BACKGROUND_COLOR",
 		hintKey: "SETTING_STYLE_COLOR_HINT",
 		target: "options",
+		when: (config) =>
+			!(config.type === "markdown" && cardSurfaceOf(config.options) === "plain"),
 	},
 ];
 
@@ -95,6 +134,8 @@ export interface CardStyleVars {
 	fg?: string;
 	bg?: string;
 	align?: TextAlign;
+	/** 恒有值；缺省或非法值回落 `card`。 */
+	surface: CardSurface;
 }
 
 /**
@@ -104,7 +145,7 @@ export interface CardStyleVars {
 export function cardStyleVars(
 	options: Record<string, string | number | boolean> | undefined,
 ): CardStyleVars {
-	const vars: CardStyleVars = {};
+	const vars: CardStyleVars = { surface: cardSurfaceOf(options) };
 	const fg = options?.textColor;
 	if (isColor(fg)) vars.fg = fg;
 	const bg = options?.backgroundColor;

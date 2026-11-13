@@ -7,6 +7,7 @@ const {
 	STYLE_SETTINGS,
 	STYLE_SETTING_KEYS,
 	DISPLAY_SETTINGS,
+	cardSurfaceOf,
 	cardStyleVars,
 	settingsOf,
 } = await load('../../src/dashboard/style-settings.ts');
@@ -35,6 +36,12 @@ const { pieChartComponent, donutChartComponent } = await load(
 const { scatterChartComponent } = await load(
 	'../../src/dashboard/components/scatter-chart.ts',
 );
+const { markdownComponent } = await load(
+	'../../src/dashboard/components/markdown.ts',
+);
+const { buttonComponent } = await load(
+	'../../src/dashboard/components/button.ts',
+);
 
 const COMPONENTS = [
 	kpiComponent,
@@ -47,6 +54,8 @@ const COMPONENTS = [
 	pieChartComponent,
 	donutChartComponent,
 	scatterChartComponent,
+	markdownComponent,
+	buttonComponent,
 ];
 
 function styleSetting(key) {
@@ -76,10 +85,20 @@ test('style settings are unique options keys in the style group', () => {
 	}
 });
 
-test('createConfig never writes style options', () => {
+test('createConfig writes only the default plain surface, never other style options', () => {
+	const surfaceDefaults = new Map([
+		['markdown', 'plain'],
+		['button', 'plain'],
+	]);
 	for (const component of COMPONENTS) {
 		const created = component.createConfig(component.defaultQueryId);
+		assert.equal(
+			created.options?.surface,
+			surfaceDefaults.get(component.type),
+			`${component.type} surface`,
+		);
 		for (const key of STYLE_SETTING_KEYS) {
+			if (key === 'surface') continue;
 			assert.equal(
 				created.options?.[key],
 				undefined,
@@ -111,16 +130,16 @@ test('coerceSettingValue accepts only alignments and hex colors', () => {
 	}
 });
 
-test('cardStyleVars returns only valid values', () => {
-	assert.deepEqual(cardStyleVars(undefined), {});
-	assert.deepEqual(cardStyleVars({}), {});
+test('cardStyleVars returns only valid values and always reports a surface', () => {
+	assert.deepEqual(cardStyleVars(undefined), { surface: 'card' });
+	assert.deepEqual(cardStyleVars({}), { surface: 'card' });
 	assert.deepEqual(
 		cardStyleVars({
 			textColor: '#112233',
 			backgroundColor: '#445566',
 			textAlign: 'center',
 		}),
-		{ fg: '#112233', bg: '#445566', align: 'center' },
+		{ surface: 'card', fg: '#112233', bg: '#445566', align: 'center' },
 	);
 	assert.deepEqual(
 		cardStyleVars({
@@ -128,8 +147,53 @@ test('cardStyleVars returns only valid values', () => {
 			backgroundColor: '#abc',
 			textAlign: 'middle',
 		}),
-		{},
+		{ surface: 'card' },
 	);
+	assert.deepEqual(cardStyleVars({ surface: 'flat' }), { surface: 'flat' });
+	assert.deepEqual(cardStyleVars({ surface: 'bogus' }), { surface: 'card' });
+});
+
+test('surface falls back to card for missing or invalid data', () => {
+	assert.equal(cardSurfaceOf(undefined), 'card');
+	assert.equal(cardSurfaceOf({}), 'card');
+	assert.equal(cardSurfaceOf({ surface: 'bogus' }), 'card');
+	for (const value of ['card', 'flat', 'plain']) {
+		assert.equal(cardSurfaceOf({ surface: value }), value);
+	}
+});
+
+test('surface is selectable only for markdown and button', () => {
+	const surface = styleSetting('surface');
+	assert.equal(surface.kind, 'select');
+	assert.equal(surface.fallback, 'card');
+	assert.deepEqual(
+		surface.options.map((option) => option.value),
+		['card', 'flat', 'plain'],
+	);
+	for (const component of COMPONENTS) {
+		const visible = !surface.when || surface.when({ type: component.type });
+		assert.equal(
+			visible,
+			component.type === 'markdown' || component.type === 'button',
+			`${component.type} surface visibility`,
+		);
+	}
+	assert.deepEqual(coerceSettingValue(surface, 'plain', new Set()), {
+		options: { surface: 'plain' },
+	});
+	assert.deepEqual(coerceSettingValue(surface, 'bogus', new Set()), {});
+});
+
+test('markdown hides the background color control on a plain surface', () => {
+	const background = styleSetting('backgroundColor');
+	const visible = (type, surface) =>
+		!background.when || background.when({ type, options: { surface } });
+	assert.equal(visible('markdown', 'plain'), false);
+	assert.equal(visible('markdown', undefined), true);
+	assert.equal(visible('markdown', 'card'), true);
+	assert.equal(visible('markdown', 'flat'), true);
+	assert.equal(visible('button', 'plain'), true);
+	assert.equal(visible('kpi', 'plain'), true);
 });
 
 test('settingsOf appends style settings and hides alignment where unsupported', () => {

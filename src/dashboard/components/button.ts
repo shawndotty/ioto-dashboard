@@ -39,6 +39,7 @@ export const buttonComponent: ComponentDefinition = {
 			hideTitle: true,
 			variant: "default",
 			openInNewTab: true,
+			surface: "plain",
 		},
 		w: 2,
 		h: 2,

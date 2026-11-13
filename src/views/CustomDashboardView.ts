@@ -47,7 +47,7 @@ import {
 	type SizeBounds,
 	type TargetPickerKind,
 } from "../dashboard/registry";
-import { cardStyleVars } from "../dashboard/style-settings";
+import { cardStyleVars, cardSurfaceOf } from "../dashboard/style-settings";
 import {
 	activeDashboard as activeDashboardOf,
 	activePageOf,
@@ -412,10 +412,16 @@ export class CustomDashboardView extends ItemView {
 
 	private syncToolbar(): void {
 		const dashboard = this.activeDashboard;
+		const selected = this.editMode ? this.selectedBareComponent() : null;
+		const selectedTitle = selected
+			? this.titleOf(selected, this.registry.get(selected.type))
+			: "";
 		const signature = [
 			this.editMode ? "edit" : "view",
 			dashboard?.id ?? "",
 			dashboard?.name ?? "",
+			selected?.id ?? "",
+			selectedTitle,
 		].join("|");
 		if (signature === this.toolbarSignature) return;
 		this.toolbarSignature = signature;
@@ -443,6 +449,32 @@ export class CustomDashboardView extends ItemView {
 		);
 
 		const actions = toolbar.createDiv({ cls: "ioto-dashboard-actions" });
+		if (selected) {
+			const selectedContext = actions.createDiv({
+				cls: "ioto-dashboard-selected-context",
+			});
+			selectedContext.setAttr(
+				"aria-label",
+				t("DASHBOARD_SELECTED_COMPONENT"),
+			);
+			selectedContext.createSpan({
+				cls: "ioto-dashboard-selected-title",
+				text: selectedTitle,
+			});
+			this.addIconToolbarButton(
+				selectedContext,
+				"pencil",
+				t("DASHBOARD_RENAME_COMPONENT"),
+				() => this.selectComponent(selected.id, "title"),
+			);
+			this.addIconToolbarButton(
+				selectedContext,
+				"trash-2",
+				t("DASHBOARD_CONFIG_REMOVE"),
+				() => this.confirmRemove(selected.id),
+				"ioto-dashboard-selected-remove",
+			);
+		}
 		if (this.editMode) {
 			this.addToolbarButton(
 				actions,
@@ -964,6 +996,57 @@ export class CustomDashboardView extends ItemView {
 		menu.showAtPosition({ x: rect.right, y: rect.bottom });
 	}
 
+	private openCardMenu(
+		event: MouseEvent,
+		config: DashboardComponentConfig,
+	): void {
+		if (!this.editMode) return;
+		const target = event.target as HTMLElement | null;
+		if (
+			target?.closest(
+				"a, button, input, select, textarea, [contenteditable='true']",
+			)
+		) {
+			return;
+		}
+		event.preventDefault();
+		// duplicate/move 读取 selectedComponentId，先同步选中再打开菜单。
+		this.selectComponent(config.id);
+		const menu = new Menu();
+		menu.addItem((item) =>
+			item
+				.setTitle(t("DASHBOARD_RENAME_COMPONENT"))
+				.setIcon("pencil")
+				.onClick(() => this.selectComponent(config.id, "title")),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(t("DASHBOARD_DUPLICATE_COMPONENT"))
+				.setIcon("copy")
+				.onClick(() => void this.duplicateSelectedComponent()),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(t("DASHBOARD_MOVE_COMPONENT"))
+				.setIcon("folder-symlink")
+				.onClick(() => void this.moveSelectedComponent()),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(t("DASHBOARD_RESET_SIZE"))
+				.setIcon("maximize")
+				.onClick(() => void this.resetComponentSize(config.id)),
+		);
+		menu.addSeparator();
+		menu.addItem((item) =>
+			item
+				.setTitle(t("DASHBOARD_CONFIG_REMOVE"))
+				.setIcon("trash-2")
+				.onClick(() => this.confirmRemove(config.id)),
+		);
+		menu.showAtMouseEvent(event);
+	}
+
 	/**
 	 * Reconciles the grid with the store: unchanged cards keep their DOM node,
 	 * only changed or missing ones are rebuilt; order changes are minimal moves.
@@ -1074,6 +1157,11 @@ export class CustomDashboardView extends ItemView {
 		card.addClass("ioto-dashboard-card");
 		card.setAttr("data-component-id", config.id);
 		const style = cardStyleVars(config.options);
+		const bare = style.surface !== "card";
+		card.dataset.componentType = config.type;
+		card.toggleClass("is-surface-plain", style.surface === "plain");
+		card.toggleClass("is-surface-flat", style.surface === "flat");
+		card.toggleClass("is-surface-bare", bare);
 		if (style.fg) card.style.setProperty("--ioto-card-fg", style.fg);
 		if (style.bg) card.style.setProperty("--ioto-card-bg", style.bg);
 		if (style.align) card.style.setProperty("--ioto-card-align", style.align);
@@ -1106,15 +1194,23 @@ export class CustomDashboardView extends ItemView {
 		}
 		if (hideTitle) {
 			card.setAttr("aria-label", this.titleOf(config, definition));
+		} else if (this.editMode && bare) {
+			// 裸表面编辑态不渲染标题，避免回流位移；可访问名落到卡片上。
+			card.setAttr("aria-label", this.titleOf(config, definition));
 		} else {
 			header.createDiv({
 				cls: "ioto-dashboard-card-title",
 				text: this.titleOf(config, definition),
 			});
 		}
-		if (this.editMode) {
+		if (this.editMode && !bare) {
 			this.renderRenameButton(header, config);
 			this.renderRemoveButton(header, config);
+		}
+		if (this.editMode) {
+			card.addEventListener("contextmenu", (event) =>
+				this.openCardMenu(event, config),
+			);
 		}
 
 		const body = card.createDiv({ cls: "ioto-dashboard-card-body" });
@@ -1473,6 +1569,14 @@ export class CustomDashboardView extends ItemView {
 		this.render();
 	}
 
+	private selectedBareComponent(): DashboardComponentConfig | null {
+		const id = this.selectedComponentId;
+		if (!id) return null;
+		const config = this.activePage?.components.find((item) => item.id === id);
+		if (!config) return null;
+		return cardSurfaceOf(config.options) === "card" ? null : config;
+	}
+
 	private selectComponent(id: string, focus?: InspectorFocus): void {
 		const pageId = this.activePage?.id;
 		if (!pageId) return;
@@ -1517,13 +1621,16 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private syncSelectionClasses(): void {
-		if (!this.gridEl) return;
-		for (const child of Array.from(this.gridEl.children)) {
-			const element = child as HTMLElement;
-			const id = element.dataset.componentId;
-			if (!id) continue;
-			element.toggleClass("is-selected", id === this.selectedComponentId);
+		const grid = this.gridEl;
+		if (grid) {
+			for (const child of Array.from(grid.children)) {
+				const element = child as HTMLElement;
+				const id = element.dataset.componentId;
+				if (!id) continue;
+				element.toggleClass("is-selected", id === this.selectedComponentId);
+			}
 		}
+		this.syncToolbar();
 	}
 
 	private inspectorHost(): "sidebar" | "inline" {
