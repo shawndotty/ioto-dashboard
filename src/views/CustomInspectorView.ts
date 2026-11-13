@@ -71,6 +71,9 @@ export class CustomInspectorView extends ItemView {
 				moveTo: () => component()?.moveTo(),
 				remove: () => this.confirmRemove(),
 				openPageSettings: () => component()?.openPageSettings(),
+				pickTarget: (picker, key) => component()?.pickTarget(picker, key),
+				describeTarget: (picker, value) =>
+					component()?.describeTarget(picker, value) ?? value,
 			},
 			page: {
 				rename: (name) => page()?.renamePage(name),

@@ -2,6 +2,7 @@ import type { QueryDefinition } from "../query/types";
 import type {
 	ComponentDefinition,
 	SizeBounds,
+	TargetPickerKind,
 } from "./registry";
 import type { DashboardComponentConfig } from "./types";
 
@@ -60,6 +61,10 @@ export interface ComponentInspectorController extends InspectorControllerBase {
 	moveTo(): void;
 	remove(): void;
 	openPageSettings(): void;
+	/** 打开对应选择器，选中后由视图写回该 setting.key。 */
+	pickTarget(picker: TargetPickerKind, key: string): void;
+	/** 目标值的只读展示文案；空值返回空串。 */
+	describeTarget(picker: TargetPickerKind, value: string): string;
 }
 
 export interface PageInspectorController extends InspectorControllerBase {

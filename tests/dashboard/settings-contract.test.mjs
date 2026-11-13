@@ -23,6 +23,9 @@ const { barChartComponent } = await load(
 const { markdownComponent } = await load(
 	'../../src/dashboard/components/markdown.ts',
 );
+const { buttonComponent } = await load(
+	'../../src/dashboard/components/button.ts',
+);
 
 const COMPONENTS = [
 	kpiComponent,
@@ -33,6 +36,7 @@ const COMPONENTS = [
 	lineChartComponent,
 	barChartComponent,
 	markdownComponent,
+	buttonComponent,
 ];
 const CONFIG_KEYS = new Set(['id', 'type', 'queryId', 'basis', 'limit', 'title', 'view', 'measure', 'options', 'x', 'y', 'w', 'h']);
 const QUERY_IDS = new Set(['builtin:tasks-all', 'builtin:tasks-unfinished', 'user:1']);
@@ -263,6 +267,23 @@ test('the textarea setting keeps newlines and deletes an all-whitespace value', 
 		options: { markdown: undefined },
 	});
 	assert.deepEqual(coerceSettingValue(setting, 7, QUERY_IDS), {});
+});
+
+test('the target setting trims values and deletes the key when cleared', () => {
+	const setting = {
+		key: 'notePath',
+		kind: 'target',
+		picker: 'note',
+		group: 'display',
+		target: 'options',
+	};
+	assert.deepEqual(coerceSettingValue(setting, '  Notes/A.md ', QUERY_IDS), {
+		options: { notePath: 'Notes/A.md' },
+	});
+	assert.deepEqual(coerceSettingValue(setting, '   ', QUERY_IDS), {
+		options: { notePath: undefined },
+	});
+	assert.deepEqual(coerceSettingValue(setting, 42, QUERY_IDS), {});
 });
 
 test('the table writes defaults its settings advertise', () => {

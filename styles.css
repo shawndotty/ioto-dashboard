@@ -3425,3 +3425,80 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 .ioto-custom-dashboard-view .ioto-markdown-body .markdown-embed {
     max-width: 100%;
 }
+
+/* ---- Button component ---- */
+.ioto-custom-dashboard-view .ioto-dashboard-button-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-button {
+    width: 100%;
+    max-width: 320px;
+    min-height: 32px;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+}
+
+/* Card selection relies on this: clicks fall through to the card body. */
+.ioto-custom-dashboard-view .ioto-dashboard-button:disabled {
+    opacity: 0.6;
+    cursor: default;
+    pointer-events: none;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-button-empty {
+    display: flex;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+    text-align: center;
+}
+
+/* ---- Inspector target row ---- */
+.ioto-inspector-target-row {
+    display: flex;
+    align-items: center;
+    gap: var(--ioto-inspector-space-inline);
+}
+
+.ioto-inspector-target-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-inspector-target-value.is-empty {
+    color: var(--text-faint);
+}
+
+.ioto-inspector-target-pick {
+    flex: 0 0 auto;
+}
+
+/* ---- Command picker suggestions ---- */
+.ioto-command-picker-icon {
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    margin-right: 6px;
+    color: var(--text-muted);
+}
+
+.ioto-command-picker-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-command-picker-badge {
+    margin-left: var(--size-4-2);
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}

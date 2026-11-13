@@ -8,6 +8,7 @@ import { barChartComponent } from "./bar-chart";
 import { donutChartComponent, pieChartComponent } from "./pie-chart";
 import { scatterChartComponent } from "./scatter-chart";
 import { markdownComponent } from "./markdown";
+import { buttonComponent } from "./button";
 import { ComponentRegistry } from "../registry";
 
 export function createComponentRegistry(): ComponentRegistry {
@@ -23,5 +24,6 @@ export function createComponentRegistry(): ComponentRegistry {
 	registry.register(donutChartComponent);
 	registry.register(scatterChartComponent);
 	registry.register(markdownComponent);
+	registry.register(buttonComponent);
 	return registry;
 }

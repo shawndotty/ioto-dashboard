@@ -385,7 +385,7 @@ export default class IotoDashboardPlugin extends Plugin {
 	 */
 	async activateCustomDashboard(
 		dashboardId: string,
-		options: { newWindow?: boolean } = {},
+		options: { newWindow?: boolean; pageId?: string } = {},
 	): Promise<void> {
 		const { workspace } = this.app;
 		let leaf: WorkspaceLeaf | null = null;
@@ -394,20 +394,26 @@ export default class IotoDashboardPlugin extends Plugin {
 			leaf = workspace.getLeaf("window");
 			await leaf.setViewState({
 				type: CUSTOM_DASHBOARD_VIEW_TYPE,
-				state: { dashboardId },
+				state: { dashboardId, pageId: options.pageId },
 				active: true,
 			});
 		} else {
 			const existing = this.findDashboardLeaf(dashboardId);
 			if (existing) {
 				void workspace.revealLeaf(existing);
+				if (
+					options.pageId &&
+					existing.view instanceof CustomDashboardView
+				) {
+					existing.view.showPage(options.pageId);
+				}
 				await this.markDashboardActive(dashboardId);
 				return;
 			}
 			leaf = workspace.getLeaf("tab");
 			await leaf.setViewState({
 				type: CUSTOM_DASHBOARD_VIEW_TYPE,
-				state: { dashboardId },
+				state: { dashboardId, pageId: options.pageId },
 				active: true,
 			});
 		}

@@ -45,6 +45,7 @@ import {
 	type ComponentRenderContext,
 	type ComponentStatus,
 	type SizeBounds,
+	type TargetPickerKind,
 } from "../dashboard/registry";
 import { cardStyleVars } from "../dashboard/style-settings";
 import {
@@ -70,6 +71,8 @@ import { FolderContentsModal } from "../ui/folder-contents-modal";
 import { PageLayoutModal } from "../ui/page-layout-modal";
 import { PageNameModal } from "../ui/page-name-modal";
 import { PagePickerModal, type PageTarget } from "../ui/page-picker";
+import { CommandPickerModal } from "../ui/pickers/command-picker";
+import { NotePickerModal } from "../ui/pickers/note-picker";
 import { ProjectTasksModal } from "../ui/project-tasks-modal";
 import {
 	QueryEditModal,
@@ -739,6 +742,11 @@ export class CustomDashboardView extends ItemView {
 			});
 	}
 
+	/** 供插件激活入口精确落页；内部仍走 switchPage 的选择清理与持久化。 */
+	showPage(pageId: string): void {
+		this.switchPage(pageId);
+	}
+
 	private async createPage(): Promise<void> {
 		const dashboard = this.activeDashboard;
 		if (!dashboard) return;
@@ -1124,6 +1132,9 @@ export class CustomDashboardView extends ItemView {
 			revealInExplorer: (path) => void this.revealInExplorer(path),
 			openLink: (path, line, newTab) =>
 				void this.openVaultTarget(path, line, newTab),
+			executeCommand: (id) => this.app.commands.executeCommandById(id),
+			openPage: (pageId) => this.openPageById(pageId),
+			describeTarget: (picker, value) => this.describeTarget(picker, value),
 			openChartBucket: (payload) => this.openChartBucket(payload),
 			renderMarkdown: (el, path) => this.renderMarkdown(el, path),
 			renderInlineMarkdown: (el, markdown, sourcePath) =>
@@ -1533,6 +1544,10 @@ export class CustomDashboardView extends ItemView {
 						const page = this.activePage;
 						if (page) this.openPageSettings(page);
 					},
+					pickTarget: (picker, key) =>
+						this.controller?.pickTarget(picker, key),
+					describeTarget: (picker, value) =>
+						this.controller?.describeTarget(picker, value) ?? value,
 				},
 				page: {
 					rename: (name) => {
@@ -1629,6 +1644,8 @@ export class CustomDashboardView extends ItemView {
 				const page = this.activePage;
 				if (page) this.openPageSettings(page);
 			},
+			pickTarget: (picker, key) => this.pickTargetForComponent(picker, key),
+			describeTarget: (picker, value) => this.describeTarget(picker, value),
 		};
 	}
 
@@ -1779,24 +1796,59 @@ export class CustomDashboardView extends ItemView {
 		return name || config.type;
 	}
 
+	private pageTargets(excludePageId?: string): PageTarget[] {
+		const targets: PageTarget[] = [];
+		const others: PageTarget[] = [];
+		const currentDashboardId = this.activeDashboard?.id;
+		for (const dashboard of this.store?.dashboards ?? []) {
+			for (const page of dashboard.pages) {
+				if (page.id === excludePageId) continue;
+				const entry = { dashboard, page };
+				if (dashboard.id === currentDashboardId) targets.push(entry);
+				else others.push(entry);
+			}
+		}
+		return [...targets, ...others];
+	}
+
+	private pickTargetForComponent(
+		picker: TargetPickerKind,
+		key: string,
+	): void {
+		const componentId = this.selectedComponentId;
+		if (!componentId) return;
+		const apply = (value: string): void => {
+			void this.updateComponent(componentId, {
+				options: { [key]: value || undefined },
+			} as Partial<DashboardComponentConfig>);
+		};
+		if (picker === "note") {
+			new NotePickerModal(this.app, (file) => apply(file.path)).open();
+			return;
+		}
+		if (picker === "command") {
+			new CommandPickerModal(this.app, (command) =>
+				apply(command.id),
+			).open();
+			return;
+		}
+		const targets = this.pageTargets(this.activePage?.id);
+		if (targets.length === 0) {
+			new Notice(t("PICKER_NO_PAGES_FOUND"));
+			return;
+		}
+		new PagePickerModal(this.app, targets, (target) =>
+			apply(target.page.id),
+		).open();
+	}
+
 	private async moveSelectedComponent(): Promise<void> {
 		const page = this.activePage;
 		const config = page?.components.find(
 			(item) => item.id === this.selectedComponentId,
 		);
 		if (!page || !config || !this.store) return;
-		const dashboardId = this.activeDashboard?.id;
-		const targets: PageTarget[] = [];
-		const others: PageTarget[] = [];
-		for (const dashboard of this.store.dashboards) {
-			for (const target of dashboard.pages) {
-				if (target.id === page.id) continue;
-				const entry = { dashboard, page: target };
-				if (dashboard.id === dashboardId) targets.push(entry);
-				else others.push(entry);
-			}
-		}
-		targets.push(...others);
+		const targets = this.pageTargets(page.id);
 		if (targets.length === 0) {
 			new Notice(t("DASHBOARD_MOVE_COMPONENT_FAILED"));
 			return;
@@ -2631,12 +2683,46 @@ export class CustomDashboardView extends ItemView {
 		await leaf.openFile(file, { eState: { line: line ?? 0 } });
 	}
 
+	private openPageById(pageId: string): void {
+		const target = this.store
+			? findDashboardForPage(this.store, pageId)
+			: undefined;
+		if (!target) {
+			new Notice(t("BUTTON_PAGE_MISSING"));
+			return;
+		}
+		if (target.id === this.activeDashboard?.id) {
+			this.switchPage(pageId);
+			return;
+		}
+		void this.plugin.activateCustomDashboard(target.id, { pageId });
+	}
+
+	private describeTarget(picker: TargetPickerKind, value: string): string {
+		const stored = value.trim();
+		if (!stored) return "";
+		if (picker === "note") {
+			return stored.split("/").pop()?.replace(/\.md$/i, "") || stored;
+		}
+		if (picker === "command") {
+			return (
+				this.app.commands
+					.listCommands()
+					.find((command) => command.id === stored)?.name ?? stored
+			);
+		}
+		const dashboard = this.store
+			? findDashboardForPage(this.store, stored)
+			: undefined;
+		const page = dashboard?.pages.find((item) => item.id === stored);
+		return dashboard && page ? `${dashboard.name} / ${page.name}` : stored;
+	}
+
 	private async openVaultTarget(
 		path: string,
 		line: number | undefined,
 		newTab: boolean,
-	): Promise<void> {
-		if (!path) return;
+	): Promise<void> {		if (!path) return;
 		let node: TAbstractFile | null =
 			this.app.vault.getAbstractFileByPath(path);
 

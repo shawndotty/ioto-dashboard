@@ -58,6 +58,9 @@ export interface SettingOption {
 	labelKey: string;
 }
 
+/** How a `target` setting resolves its value in the inspector. */
+export type TargetPickerKind = "note" | "command" | "page";
+
 interface SettingBase {
 	/** Hides the row when the predicate returns false. */
 	when?(config: DashboardComponentConfig, context?: SettingContext): boolean;
@@ -155,6 +158,15 @@ export type ComponentSetting = SettingBase &
 				labelKey: string;
 				target?: "options";
 		  }
+		| {
+				/** A note / command / dashboard page chosen through a picker. */
+				key: string;
+				kind: "target";
+				picker: TargetPickerKind;
+				group: ComponentSettingGroup;
+				labelKey: string;
+				target?: "options";
+		  }
 	);
 
 export interface ComponentRenderContext {
@@ -176,6 +188,12 @@ export interface ComponentRenderContext {
 	revealInExplorer(path: string): void;
 	/** 按 Vault 实际节点类型分流：文件→新标签、文件夹→内容弹窗、缺失→Notice。 */
 	openLink?(path: string, line: number | undefined, newTab: boolean): void;
+	/** 执行一条已注册命令；返回 false 表示当前上下文不可执行。 */
+	executeCommand?(id: string): boolean;
+	/** 跳转到指定页面（同库切页 / 跨库激活），缺失时由宿主提示。 */
+	openPage?(pageId: string): void;
+	/** 把目标值解析成可读文案：笔记名 / 命令名 / `Dashboard / Page`。 */
+	describeTarget?(picker: TargetPickerKind, value: string): string;
 	/** Opens the per-bucket detail list for a line chart point. */
 	openChartBucket?(payload: ChartBucketPayload): void;
 	/** Renders Markdown owned by the current view, so it unloads with the card. */
@@ -372,6 +390,16 @@ export function coerceSettingValue(
 			return setting.target === "options"
 				? optionPatch(setting.key, values.join(",") || undefined)
 				: {};
+		}
+		case "target": {
+			// The picker is the only writer; validity is checked at execution time.
+			if (typeof raw !== "string") return {};
+			const trimmed = raw.trim();
+			return setting.target === "options"
+				? optionPatch(setting.key, trimmed || undefined)
+				: ({
+						[setting.key]: trimmed || undefined,
+					} as Partial<DashboardComponentConfig>);
 		}
 		case "color": {
 			if (typeof raw !== "string" || !/^#[0-9a-fA-F]{6}$/.test(raw)) {

@@ -1,5 +1,6 @@
 export type Category = "Input" | "Output" | "Outcome" | "Tasks" | "Notes";
 
+import type { Command } from "obsidian";
 import type { GroupOption, SortOption, SortOrder } from "../data/types";
 
 export type {
@@ -12,7 +13,9 @@ export type {
 declare module "obsidian" {
 	interface App {
 		commands: {
-			executeCommandById(id: string): void;
+			/** Returns false when the command's check callback rejects the context. */
+			executeCommandById(id: string): boolean;
+			listCommands(): Command[];
 		};
 		plugins: {
 			plugins: {

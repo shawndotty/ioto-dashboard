@@ -7,6 +7,7 @@ import {
 	queryTargetsFor,
 	resolveSettingOptions,
 	type ComponentSetting,
+	type TargetPickerKind,
 } from "../../dashboard/registry";
 import {
 	columnsForObject,
@@ -43,6 +44,8 @@ export interface ComponentInspectorDeps {
 	moveTo(): void;
 	remove(): void;
 	openPageSettings?(): void;
+	pickTarget?(picker: TargetPickerKind, key: string): void;
+	describeTarget?(picker: TargetPickerKind, value: string): string;
 }
 
 type LabelKey = Parameters<typeof t>[0];
@@ -111,6 +114,14 @@ export class ComponentInspector {
 			reset: HTMLButtonElement;
 			row: HTMLElement;
 			setting: ComponentSetting;
+		}
+	>();
+	private targetRefs = new Map<
+		string,
+		{
+			valueEl: HTMLElement;
+			pick: HTMLButtonElement;
+			setting: Extract<ComponentSetting, { kind: "target" }>;
 		}
 	>();
 	private titleInput: HTMLInputElement | null = null;
@@ -729,6 +740,28 @@ export class ComponentInspector {
 				});
 				return;
 			}
+			case "target": {
+				field.createEl("label", {
+					text: t(setting.labelKey as LabelKey),
+				});
+				const row = field.createDiv({
+					cls: "ioto-inspector-row ioto-inspector-target-row",
+				});
+				const valueEl = row.createDiv({
+					cls: "ioto-inspector-target-value",
+				});
+				const pick = row.createEl("button", {
+					cls: "ioto-inspector-target-pick",
+					text: t("INSPECTOR_TARGET_PICK"),
+					attr: { type: "button" },
+				});
+				pick.disabled = !state.editable;
+				pick.onClickEvent(() =>
+					this.deps.pickTarget?.(setting.picker, setting.key),
+				);
+				this.targetRefs.set(setting.key, { valueEl, pick, setting });
+				return;
+			}
 			case "columns": {
 				field.createEl("label", { text: t(setting.labelKey as LabelKey) });
 				const query = state.queries.find(
@@ -1252,6 +1285,17 @@ export class ComponentInspector {
 			input.disabled = !state.editable;
 			reset.disabled = !state.editable;
 		}
+		for (const [, entry] of this.targetRefs) {
+			const stored = this.storedSettingValue(state, entry.setting);
+			const value = typeof stored === "string" ? stored : "";
+			const label = value
+				? (this.deps.describeTarget?.(entry.setting.picker, value) ??
+					value)
+				: t("INSPECTOR_TARGET_EMPTY");
+			entry.valueEl.setText(label);
+			entry.valueEl.toggleClass("is-empty", !value);
+			entry.pick.disabled = !state.editable;
+		}
 
 		const size = clampSize(config.w, config.h, bounds);
 		const widthText = `${t("DASHBOARD_WIDTH")}: ${size.w} (${bounds.minW}–${bounds.maxW})`;
@@ -1398,6 +1442,7 @@ export class ComponentInspector {
 		this.basisSelect = null;
 		this.inputRefs.clear();
 		this.colorRefs.clear();
+		this.targetRefs.clear();
 		this.titleInput = null;
 		this.widthValueEl = null;
 		this.heightValueEl = null;
