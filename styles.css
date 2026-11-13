@@ -547,10 +547,61 @@
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-page-tab.is-active {
-    background: var(--tab-background-active, var(--background-primary));
-    border-color: var(--background-modifier-border);
-    color: var(--text-normal);
+    background: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+    color: var(--text-on-accent, var(--text-normal));
     font-weight: 500;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-page-tab.is-active:hover {
+    background: var(--interactive-accent-hover, var(--interactive-accent));
+}
+
+.ioto-custom-dashboard-view
+    .ioto-dashboard-page-tab.is-active
+    .ioto-dashboard-page-tool {
+    color: color-mix(
+        in srgb,
+        var(--text-on-accent, var(--text-normal)) 78%,
+        transparent
+    );
+}
+
+.ioto-custom-dashboard-view
+    .ioto-dashboard-page-tab.is-active
+    .ioto-dashboard-page-tool:hover {
+    background: color-mix(
+        in srgb,
+        var(--text-on-accent, var(--text-normal)) 18%,
+        transparent
+    );
+    color: var(--text-on-accent, var(--text-normal));
+}
+
+.ioto-custom-dashboard-view
+    .ioto-dashboard-page-tab.is-active
+    .ioto-dashboard-page-tool.is-danger:hover {
+    background: color-mix(
+        in srgb,
+        var(--text-error) 30%,
+        var(--interactive-accent)
+    );
+    color: var(--text-on-accent, var(--text-normal));
+}
+
+.ioto-custom-dashboard-view
+    .ioto-dashboard-page-tab.is-active
+    .ioto-dashboard-page-tab-chevron {
+    color: color-mix(
+        in srgb,
+        var(--text-on-accent, var(--text-normal)) 78%,
+        transparent
+    );
+}
+
+.ioto-custom-dashboard-view
+    .ioto-dashboard-page-tab.is-active:focus-visible {
+    outline-color: var(--text-on-accent, var(--text-normal));
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-page-tab:focus-visible {
@@ -3966,7 +4017,20 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 }
 
 .ioto-pages-row.is-active {
+    background: color-mix(
+        in srgb,
+        var(--interactive-accent) 12%,
+        transparent
+    );
     box-shadow: inset 2px 0 0 var(--interactive-accent);
+}
+
+.ioto-pages-row.is-active:hover {
+    background: color-mix(
+        in srgb,
+        var(--interactive-accent) 18%,
+        transparent
+    );
 }
 
 .ioto-pages-row.is-dragging {
@@ -4074,14 +4138,24 @@ body.is-mobile .ioto-pages-handle {
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-subpage-tab.is-active {
-    color: var(--text-normal);
-    background: var(--background-modifier-hover);
+    color: var(--text-on-accent, var(--text-normal));
+    background: var(--interactive-accent);
     font-weight: var(--font-medium);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-subpage-tab.is-active:hover {
+    background: var(--interactive-accent-hover, var(--interactive-accent));
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-subpage-tab:focus-visible {
     outline: 2px solid var(--interactive-accent);
     outline-offset: 1px;
+}
+
+.ioto-custom-dashboard-view
+    .ioto-dashboard-subpage-tab.is-active:focus-visible {
+    outline-color: var(--text-on-accent, var(--text-normal));
+    outline-offset: -2px;
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-subpages-toggle {
