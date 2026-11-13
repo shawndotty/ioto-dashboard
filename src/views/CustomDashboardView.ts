@@ -917,6 +917,8 @@ export class CustomDashboardView extends ItemView {
 		ghost.removeAttribute("data-page-id");
 		ghost.removeAttribute("tabindex");
 		ghost.setAttr("aria-hidden", "true");
+		ghost.removeClass("is-active");
+		ghost.addClass("ioto-custom-dashboard-view");
 		ghost.addClass("ioto-dashboard-page-tab-ghost");
 		ghost.style.left = `${rect.left}px`;
 		ghost.style.top = `${rect.top}px`;

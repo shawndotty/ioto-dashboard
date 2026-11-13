@@ -23,6 +23,8 @@ export class PagesInspector {
 	private signature = "";
 	private state: PagesInspectorState | null = null;
 	private listEl: HTMLElement | null = null;
+	// Guards the click that follows a row drag from switching pages.
+	private suppressRowClick = false;
 
 	constructor(
 		container: HTMLElement,
@@ -122,9 +124,15 @@ export class PagesInspector {
 		const list = this.root.createDiv({ cls: "ioto-pages-list" });
 		this.listEl = list;
 		state.target.pages.forEach((page, index) => {
+			const total = state.target.pages.length;
 			const row = list.createDiv({
 				cls: `ioto-pages-row${page.isActive ? " is-active" : ""}`,
-				attr: { "data-page-id": page.id },
+				attr: {
+					"data-page-id": page.id,
+					role: "button",
+					tabindex: "0",
+					...(page.isActive ? { "aria-current": "page" } : {}),
+				},
 			});
 			const handle = row.createDiv({
 				cls: "ioto-pages-handle",
@@ -132,48 +140,57 @@ export class PagesInspector {
 			});
 			setIcon(handle, "grip-vertical");
 
-			const name = row.createEl("button", {
-				cls: "ioto-pages-name",
-				attr: { type: "button" },
-			});
-			name.createSpan({ text: page.name });
-			if (page.isActive) name.setAttr("aria-current", "page");
-			name.onClickEvent(() => this.deps.switchTo(page.id));
-
+			row.createDiv({ cls: "ioto-pages-name", text: page.name });
 			row.createSpan({
 				cls: "ioto-pages-count",
 				text: t("PAGE_SETTINGS_COMPONENTS", [
 					String(page.componentCount),
 				]),
 			});
-			if (page.isActive) {
-				row.createSpan({
-					cls: "ioto-pages-current-dot",
-					attr: { "aria-hidden": "true" },
-				});
-			}
 
-			this.createMoveButton(
+			row.addEventListener("click", (event) => {
+				if (this.suppressRowClick) return;
+				if ((event.target as HTMLElement | null)?.closest("button")) {
+					return;
+				}
+				this.deps.switchTo(page.id);
+			});
+			row.addEventListener("keydown", (event) => {
+				if (event.target !== row) return;
+				if (event.key !== "Enter" && event.key !== " ") return;
+				event.preventDefault();
+				this.deps.switchTo(page.id);
+			});
+
+			if (Platform.isMobile) {
+				this.createMoveButton(
+					row,
+					page.id,
+					index,
+					total,
+					-1,
+					"arrow-up",
+					t("PAGE_MOVE_UP"),
+					state.editable,
+				);
+				this.createMoveButton(
+					row,
+					page.id,
+					index,
+					total,
+					1,
+					"arrow-down",
+					t("PAGE_MOVE_DOWN"),
+					state.editable,
+				);
+			}
+			this.createMenuButton(
 				row,
-				page.id,
+				page,
 				index,
-				state.target.pages.length,
-				-1,
-				"arrow-up",
-				t("PAGE_MOVE_UP"),
+				total,
 				state.editable,
 			);
-			this.createMoveButton(
-				row,
-				page.id,
-				index,
-				state.target.pages.length,
-				1,
-				"arrow-down",
-				t("PAGE_MOVE_DOWN"),
-				state.editable,
-			);
-			this.createMenuButton(row, page, state.editable);
 
 			if (!Platform.isMobile && state.editable) {
 				row.addEventListener("pointerdown", (event) => {
@@ -183,11 +200,6 @@ export class PagesInspector {
 					this.armRowDrag(row, event);
 				});
 			}
-		});
-
-		this.root.createDiv({
-			cls: "ioto-inspector-hint",
-			text: t("DASHBOARD_PAGES_HINT"),
 		});
 	}
 
@@ -216,6 +228,8 @@ export class PagesInspector {
 	private createMenuButton(
 		row: HTMLElement,
 		page: PagesInspectorState["target"]["pages"][number],
+		index: number,
+		total: number,
 		editable: boolean,
 	): void {
 		const button = row.createEl("button", {
@@ -229,13 +243,17 @@ export class PagesInspector {
 		setIcon(button, "more-horizontal");
 		setTooltip(button, t("INSPECTOR_MORE_ACTIONS"));
 		button.disabled = !editable;
-		button.onClickEvent((event) => this.openMenu(event, button, page));
+		button.onClickEvent((event) =>
+			this.openMenu(event, button, page, index, total),
+		);
 	}
 
 	private openMenu(
 		event: MouseEvent,
 		button: HTMLButtonElement,
 		page: PagesInspectorState["target"]["pages"][number],
+		index: number,
+		total: number,
 	): void {
 		if (!this.state?.editable) return;
 		const menu = new Menu();
@@ -248,6 +266,19 @@ export class PagesInspector {
 			item.setTitle(t("PAGE_DUPLICATE"))
 				.setIcon("copy")
 				.onClick(() => this.deps.duplicate(page.id));
+		});
+		menu.addSeparator();
+		menu.addItem((item) => {
+			item.setTitle(t("PAGE_MOVE_UP"))
+				.setIcon("arrow-up")
+				.setDisabled(index === 0)
+				.onClick(() => this.deps.move(page.id, -1, "step"));
+		});
+		menu.addItem((item) => {
+			item.setTitle(t("PAGE_MOVE_DOWN"))
+				.setIcon("arrow-down")
+				.setDisabled(index === total - 1)
+				.onClick(() => this.deps.move(page.id, 1, "step"));
 		});
 		menu.addSeparator();
 		menu.addItem((item) => {
@@ -284,6 +315,7 @@ export class PagesInspector {
 		if (!list || listParent !== list) return;
 		const pageId = row.dataset.pageId ?? "";
 		if (!pageId) return;
+		this.suppressRowClick = true;
 		startEvent.preventDefault();
 		try {
 			row.setPointerCapture(startEvent.pointerId);
@@ -347,6 +379,9 @@ export class PagesInspector {
 			onMove: (moveEvent) => preview(moveEvent.clientY),
 			onFinish: (cancelled) => {
 				row.removeClass("is-dragging");
+				win.setTimeout(() => {
+					this.suppressRowClick = false;
+				}, 0);
 				if (cancelled) {
 					// Preview reordering mutated the list; rebuild from state.
 					this.signature = "";
