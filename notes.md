@@ -1,3 +1,18 @@
-- 代码重构
-- Bug fix
-- 项目进度：仅支持任务查询，新增分母口径 / 排序 / 显示条数 / 空项目过滤设置，新建卡片默认「整个文件」口径
+- IOTO仪表盘插件
+    - **全新自定义Dashboard功能上线**
+    - 无限Dashbaord
+    - 无限Page
+    - 目前提供以下组件
+        - KPI（KPI）
+        - 项目进度（Project progress）
+        - 任务列表（Task list）
+        - 笔记列表（Note list）
+        - 表格（Table）
+        - 折线图（Line chart）
+        - 柱状图（Bar chart）
+        - 饼图（Pie chart）
+        - 圆环图（Donut chart）
+        - 散点图（Scatter chart）
+        - Markdown 卡片（Markdown card）
+        - 按钮（Button）
+        - 容器（Container）
