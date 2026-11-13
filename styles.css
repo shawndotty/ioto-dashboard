@@ -361,37 +361,6 @@
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 8px;
-    background: var(--background-secondary);
-}
-
-.ioto-custom-dashboard-view .ioto-dashboard-manage .clickable-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--text-muted);
-    opacity: 0.75;
-    cursor: pointer;
-}
-
-.ioto-custom-dashboard-view .ioto-dashboard-manage .clickable-icon:hover,
-.ioto-custom-dashboard-view .ioto-dashboard-manage .clickable-icon:focus-visible {
-    color: var(--text-normal);
-    background: var(--background-modifier-hover);
-    opacity: 1;
-}
-
-.ioto-custom-dashboard-view .ioto-dashboard-manage .clickable-icon:focus-visible {
-    outline: 2px solid var(--interactive-accent);
-    outline-offset: 1px;
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-actions {
@@ -401,43 +370,62 @@
     gap: 6px;
 }
 
+/* 头部按钮统一轻量规格：静止无框无底，hover / 聚焦才出现一层淡底 */
+.ioto-custom-dashboard-view .ioto-dashboard-manage .clickable-icon,
 .ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    padding: 4px 10px;
-    border: 1px solid var(--background-modifier-border);
+    height: 28px;
+    min-width: 28px;
+    padding: 0 8px;
+    border: 1px solid transparent;
     border-radius: 6px;
-    background: var(--background-secondary);
+    background: transparent;
     color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
     cursor: pointer;
 }
 
-.ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon:hover {
-    color: var(--text-normal);
-    background: var(--background-modifier-hover);
+.ioto-custom-dashboard-view .ioto-dashboard-manage .clickable-icon.ioto-icon-button,
+.ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon.ioto-icon-button {
+    width: 28px;
+    padding: 0;
 }
 
+.ioto-custom-dashboard-view .ioto-dashboard-manage .clickable-icon:hover,
+.ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon:hover,
+.ioto-custom-dashboard-view .ioto-dashboard-manage .clickable-icon:focus-visible,
+.ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon:focus-visible {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+    border-color: transparent;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-manage .clickable-icon:focus-visible,
+.ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 1px;
+}
+
+/* 编辑模式唯一的强调：accent 描边 + 前景，不再整块实心 */
 .ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon.mod-cta {
-    background: var(--interactive-accent);
     border-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-    font-weight: 600;
+    background: transparent;
+    color: var(--interactive-accent);
+    font-weight: 500;
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon.mod-cta:hover {
-    background: var(--interactive-accent-hover, var(--interactive-accent));
-    border-color: var(--interactive-accent-hover, var(--interactive-accent));
-    color: var(--text-on-accent);
+    background: var(--background-modifier-hover);
+    border-color: var(--interactive-accent);
+    color: var(--interactive-accent-hover, var(--interactive-accent));
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-actions .clickable-icon.mod-cta:focus-visible {
     outline: 2px solid var(--interactive-accent);
     outline-offset: 2px;
-}
-
-.ioto-custom-dashboard-view .ioto-button-label {
-    font-size: 0.9em;
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-actions .ioto-dashboard-manage-more {
@@ -459,12 +447,6 @@
 
     .ioto-custom-dashboard-view .ioto-dashboard-selected-title {
         display: none;
-    }
-
-    .ioto-custom-dashboard-view .ioto-dashboard-selected-context {
-        margin-left: 0;
-        padding-left: 0;
-        border-left: 0;
     }
 }
 
@@ -3849,9 +3831,16 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    margin-left: 4px;
-    padding-left: 8px;
-    border-left: 1px solid var(--background-modifier-border);
+    margin-left: 6px;
+}
+
+/* 需排在通用 hover 之后，才能覆盖 --text-normal */
+.ioto-custom-dashboard-view .ioto-dashboard-selected-context .ioto-dashboard-selected-remove {
+    color: var(--text-faint);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-selected-context .ioto-dashboard-selected-remove:hover {
+    color: var(--text-error);
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-selected-title {
@@ -3865,4 +3854,17 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 
 .ioto-custom-dashboard-view.is-narrow .ioto-dashboard-selected-title {
     display: none;
+}
+
+/* 移动端没有 hover，静态给一层不带描边的淡底作为可点暗示，同时放大热区 */
+.ioto-custom-dashboard-view.is-mobile .ioto-dashboard-manage .clickable-icon,
+.ioto-custom-dashboard-view.is-mobile .ioto-dashboard-actions .clickable-icon {
+    height: 32px;
+    min-width: 32px;
+    background: var(--background-secondary);
+}
+
+.ioto-custom-dashboard-view.is-mobile .ioto-dashboard-manage .clickable-icon.ioto-icon-button,
+.ioto-custom-dashboard-view.is-mobile .ioto-dashboard-actions .clickable-icon.ioto-icon-button {
+    width: 32px;
 }
