@@ -456,6 +456,16 @@
     .ioto-custom-dashboard-view .ioto-dashboard-actions .ioto-dashboard-manage-more {
         display: inline-flex;
     }
+
+    .ioto-custom-dashboard-view .ioto-dashboard-selected-title {
+        display: none;
+    }
+
+    .ioto-custom-dashboard-view .ioto-dashboard-selected-context {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: 0;
+    }
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-banner {
@@ -3698,18 +3708,18 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     }
 }
 
-/* 容器隐藏标题：编辑态 header 脱流，平时透明，悬停/选中/键盘聚焦时才出现。 */
+/* 容器隐藏标题：编辑态 header 脱流到左上角，仅选中/聚焦时出现。 */
 .ioto-custom-dashboard-view.is-editing
     .ioto-dashboard-card.is-container:not(.ioto-drag-ghost)
     > .ioto-dashboard-card-header.is-title-overlay {
+    top: 2px;
+    left: 2px;
+    right: auto;
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms ease;
 }
 
-.ioto-custom-dashboard-view.is-editing
-    .ioto-dashboard-card.is-container:not(.ioto-drag-ghost):hover
-    > .ioto-dashboard-card-header.is-title-overlay,
 .ioto-custom-dashboard-view.is-editing
     .ioto-dashboard-card.is-container:not(.ioto-drag-ghost):focus-within
     > .ioto-dashboard-card-header.is-title-overlay,

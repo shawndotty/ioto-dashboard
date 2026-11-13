@@ -3,7 +3,7 @@
 对应执行计划：`4-成果/IOTO Dashboard/Plan/Plan-20261108-061254.md` §3。
 本文件只记录已确认、不再讨论的决策，供后续迭代（M5 拖拽、趋势组件）直接引用。
 
-## 1. 22 条决策
+## 1. 23 条决策
 
 1. **项目归属**：`3-任务/<Project>/` 文件夹优先 → frontmatter `Project` → 未分类；其他根目录仍以 frontmatter 为准。
 2. **进度口径**：首版默认 `basis: "file"`（任务笔记全文 checkbox）；`section` 为可选项；UI 必须显示当前口径。
@@ -27,6 +27,7 @@
 20. **按钮组件（Action）**：(1) 按钮是 `queryless` 组件，不解析查询、不请求数据，配置全部存 `config.options` 标量，`schemaVersion` 保持 5。(2) 一卡一动作，多按钮用网格拼排；`target` 设置种类只有一种（`picker: note | command | page`），由视图统一打开选择器。(3) URL 仅放行 `http/https/mailto`，无 scheme 补 `https://`，显式拒绝 `javascript:` / `data:` / `file:`；编辑态按钮 `disabled` + `pointer-events: none`，点击穿透给卡片选中；命令失败以 Notice 反馈，不做配置期预检，系统命令可选中并打标。(4) 页面 id 全局唯一，允许跨 Dashboard 跳转；跳转会把目标 Dashboard 的 `lastPageId` 更新为落点页。
 21. **画布禅模式（Zen Mode）**：只作用于画布视图自身，隐藏顶部工具栏（仪表盘名 / 管理 / 编辑），保留页签并常驻右侧退出图标，不隐藏 Obsidian 标签栏、侧栏、异常横幅或空仪表盘 CTA。隐藏方式为在 `contentEl` 挂 `is-zen` 类、由 CSS 控制显隐，不删 DOM；页面栏拆为「外层 row + 内层滚动 strip + 右侧固定退出按钮」，`syncPagesBar()` 只清空内层，退出按钮只在 `ensureShell()` 创建一次。状态字段与状态键统一为 `isZenMode`，随 leaf 布局持久化（`getState/setState` + `requestSaveLayout()`），不进 `data.json`，`schemaVersion` 仍为 5。进入前先退出编辑态并清选中；编辑态不渲染进入按钮；Escape 有选中先取消、无选中才退出；另提供 `toggle-ioto-canvas-zen-mode` 命令便于移动端与快捷键。
 22. **卡片表面（Surface）**：共享样式设置 `options.surface` 三档 `card | flat | plain`，只对 `markdown` / `button` 显示，**缺省按 `card` 解释**，因此旧看板与新增该设置前的卡片外观零变化；`createConfig` 只为这两个类型写入 `surface: "plain"`。`flat` 去边框、保留底色；`plain` 去边框、去底色、正文去内边距。编辑态对 `flat` + `plain` 统一加「编辑皮肤」：1px 低对比虚线 `outline` 标占地（不参与布局，切换编辑/预览不位移）、hover/选中升为 accent、选中为 2px 实线；header 改为右上角绝对定位悬浮操作条，只在 hover / 选中 / `focus-within` 出现，触摸设备常显。拖拽 ghost 通过 `:not(.ioto-drag-ghost)` 排除，始终保留边框与底色。Button 的尺寸语义是「内容自适应 + 居中」（`min-width: 96px`，`max-width: 320px`），`plain` 下自定义背景色落到按钮本体而非卡片；Markdown 在 `plain` 下隐藏无效的背景色控件。`schemaVersion` 仍为 5，无数据迁移。
+23. **容器的选中操作统一走工具栏上下文**：容器的重命名 / 删除不再渲染在卡片 header 内，而是与 `plain` / `flat` 裸表面组件一样进入顶部工具栏 `.ioto-dashboard-selected-context`（组件名 + 重命名 + 删除），位于「添加组件」左侧；选中条件由 `selectedBareComponent()`（只认裸表面）放宽为 `selectedToolbarComponent()`（裸表面 **或** `type === "container"`）。容器编辑态 header 因此只保留拖拽手柄，`hideTitle` 下浮层从右上角移到**左上角**，并把显示触发由 `hover / 选中 / focus-within` 收窄为 `focus-within / 选中`（触摸设备仅选中），避免容器 `:hover` 因子组件冒泡而盖住子卡片手柄；未选中容器时不占位、不拦截子组件拖拽。表格 / 图表等其他 `card` 表面组件不受影响，仍在 header 内显示按钮。窄屏（≤ 520px）隐藏上下文标题文本，保留两个图标按钮。不新增 schema 字段、不改 locale，右键菜单与检查器仍提供同等的重命名 / 复制 / 移动 / 删除。
 
 ## 2. 存储落位
 

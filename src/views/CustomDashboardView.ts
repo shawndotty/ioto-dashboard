@@ -425,7 +425,7 @@ export class CustomDashboardView extends ItemView {
 
 	private syncToolbar(): void {
 		const dashboard = this.activeDashboard;
-		const selected = this.editMode ? this.selectedBareComponent() : null;
+		const selected = this.editMode ? this.selectedToolbarComponent() : null;
 		const selectedTitle = selected
 			? this.titleOf(selected, this.registry.get(selected.type))
 			: "";
@@ -1261,7 +1261,7 @@ export class CustomDashboardView extends ItemView {
 				text: this.titleOf(config, definition),
 			});
 		}
-		if (this.editMode && !bare) {
+		if (this.editMode && !bare && config.type !== "container") {
 			this.renderRenameButton(header, config);
 			this.renderRemoveButton(header, config);
 		}
@@ -1693,13 +1693,17 @@ export class CustomDashboardView extends ItemView {
 		this.render();
 	}
 
-	private selectedBareComponent(): DashboardComponentConfig | null {
+	/** 选中操作渲染在工具栏的条件：裸表面组件，或容器。 */
+	private selectedToolbarComponent(): DashboardComponentConfig | null {
 		const id = this.selectedComponentId;
 		const page = this.activePage;
 		if (!id || !page) return null;
 		const config = findComponentLocation(page.components, id)?.config;
 		if (!config) return null;
-		return cardSurfaceOf(config.options) === "card" ? null : config;
+		return config.type === "container" ||
+			cardSurfaceOf(config.options) !== "card"
+			? config
+			: null;
 	}
 
 	private selectComponent(id: string, focus?: InspectorFocus): void {
