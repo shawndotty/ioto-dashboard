@@ -17,6 +17,7 @@ export const containerComponent: ComponentDefinition = {
 		children: [],
 		options: {
 			columns: 12,
+			density: "standard",
 			rowHeight: 56,
 			gap: 8,
 			padding: 8,
@@ -24,7 +25,7 @@ export const containerComponent: ComponentDefinition = {
 			radius: 10,
 		},
 	}),
-	size: { minW: 2, minH: 2, maxH: 24 },
+	size: { minW: 2, minH: 1, maxH: 24 },
 	isEmpty: () => false,
 	settings: [
 		{ key: "title", kind: "text", group: "display" },
@@ -37,6 +38,23 @@ export const containerComponent: ComponentDefinition = {
 			fallback: 12,
 			target: "options",
 			labelKey: "SETTING_CONTAINER_COLUMNS",
+		},
+		{
+			key: "density",
+			kind: "select",
+			group: "display",
+			target: "options",
+			labelKey: "SETTING_CONTAINER_DENSITY",
+			hintKey: "SETTING_CONTAINER_DENSITY_HINT",
+			fallback: "standard",
+			options: [
+				{ value: "standard", labelKey: "CONTAINER_DENSITY_STANDARD" },
+				{ value: "compact", labelKey: "CONTAINER_DENSITY_COMPACT" },
+			],
+			preset: {
+				standard: { rowHeight: 56, gap: 8, padding: 8 },
+				compact: { rowHeight: 48, gap: 4, padding: 4 },
+			},
 		},
 		{
 			key: "rowHeight",

@@ -25,6 +25,12 @@ import {
 	walkComponents,
 } from "../dashboard/hierarchy";
 import { datasetKey, type DatasetRequest } from "../dashboard/dataset/types";
+import {
+	CARD_HEADER_HEIGHT,
+	effectiveContainerRowHeight,
+	fitContainerRows,
+	gridRowsUsed,
+} from "../dashboard/container-layout";
 import type {
 	ComponentInspectorController,
 	ComponentInspectorTarget,
@@ -46,6 +52,7 @@ import {
 	dropIndex,
 	dropIndexX,
 	gridMetrics,
+	insertionLine,
 	snapSize,
 	stepSize,
 	type CardRect,
@@ -107,6 +114,13 @@ import {
 	type InspectorPanelState,
 } from "./components/InspectorPanel";
 
+interface DropTarget {
+	parentId: string | null;
+	containerEl: HTMLElement | null;
+	grid: HTMLElement;
+	index: number;
+}
+
 export class CustomDashboardView extends ItemView {
 	private store: DashboardStoreData | null = null;
 	private leafDashboardId: string | null = null;
@@ -148,6 +162,14 @@ export class CustomDashboardView extends ItemView {
 	private toolbarSignature = "";
 	private pagesSignature = "";
 	private dragGhost: HTMLElement | null = null;
+	private dropTargetEl: HTMLElement | null = null;
+	private dropIndicatorEl: HTMLElement | null = null;
+	private dropHintEl: HTMLElement | null = null;
+	private dropPreviewKey = "";
+	private readonly dropRectCache = new Map<
+		HTMLElement,
+		{ scrollTop: number; rects: Map<string, CardRect> }
+	>();
 	private autoRepairKeys = new Set<string>();
 	private renderFailures = new Set<string>();
 	private visibilityTimer: number | null = null;
@@ -765,6 +787,15 @@ export class CustomDashboardView extends ItemView {
 			"--ioto-dashboard-row-height",
 			`${page?.rowHeight ?? 72}px`,
 		);
+	}
+
+	/** Page grid row gap; falls back to the CSS default when unreadable. */
+	private pageGridRowGap(): number {
+		const grid = this.ensureGrid();
+		const value = Number.parseFloat(
+			grid.ownerDocument.defaultView?.getComputedStyle(grid).rowGap ?? "",
+		);
+		return Number.isFinite(value) && value >= 0 ? value : 12;
 	}
 
 	private syncPagesBar(): void {
@@ -1708,6 +1739,14 @@ export class CustomDashboardView extends ItemView {
 					.onClick(() => void this.dissolveSelectedContainer()),
 			);
 		}
+		if ((config.children?.length ?? 0) > 0) {
+			menu.addItem((item) =>
+				item
+					.setTitle(t("DASHBOARD_FIT_CONTENT_HEIGHT"))
+					.setIcon("move-vertical")
+					.onClick(() => void this.fitContainerHeight(config.id)),
+			);
+		}
 		menu.addItem((item) =>
 			item
 				.setTitle(t("DASHBOARD_RESET_SIZE"))
@@ -1733,9 +1772,16 @@ export class CustomDashboardView extends ItemView {
 		components: readonly DashboardComponentConfig[],
 	): void {
 		for (const overlay of Array.from(
-			grid.querySelectorAll(".ioto-card-resize-ghost, .ioto-card-resize-snap"),
+			grid.querySelectorAll(
+				".ioto-card-resize-ghost, .ioto-card-resize-snap, .ioto-drop-indicator, .ioto-drop-hint",
+			),
 		)) {
 			overlay.remove();
+		}
+		for (const marked of Array.from(
+			grid.querySelectorAll(".is-drop-target"),
+		)) {
+			marked.removeClass("is-drop-target");
 		}
 		const queries = this.queryRepository();
 		const existing = new Map<string, HTMLElement>();
@@ -2016,11 +2062,24 @@ export class CustomDashboardView extends ItemView {
 		config: DashboardComponentConfig,
 	): void {
 		const vars = containerVarsOf(config.options);
+		const page = this.activePage;
+		const size = clampSize(config.w, config.h, this.boundsFor(config));
+		const hideTitle = titleHiddenInMode(config.options, this.editMode, true);
 		card.addClass("is-container");
 		card.style.setProperty("--ioto-dashboard-columns", String(vars.columns));
 		card.style.setProperty(
 			"--ioto-dashboard-row-height",
-			`${vars.rowHeight}px`,
+			`${effectiveContainerRowHeight({
+				cardRows: size.h,
+				pageRowHeight: page?.rowHeight ?? 72,
+				pageGap: this.pageGridRowGap(),
+				headerHeight: hideTitle ? 0 : CARD_HEADER_HEIGHT,
+				padding: vars.padding,
+				borderWidth: vars.borderWidth,
+				gap: vars.gap,
+				rows: gridRowsUsed(config.children ?? [], vars.columns),
+				configuredRowHeight: vars.rowHeight,
+			})}px`,
 		);
 		card.style.setProperty("--ioto-container-gap", `${vars.gap}px`);
 		card.style.setProperty("--ioto-container-padding", `${vars.padding}px`);
@@ -2246,6 +2305,49 @@ export class CustomDashboardView extends ItemView {
 		this.render();
 	}
 
+	private async fitContainerHeight(componentId: string): Promise<void> {
+		const page = this.activePage;
+		if (!page) return;
+		const location = findComponentLocation(page.components, componentId);
+		const config = location?.config;
+		if (
+			!config ||
+			config.type !== "container" ||
+			(location?.depth ?? 0) > 0
+		) {
+			return;
+		}
+		const children = config.children ?? [];
+		if (children.length === 0) return;
+
+		const vars = containerVarsOf(config.options);
+		const bounds = this.boundsFor(config);
+		const current = clampSize(config.w, config.h, bounds);
+		const hideTitle = titleHiddenInMode(config.options, this.editMode, true);
+		const h = clampSize(
+			current.w,
+			fitContainerRows({
+				cardRows: current.h,
+				pageRowHeight: page.rowHeight ?? 72,
+				pageGap: this.pageGridRowGap(),
+				headerHeight: hideTitle ? 0 : CARD_HEADER_HEIGHT,
+				padding: vars.padding,
+				borderWidth: vars.borderWidth,
+				gap: vars.gap,
+				rows: gridRowsUsed(children, vars.columns),
+				configuredRowHeight: vars.rowHeight,
+			}),
+			bounds,
+		).h;
+		if (h === current.h) return;
+		this.store = await this.plugin.dashboardRepository.updateComponent(
+			page.id,
+			componentId,
+			{ h },
+		);
+		this.render();
+	}
+
 	private async nudgeComponent(
 		componentId: string,
 		offset: -1 | 1,
@@ -2454,6 +2556,7 @@ export class CustomDashboardView extends ItemView {
 					stepSize: (axis, direction) =>
 						this.controller?.stepSize(axis, direction),
 					resetSize: () => this.controller?.resetSize(),
+					fitHeight: () => this.controller?.fitHeight(),
 					move: (offset) => this.controller?.move(offset),
 					duplicate: () => this.controller?.duplicate(),
 					moveTo: () => this.controller?.moveTo(),
@@ -2621,6 +2724,10 @@ export class CustomDashboardView extends ItemView {
 			resetSize: () => {
 				const id = this.selectedComponentId;
 				if (id) void this.resetComponentSize(id);
+			},
+			fitHeight: () => {
+				const id = this.selectedComponentId;
+				if (id) void this.fitContainerHeight(id);
 			},
 			move: (offset) => {
 				const id = this.selectedComponentId;
@@ -3185,6 +3292,12 @@ export class CustomDashboardView extends ItemView {
 		startEvent: PointerEvent,
 		win: Window,
 	): void {
+		const pageGrid = this.gridEl;
+		const page = this.activePage;
+		const location = page
+			? findComponentLocation(page.components, componentId)
+			: undefined;
+		if (!pageGrid || !page || !location) return;
 		startEvent.preventDefault();
 		this.beginInteraction();
 		this.contentEl.addClass("is-dragging");
@@ -3194,6 +3307,10 @@ export class CustomDashboardView extends ItemView {
 			// Capture is best-effort; document listeners still receive moves.
 		}
 
+		const sourceParentId = location.parent?.id ?? null;
+		const draggingContainer = location.config.type === "container";
+		this.dropRectCache.clear();
+		this.clearDropPreview();
 		const startX = startEvent.clientX;
 		const startY = startEvent.clientY;
 		const reduceMotion =
@@ -3215,11 +3332,19 @@ export class CustomDashboardView extends ItemView {
 			if (scrolled !== 0) {
 				// Cached rects stay valid: only the viewport moved.
 				for (const rect of rects.values()) rect.top -= scrolled;
+				this.shiftDropRects(scrolled);
 				dirty = true;
 			}
 			if (dirty) {
 				dirty = false;
-				const moved = this.reorderPreview(
+				const next = this.resolveDropTarget(
+					pointer.x,
+					pointer.y,
+					componentId,
+					draggingContainer,
+				);
+				const moved = this.applyDropPreview(
+					next,
 					grid,
 					card,
 					componentId,
@@ -3227,8 +3352,12 @@ export class CustomDashboardView extends ItemView {
 					pointer.y,
 					rects,
 					reduceMotion,
+					sourceParentId,
 				);
-				if (moved) rects = this.measureCards(grid);
+				if (moved) {
+					rects = this.measureCards(grid);
+					this.dropRectCache.delete(grid);
+				}
 			}
 			// Keep the loop alive only while the pointer keeps the page scrolling.
 			if (scrolled !== 0) frame = win.requestAnimationFrame(tick);
@@ -3238,7 +3367,8 @@ export class CustomDashboardView extends ItemView {
 		};
 		schedule();
 
-		bindPointerSession(handle, startEvent.pointerId, {			onMove: (moveEvent) => {
+		bindPointerSession(handle, startEvent.pointerId, {
+			onMove: (moveEvent) => {
 				pointer.x = moveEvent.clientX;
 				pointer.y = moveEvent.clientY;
 				ghost.style.transform = `translate3d(${pointer.x - startX}px, ${pointer.y - startY}px, 0)`;
@@ -3248,6 +3378,8 @@ export class CustomDashboardView extends ItemView {
 			onFinish: (cancelled) => {
 				if (frame !== null) win.cancelAnimationFrame(frame);
 				frame = null;
+				this.clearDropPreview();
+				this.dropRectCache.clear();
 				this.removeDragGhost();
 				this.contentEl.removeClass("is-dragging");
 				card.removeClass("is-dragging");
@@ -3256,7 +3388,13 @@ export class CustomDashboardView extends ItemView {
 					this.abortInteraction();
 					return;
 				}
-				void this.commitDragOrder(grid, componentId);
+				const next = this.resolveDropTarget(
+					pointer.x,
+					pointer.y,
+					componentId,
+					draggingContainer,
+				);
+				void this.commitDrop(componentId, next);
 			},
 		});
 	}
@@ -3280,6 +3418,169 @@ export class CustomDashboardView extends ItemView {
 	private removeDragGhost(): void {
 		this.dragGhost?.remove();
 		this.dragGhost = null;
+	}
+
+	/**
+	 * Nearest top-level container under the pointer, else the page grid.
+	 * Returns `null` outside the page grid so a stray release cancels instead
+	 * of silently reordering. Rects are cached per grid and dropped whenever
+	 * the viewport or the grid's own scroll changes.
+	 */
+	private resolveDropTarget(
+		x: number,
+		y: number,
+		draggedId: string,
+		draggingContainer: boolean,
+	): DropTarget | null {
+		const pageGrid = this.gridEl;
+		const page = this.activePage;
+		if (!pageGrid || !page) return null;
+		const pageRect = pageGrid.getBoundingClientRect();
+		if (
+			x < pageRect.left ||
+			x > pageRect.right ||
+			y < pageRect.top ||
+			y > pageRect.bottom
+		) {
+			return null;
+		}
+		if (!draggingContainer) {
+			const stack = this.contentEl.ownerDocument.elementsFromPoint(x, y);
+			for (const node of stack) {
+				const element = node as HTMLElement;
+				const id = element.dataset?.componentId;
+				if (!id || id === draggedId) continue;
+				if (element.dataset.componentType !== "container") continue;
+				const nested = element.querySelector<HTMLElement>(
+					":scope > .ioto-dashboard-card-body > .ioto-dashboard-grid.is-nested",
+				);
+				if (!nested) continue;
+				const nestedRect = nested.getBoundingClientRect();
+				const insideGrid =
+					x >= nestedRect.left &&
+					x <= nestedRect.right &&
+					y >= nestedRect.top &&
+					y <= nestedRect.bottom;
+				const children =
+					findComponentLocation(page.components, id)?.config.children ?? [];
+				const index = insideGrid
+					? dropIndex(
+							[...this.rectsForGrid(nested).values()],
+							x,
+							y,
+							draggedId,
+						)
+					: children.length;
+				return { parentId: id, containerEl: element, grid: nested, index };
+			}
+		}
+		return {
+			parentId: null,
+			containerEl: null,
+			grid: pageGrid,
+			index: dropIndex(
+				[...this.rectsForGrid(pageGrid).values()],
+				x,
+				y,
+				draggedId,
+			),
+		};
+	}
+
+	private rectsForGrid(grid: HTMLElement): Map<string, CardRect> {
+		const cached = this.dropRectCache.get(grid);
+		if (cached && cached.scrollTop === grid.scrollTop) return cached.rects;
+		const rects = this.measureCards(grid);
+		this.dropRectCache.set(grid, { scrollTop: grid.scrollTop, rects });
+		return rects;
+	}
+
+	/** Auto-scroll moved the viewport: shift the page grid, drop the rest. */
+	private shiftDropRects(delta: number): void {
+		const pageGrid = this.gridEl;
+		for (const [key, entry] of this.dropRectCache) {
+			if (key !== pageGrid) {
+				this.dropRectCache.delete(key);
+				continue;
+			}
+			for (const rect of entry.rects.values()) rect.top -= delta;
+		}
+	}
+
+	/**
+	 * Same parent keeps the existing DOM reorder + FLIP. Cross parent never
+	 * moves the real card: it paints a container highlight and an insertion
+	 * line so the final `render()` does the only DOM move.
+	 */
+	private applyDropPreview(
+		target: DropTarget | null,
+		sourceGrid: HTMLElement,
+		card: HTMLElement,
+		componentId: string,
+		x: number,
+		y: number,
+		rects: Map<string, CardRect>,
+		reduceMotion: boolean,
+		sourceParentId: string | null,
+	): boolean {
+		if (!target) {
+			this.clearDropPreview();
+			card.addClass("is-placeholder");
+			return false;
+		}
+		if (target.parentId === sourceParentId) {
+			this.clearDropPreview();
+			card.addClass("is-placeholder");
+			return this.reorderPreview(
+				sourceGrid,
+				card,
+				componentId,
+				x,
+				y,
+				rects,
+				reduceMotion,
+			);
+		}
+		card.removeClass("is-placeholder");
+		this.paintCrossPreview(target);
+		return false;
+	}
+
+	private paintCrossPreview(target: DropTarget): void {
+		const key = `${target.parentId ?? "page"}|${target.index}|${target.grid.scrollTop}`;
+		if (key === this.dropPreviewKey) return;
+		this.clearDropPreview();
+		this.dropPreviewKey = key;
+		if (target.containerEl) {
+			target.containerEl.addClass("is-drop-target");
+			this.dropTargetEl = target.containerEl;
+		}
+		const grid = target.grid;
+		const rects = [...this.rectsForGrid(grid).values()];
+		if (rects.length === 0) {
+			const hint = grid.createDiv({ cls: "ioto-drop-hint" });
+			hint.setText(t("DASHBOARD_DROP_HINT"));
+			this.dropHintEl = hint;
+			return;
+		}
+		const line = insertionLine(rects, target.index, this.readGridMetrics(grid).gap);
+		if (!line) return;
+		const gridRect = grid.getBoundingClientRect();
+		const indicator = grid.createDiv({ cls: "ioto-drop-indicator" });
+		indicator.style.top = `${line.top - gridRect.top + grid.scrollTop}px`;
+		indicator.style.left = `${line.left - gridRect.left + grid.scrollLeft}px`;
+		indicator.style.width = `${line.width}px`;
+		this.dropIndicatorEl = indicator;
+	}
+
+	private clearDropPreview(): void {
+		this.dropTargetEl?.removeClass("is-drop-target");
+		this.dropTargetEl = null;
+		this.dropIndicatorEl?.remove();
+		this.dropIndicatorEl = null;
+		this.dropHintEl?.remove();
+		this.dropHintEl = null;
+		this.dropPreviewKey = "";
 	}
 
 	private reorderPreview(
@@ -3370,33 +3671,69 @@ export class CustomDashboardView extends ItemView {
 		return scroller.scrollTop - before;
 	}
 
-	private async commitDragOrder(
-		grid: HTMLElement,
+	private async commitDrop(
 		componentId: string,
+		target: DropTarget | null,
 	): Promise<void> {
 		const page = this.activePage;
-		const pageId = page?.id;
-		if (!page || !pageId) {
+		if (!page || !target) {
 			this.abortInteraction();
 			return;
 		}
+		const location = findComponentLocation(page.components, componentId);
+		if (!location) {
+			this.abortInteraction();
+			return;
+		}
+		const sourceParentId = location.parent?.id ?? null;
+		this.clearDropPreview();
+		if (target.parentId !== sourceParentId) {
+			const name = this.componentDisplayName(location.config);
+			const targetConfig = target.parentId
+				? findComponentLocation(page.components, target.parentId)?.config
+				: undefined;
+			const result = await this.plugin.dashboardRepository.reparentComponent(
+				page.id,
+				componentId,
+				target.parentId,
+				target.index,
+			);
+			if (!result) {
+				new Notice(t("DASHBOARD_MOVE_COMPONENT_FAILED"));
+				this.abortInteraction();
+				return;
+			}
+			// Width clamping does not change `signatureOf`; render unconditionally.
+			this.store = result;
+			this.endInteraction();
+			this.render();
+			this.selectComponent(componentId);
+			new Notice(
+				target.parentId === null
+					? t("DASHBOARD_MOVED_OUT_OF_CONTAINER", [name])
+					: t("DASHBOARD_MOVED_INTO_CONTAINER", [
+							name,
+							targetConfig
+								? this.componentDisplayName(targetConfig)
+								: "",
+						]),
+			);
+			return;
+		}
 		const order: string[] = [];
-		for (const child of Array.from(grid.children)) {
+		for (const child of Array.from(target.grid.children)) {
 			const id = (child as HTMLElement).dataset?.componentId;
 			if (id) order.push(id);
 		}
 		const toIndex = order.indexOf(componentId);
-		const location = findComponentLocation(page.components, componentId);
-		const fromIndex = location?.index ?? -1;
-		const parentId = location?.parent?.id ?? null;
-		const changed =
-			toIndex >= 0 && fromIndex >= 0 && toIndex !== fromIndex;
+		const fromIndex = location.index;
+		const changed = toIndex >= 0 && toIndex !== fromIndex;
 		if (changed) {
 			this.store = await this.plugin.dashboardRepository.moveComponent(
-				pageId,
+				page.id,
 				componentId,
 				toIndex,
-				parentId,
+				sourceParentId,
 			);
 		}
 		const rendered = this.endInteraction();

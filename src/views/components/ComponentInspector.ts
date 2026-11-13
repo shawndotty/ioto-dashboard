@@ -39,6 +39,7 @@ export interface ComponentInspectorDeps {
 	patch(patch: Partial<DashboardComponentConfig>): void;
 	stepSize(axis: "w" | "h", direction: -1 | 1): void;
 	resetSize(): void;
+	fitHeight?(): void;
 	move(offset: -1 | 1): void;
 	duplicate(): void;
 	moveTo(): void;
@@ -135,6 +136,7 @@ export class ComponentInspector {
 	private heightDecEl: HTMLButtonElement | null = null;
 	private heightIncEl: HTMLButtonElement | null = null;
 	private resetEl: HTMLButtonElement | null = null;
+	private fitEl: HTMLButtonElement | null = null;
 	private upEl: HTMLButtonElement | null = null;
 	private downEl: HTMLButtonElement | null = null;
 	private orderPositionEl: HTMLElement | null = null;
@@ -1078,6 +1080,17 @@ export class ComponentInspector {
 		this.heightValueEl = height.value;
 		this.heightIncEl = height.inc;
 
+		if (state.target.config.type === "container" && state.target.depth === 0) {
+			const row = section.createDiv({ cls: "ioto-inspector-row" });
+			const fit = row.createEl("button", {
+				cls: "ioto-inspector-fit",
+				text: t("DASHBOARD_FIT_CONTENT_HEIGHT"),
+				attr: { type: "button" },
+			});
+			fit.onClickEvent(() => this.deps.fitHeight?.());
+			this.fitEl = fit;
+		}
+
 		const order = section.createDiv({ cls: "ioto-inspector-row" });
 		order.createSpan({
 			cls: "ioto-inspector-row-label",
@@ -1371,6 +1384,11 @@ export class ComponentInspector {
 				!state.editable ||
 				(size.w === defaults.w && size.h === defaults.h);
 		}
+		if (this.fitEl) {
+			this.fitEl.disabled =
+				!state.editable ||
+				(state.target.config.children?.length ?? 0) === 0;
+		}
 		if (this.upEl) {
 			this.upEl.disabled = !state.editable || state.target.index <= 0;
 		}
@@ -1492,6 +1510,7 @@ export class ComponentInspector {
 		this.heightDecEl = null;
 		this.heightIncEl = null;
 		this.resetEl = null;
+		this.fitEl = null;
 		this.upEl = null;
 		this.downEl = null;
 		this.orderPositionEl = null;

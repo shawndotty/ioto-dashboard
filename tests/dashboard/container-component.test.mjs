@@ -8,6 +8,9 @@ const { containerComponent } = await load(
 const { createComponentRegistry } = await load(
 	'../../src/dashboard/components/index.ts',
 );
+const { coerceSettingValue } = await load(
+	'../../src/dashboard/registry.ts',
+);
 
 const settingOf = (key) =>
 	containerComponent.settings.find((setting) => setting.key === key);
@@ -35,6 +38,7 @@ test('container createConfig starts empty with the default frame options', () =>
 		children: [],
 		options: {
 			columns: 12,
+			density: 'standard',
 			rowHeight: 56,
 			gap: 8,
 			padding: 8,
@@ -79,7 +83,7 @@ test('container declares a title plus display and style settings', () => {
 test('container size bounds allow any depth-1 arrangement', () => {
 	assert.deepEqual(containerComponent.size, {
 		minW: 2,
-		minH: 2,
+		minH: 1,
 		maxH: 24,
 	});
 	const defaults = containerComponent.createConfig('');
@@ -114,4 +118,27 @@ test('container render only paints the empty hint in edit mode', () => {
 	assert.equal(created.length, 1);
 	assert.equal(created[0].cls, 'ioto-container-empty');
 	assert.ok(created[0].text.length > 0);
+});
+
+test('container exposes a density preset that writes the layout numbers', () => {
+	const density = settingOf('density');
+	assert.equal(density?.kind, 'select');
+	assert.equal(density?.group, 'display');
+	assert.equal(density?.target, 'options');
+	assert.equal(density?.fallback, 'standard');
+	assert.deepEqual(
+		density.options.map((option) => option.value),
+		['standard', 'compact'],
+	);
+	assert.deepEqual(density.preset, {
+		standard: { rowHeight: 56, gap: 8, padding: 8 },
+		compact: { rowHeight: 48, gap: 4, padding: 4 },
+	});
+});
+
+test('selecting a density merges its preset into the options patch', () => {
+	const patch = coerceSettingValue(settingOf('density'), 'compact', new Set());
+	assert.deepEqual(patch, {
+		options: { density: 'compact', rowHeight: 48, gap: 4, padding: 4 },
+	});
 });

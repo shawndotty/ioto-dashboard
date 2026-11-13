@@ -749,6 +749,32 @@
     text-align: center;
 }
 
+.ioto-custom-dashboard-view .ioto-dashboard-card.is-container.is-drop-target {
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+}
+
+.ioto-custom-dashboard-view .ioto-drop-indicator {
+    position: absolute;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--interactive-accent);
+    pointer-events: none;
+    z-index: 4;
+}
+
+.ioto-custom-dashboard-view .ioto-drop-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--interactive-accent);
+    font-size: var(--font-ui-smaller);
+    pointer-events: none;
+    z-index: 4;
+}
+
 .ioto-custom-dashboard-view .ioto-dashboard-card {
     position: relative;
     display: flex;
@@ -2692,6 +2718,10 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 
 .ioto-inspector-field select,
 .ioto-inspector-field input:not([type="checkbox"]) {
+    width: 100%;
+}
+
+.ioto-inspector .ioto-inspector-fit {
     width: 100%;
 }
 

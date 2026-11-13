@@ -50,7 +50,7 @@ test('button createConfig starts on a URL action with the card title hidden', ()
 	assert.equal(created.options.hideTitle, true);
 	assert.equal(created.options.surface, 'plain');
 	assert.equal(created.w, 2);
-	assert.equal(created.h, 2);
+	assert.equal(created.h, 1);
 });
 
 test('button settings expose title plus one target row per action type', () => {

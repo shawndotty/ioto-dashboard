@@ -42,7 +42,7 @@ export const buttonComponent: ComponentDefinition = {
 			surface: "plain",
 		},
 		w: 2,
-		h: 2,
+		h: 1,
 	}),
 	size: { minW: 2, minH: 1, maxH: 8 },
 	isEmpty: () => false,

@@ -52,6 +52,45 @@ export function dropIndex(
 	return entries.length;
 }
 
+export interface InsertionLine {
+	top: number;
+	left: number;
+	width: number;
+}
+
+/**
+ * Viewport position of the drop indicator for `index` inside a target grid.
+ * Rects must be in DOM order; an empty grid returns `null` so callers can show
+ * a full-area hint instead of a zero-width line.
+ */
+export function insertionLine(
+	rects: readonly CardRect[],
+	index: number,
+	gap: number,
+): InsertionLine | null {
+	const first = rects[0];
+	const last = rects[rects.length - 1];
+	if (!first || !last) return null;
+	const safeGap = Number.isFinite(gap) ? Math.max(0, gap) : 0;
+	if (index <= 0) {
+		return { top: first.top, left: first.left, width: first.width };
+	}
+	if (index >= rects.length) {
+		return {
+			top: last.top + last.height + safeGap / 2,
+			left: last.left,
+			width: last.width,
+		};
+	}
+	const rect = rects[index];
+	if (!rect) return null;
+	return {
+		top: rect.top - safeGap / 2,
+		left: rect.left,
+		width: rect.width,
+	};
+}
+
 /**
  * Horizontal insertion index for a tab strip. The dragged tab is skipped but
  * keeps its slot, so callers can use the result against the filtered list.

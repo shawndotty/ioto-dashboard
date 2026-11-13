@@ -1856,6 +1856,173 @@ test('reparentComponent accepts a first child into a container without a childre
 	assert.deepEqual(components[0].children.map((child) => child.id), ['component:kpi']);
 });
 
+test('reparentComponent applies toIndex at the head, middle and tail of a container', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [
+							nestedComponent('component:a'),
+							nestedComponent('component:b'),
+						]),
+						nestedComponent('component:head'),
+						nestedComponent('component:mid'),
+						nestedComponent('component:tail'),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	await repository.reparentComponent('page:1', 'component:head', 'component:box', 0);
+	await repository.reparentComponent('page:1', 'component:mid', 'component:box', 2);
+	const moved = await repository.reparentComponent('page:1', 'component:tail', 'component:box', 3);
+
+	assert.ok(moved);
+	assert.deepEqual(
+		currentPage(moved).components[0].children.map((child) => child.id),
+		['component:head', 'component:a', 'component:mid', 'component:tail', 'component:b'],
+	);
+});
+
+test('reparentComponent clamps toIndex and appends when it is omitted', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [nestedComponent('component:a')]),
+						nestedComponent('component:x'),
+						nestedComponent('component:y'),
+						nestedComponent('component:z'),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const head = await repository.reparentComponent(
+		'page:1',
+		'component:y',
+		'component:box',
+		-9,
+	);
+	assert.ok(head);
+	assert.deepEqual(
+		currentPage(head).components[0].children.map((child) => child.id),
+		['component:y', 'component:a'],
+	);
+
+	const tail = await repository.reparentComponent(
+		'page:1',
+		'component:z',
+		'component:box',
+		99,
+	);
+	assert.ok(tail);
+	assert.deepEqual(
+		currentPage(tail).components[0].children.map((child) => child.id),
+		['component:y', 'component:a', 'component:z'],
+	);
+
+	const appended = await repository.reparentComponent('page:1', 'component:x', 'component:box');
+	assert.ok(appended);
+	assert.deepEqual(
+		currentPage(appended).components[0].children.map((child) => child.id),
+		['component:y', 'component:a', 'component:z', 'component:x'],
+	);
+});
+
+test('reparentComponent inserts a child back into the page at toIndex', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [
+							nestedComponent('component:a'),
+							nestedComponent('component:b'),
+						]),
+						nestedComponent('component:c'),
+						nestedComponent('component:d'),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const moved = await repository.reparentComponent('page:1', 'component:b', null, 1);
+	assert.ok(moved);
+	assert.deepEqual(
+		currentPage(moved).components.map((item) => item.id),
+		['component:box', 'component:b', 'component:c', 'component:d'],
+	);
+	assert.deepEqual(
+		currentPage(moved).components[0].children.map((child) => child.id),
+		['component:a'],
+	);
+});
+
+test('reparentComponent clamps child width to the container columns', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [], { options: { columns: 6 } }),
+						nestedComponent('component:wide', { w: 12, h: 99 }),
+						nestedComponent('component:narrow', { w: 2 }),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const wide = await repository.reparentComponent('page:1', 'component:wide', 'component:box', 0);
+	assert.ok(wide);
+	const wideChild = currentPage(wide).components[0].children[0];
+	assert.equal(wideChild.w, 6);
+	assert.equal(wideChild.h, 24);
+
+	const narrow = await repository.reparentComponent('page:1', 'component:narrow', 'component:box', 1);
+	assert.ok(narrow);
+	const narrowChild = currentPage(narrow).components[0].children[1];
+	assert.equal(narrowChild.w, 2);
+});
+
+test('reparentComponent keeps the same-parent and self-target guards', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [nestedComponent('component:a')]),
+						nestedComponent('component:outside', { w: 12 }),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	assert.equal(await repository.reparentComponent('page:1', 'component:a', 'component:box', 0), null);
+	assert.equal(await repository.reparentComponent('page:1', 'component:box', 'component:box', 0), null);
+	assert.equal(
+		await repository.reparentComponent('page:1', 'component:outside', 'component:missing', 0),
+		null,
+	);
+});
+
 test('dissolveContainer removes a container frame that has no children key', async () => {
 	const empty = { id: 'component:empty', type: 'container', queryId: '', w: 6, h: 4 };
 	const host = v4({}, [

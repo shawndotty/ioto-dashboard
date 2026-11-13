@@ -122,6 +122,8 @@ export type ComponentSetting = SettingBase &
 				fallback: string;
 				/** `options` keys land in `config.options`, everything else on config. */
 				target?: "config" | "options";
+				/** Options written alongside the selected value (e.g. layout density). */
+				preset?: Record<string, Record<string, string | number>>;
 		  }
 		| {
 				key: string;
@@ -369,11 +371,13 @@ export function coerceSettingValue(
 			if (typeof raw !== "string") return {};
 			const options = resolveSettingOptions(setting, { query, config });
 			if (!options.some((option) => option.value === raw)) return {};
-			return setting.target === "options"
-				? { options: { [setting.key]: raw } }
-				: ({
-						[setting.key]: raw,
-					} as Partial<DashboardComponentConfig>);
+			if (setting.target === "options") {
+				const preset = setting.preset?.[raw] ?? {};
+				return { options: { [setting.key]: raw, ...preset } };
+			}
+			return {
+				[setting.key]: raw,
+			} as Partial<DashboardComponentConfig>;
 		}
 		case "toggle": {
 			if (typeof raw !== "boolean") return {};

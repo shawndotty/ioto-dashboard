@@ -5,6 +5,7 @@ import { load } from '../data/helpers.mjs';
 const {
 	dropIndex,
 	dropIndexX,
+	insertionLine,
 	moveItem,
 	moveById,
 	stepSize,
@@ -248,4 +249,51 @@ test('dropIndexX handles single-element and empty strips', () => {
 	assert.equal(dropIndexX([rect('a', 0, 0)], 0, 'other'), 0);
 	assert.equal(dropIndexX([rect('a', 0, 0)], 999, 'other'), 1);
 	assert.equal(dropIndexX([rect('a', 0, 0)], 999, 'a'), 0);
+});
+
+test('insertionLine returns null for an empty grid', () => {
+	assert.equal(insertionLine([], 0, 12), null);
+});
+
+test('insertionLine places the line at the head, between cards and at the tail', () => {
+	const rects = [
+		rect('a', 100, 0, 200, 72),
+		rect('b', 100, 212, 200, 72),
+		rect('c', 184, 0, 200, 72),
+	];
+
+	assert.deepEqual(insertionLine(rects, 0, 12), {
+		top: 100,
+		left: 0,
+		width: 200,
+	});
+	assert.deepEqual(insertionLine(rects, 1, 12), {
+		top: 94,
+		left: 212,
+		width: 200,
+	});
+	assert.deepEqual(insertionLine(rects, 3, 12), {
+		top: 262,
+		left: 0,
+		width: 200,
+	});
+});
+
+test('insertionLine clamps out-of-range indexes and keeps gap 0 finite', () => {
+	const rects = [rect('a', 10, 0, 120, 60)];
+
+	assert.deepEqual(insertionLine(rects, -4, 0), {
+		top: 10,
+		left: 0,
+		width: 120,
+	});
+	assert.deepEqual(insertionLine(rects, 99, 0), {
+		top: 70,
+		left: 0,
+		width: 120,
+	});
+	const line = insertionLine(rects, 1, 0);
+	assert.ok(line);
+	assert.equal(Number.isFinite(line.top), true);
+	assert.equal(line.top, 70);
 });

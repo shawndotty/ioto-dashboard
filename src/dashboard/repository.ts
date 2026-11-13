@@ -12,6 +12,8 @@ import {
 	findComponentLocation,
 	walkComponents,
 } from "./hierarchy";
+import { MAX_COMPONENT_H, MIN_COMPONENT_W } from "./registry";
+import { containerColumnsOf } from "./style-settings";
 import type {
 	DashboardComponentConfig,
 	DashboardPage,
@@ -46,6 +48,15 @@ export interface DashboardRepositoryOptions {
 
 const DEFAULT_DASHBOARD_NAME = "Dashboard 1";
 const DEFAULT_PAGE_NAME = "Page 1";
+
+/** Array insert with the same clamping as `moveItem`; omitted index appends. */
+function insertAt<T>(list: T[], item: T, index?: number): void {
+	const at =
+		index === undefined
+			? list.length
+			: Math.min(list.length, Math.max(0, Math.trunc(index)));
+	list.splice(at, 0, item);
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -671,14 +682,16 @@ export class DashboardRepository {
 
 	/**
 	 * Moves a top-level component into a top-level container (`targetContainerId`)
-	 * or a child back to the page end (`null`). Guards keep the tree at depth 1:
+	 * or a child back to the page (`null`). Guards keep the tree at depth 1:
 	 * the target must be a page-level container, containers never nest, and a
-	 * component can never move into its own subtree.
+	 * component can never move into its own subtree. Omitting `toIndex` keeps the
+	 * historical append-at-end behaviour.
 	 */
 	async reparentComponent(
 		pageId: string,
 		componentId: string,
 		targetContainerId: string | null,
+		toIndex?: number,
 	): Promise<DashboardStoreData | null> {
 		let moved = false;
 		const store = await this.mutate((data) => {
@@ -691,7 +704,7 @@ export class DashboardRepository {
 				// Only children can leave a container.
 				if (!source.parent) return;
 				source.siblings.splice(source.index, 1);
-				page.components.push(source.config);
+				insertAt(page.components, source.config, toIndex);
 				moved = true;
 				return;
 			}
@@ -703,9 +716,22 @@ export class DashboardRepository {
 			if (containsComponent(source.config, targetContainerId)) return;
 			if (source.parent?.id === targetContainerId) return;
 			source.siblings.splice(source.index, 1);
+			// Clamp only downwards: a child never grows to fill the container.
+			const columns = Math.max(
+				MIN_COMPONENT_W,
+				containerColumnsOf(target.config.options),
+			);
+			const width = source.config.w ?? columns;
+			source.config.w = Math.min(columns, Math.max(MIN_COMPONENT_W, width));
+			if (source.config.h !== undefined) {
+				source.config.h = Math.min(
+					MAX_COMPONENT_H,
+					Math.max(1, source.config.h),
+				);
+			}
 			const children =
 				target.config.children ?? (target.config.children = []);
-			children.push(source.config);
+			insertAt(children, source.config, toIndex);
 			moved = true;
 		});
 		return moved ? store : null;

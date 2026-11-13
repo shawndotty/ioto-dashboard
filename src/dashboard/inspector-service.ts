@@ -88,6 +88,8 @@ export interface ComponentInspectorController extends InspectorControllerBase {
 	patch(patch: Partial<DashboardComponentConfig>): void;
 	stepSize(axis: "w" | "h", direction: -1 | 1): void;
 	resetSize(): void;
+	/** 容器专用：按内容一次性换算高度。 */
+	fitHeight(): void;
 	move(offset: -1 | 1): void;
 	duplicate(): void;
 	moveTo(): void;
