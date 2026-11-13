@@ -468,15 +468,46 @@
     font-size: 0.9em;
 }
 
+.ioto-custom-dashboard-view.is-zen {
+    padding-top: 12px;
+}
+
+.ioto-custom-dashboard-view.is-zen .ioto-dashboard-toolbar {
+    display: none;
+}
+
 .ioto-custom-dashboard-view .ioto-dashboard-pages {
     display: flex;
     align-items: center;
     gap: 6px;
     flex-wrap: nowrap;
-    overflow-x: auto;
     padding-bottom: 4px;
     margin-bottom: 12px;
     border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-pages-scroll {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-zen-exit {
+    display: none;
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+}
+
+.ioto-custom-dashboard-view.is-zen .ioto-dashboard-zen-exit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .ioto-custom-dashboard-view .ioto-dashboard-page-tab {

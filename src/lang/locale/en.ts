@@ -224,6 +224,7 @@ export default {
 	DASHBOARD_NAME_PLACEHOLDER: "Dashboard name",
 	COMMAND_OPEN_DASHBOARD_PICKER: "Open dashboard…",
 	COMMAND_OPEN_NAMED_DASHBOARD: "Open dashboard: {0}",
+	COMMAND_TOGGLE_CANVAS_ZEN_MODE: "Toggle canvas Zen Mode",
 
 	// Component inspector
 	INSPECTOR_TITLE: "Panel settings",

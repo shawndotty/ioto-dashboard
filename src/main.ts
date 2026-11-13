@@ -276,6 +276,19 @@ export default class IotoDashboardPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "toggle-ioto-canvas-zen-mode",
+			name: t("COMMAND_TOGGLE_CANVAS_ZEN_MODE"),
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(
+					CustomDashboardView,
+				);
+				if (!view) return false;
+				if (!checking) view.toggleZenMode();
+				return true;
+			},
+		});
+
 		// Settings Tab
 		this.addSettingTab(new DashboardSettingTab(this.app, this));
 	}

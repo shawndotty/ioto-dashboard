@@ -226,6 +226,7 @@ export default {
 	DASHBOARD_NAME_PLACEHOLDER: "仪表盘名称",
 	COMMAND_OPEN_DASHBOARD_PICKER: "打开仪表盘…",
 	COMMAND_OPEN_NAMED_DASHBOARD: "打开仪表盘：{0}",
+	COMMAND_TOGGLE_CANVAS_ZEN_MODE: "切换画布禅模式",
 
 	// Component inspector
 	INSPECTOR_TITLE: "面板设置",

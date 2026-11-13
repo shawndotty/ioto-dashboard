@@ -92,6 +92,7 @@ export class CustomDashboardView extends ItemView {
 	private hub: DataHub | null = null;
 	private registry = createComponentRegistry();
 	private editMode = false;
+	private isZenMode = false;
 	private damaged = false;
 	private unsubscribers: Array<() => void> = [];
 	private interacting = false;
@@ -111,6 +112,7 @@ export class CustomDashboardView extends ItemView {
 	private toolbarEl: HTMLElement | null = null;
 	private bannerEl: HTMLElement | null = null;
 	private pagesEl: HTMLElement | null = null;
+	private pagesScrollEl: HTMLElement | null = null;
 	private emptyEl: HTMLElement | null = null;
 	private gridEl: HTMLElement | null = null;
 	private toolbarSignature = "";
@@ -192,7 +194,9 @@ export class CustomDashboardView extends ItemView {
 			if (event.key !== "Escape" || this.interacting) return;
 			if (this.selectedComponentId || this.localSelection()?.kind === "page") {
 				this.clearSelection();
+				return;
 			}
+			if (this.isZenMode) this.toggleZenMode();
 		});
 		this.render();
 		this.updateVisibility();
@@ -253,6 +257,7 @@ export class CustomDashboardView extends ItemView {
 			dashboardId:
 				this.leafDashboardId ?? this.store?.activeDashboardId,
 			pageId: this.leafPageId ?? undefined,
+			isZenMode: this.isZenMode,
 		};
 	}
 
@@ -261,6 +266,7 @@ export class CustomDashboardView extends ItemView {
 			activePageId?: unknown;
 			dashboardId?: unknown;
 			pageId?: unknown;
+			isZenMode?: unknown;
 		};
 		if (typeof s.dashboardId === "string") {
 			this.leafDashboardId = s.dashboardId;
@@ -270,6 +276,9 @@ export class CustomDashboardView extends ItemView {
 		} else if (typeof s.activePageId === "string") {
 			// Legacy layout state without a dashboard id.
 			this.leafPageId = s.activePageId;
+		}
+		if (typeof s.isZenMode === "boolean") {
+			this.isZenMode = s.isZenMode;
 		}
 		await super.setState(state, result);
 		if (this.store) {
@@ -346,6 +355,7 @@ export class CustomDashboardView extends ItemView {
 		this.toolbarEl = null;
 		this.bannerEl = null;
 		this.pagesEl = null;
+		this.pagesScrollEl = null;
 		this.emptyEl = null;
 		this.gridEl = null;
 		this.toolbarSignature = "";
@@ -356,6 +366,7 @@ export class CustomDashboardView extends ItemView {
 		const scrollTop = this.contentEl.scrollTop;
 		this.contentEl.addClass("ioto-custom-dashboard-view");
 		this.ensureShell();
+		this.contentEl.toggleClass("is-zen", this.isZenMode);
 		this.syncToolbar();
 		this.syncBanner();
 		this.syncPagesBar();
@@ -386,6 +397,16 @@ export class CustomDashboardView extends ItemView {
 			this.pagesEl = this.contentEl.createDiv({
 				cls: "ioto-dashboard-pages",
 			});
+			this.pagesScrollEl = this.pagesEl.createDiv({
+				cls: "ioto-dashboard-pages-scroll",
+			});
+			const exit = this.pagesEl.createEl("button", {
+				cls: "ioto-dashboard-zen-exit clickable-icon",
+				attr: { type: "button", "aria-label": t("ZEN_MODE_OFF") },
+			});
+			setIcon(exit, "minimize");
+			setTooltip(exit, t("ZEN_MODE_OFF"));
+			exit.onClickEvent(() => this.toggleZenMode());
 		}
 	}
 
@@ -447,6 +468,15 @@ export class CustomDashboardView extends ItemView {
 				this.render();
 			},
 		);
+		if (!this.editMode) {
+			this.addIconToolbarButton(
+				actions,
+				"maximize",
+				t("ZEN_MODE_ON"),
+				() => this.toggleZenMode(),
+				"ioto-dashboard-zen-enter",
+			);
+		}
 	}
 
 	private openDashboardManager(): void {
@@ -626,12 +656,12 @@ export class CustomDashboardView extends ItemView {
 		].join("#");
 		if (signature === this.pagesSignature) return;
 		this.pagesSignature = signature;
-		const pagesBar = this.pagesEl;
-		if (!pagesBar) return;
-		pagesBar.empty();
+		const strip = this.pagesScrollEl;
+		if (!strip) return;
+		strip.empty();
 		for (const page of pages) {
 			const active = page.id === this.activePage?.id;
-			const tab = pagesBar.createEl("button", {
+			const tab = strip.createEl("button", {
 				cls: `ioto-dashboard-page-tab${active ? " is-active" : ""}`,
 				attr: { "aria-pressed": active ? "true" : "false" },
 			});
@@ -660,7 +690,7 @@ export class CustomDashboardView extends ItemView {
 			}
 		}
 		if (this.editMode) {
-			const add = pagesBar.createEl("button", {
+			const add = strip.createEl("button", {
 				cls: "ioto-dashboard-page-add clickable-icon",
 				attr: { "aria-label": t("PAGE_TABS_ADD"), title: t("PAGE_TABS_ADD") },
 				text: "+",
@@ -745,6 +775,16 @@ export class CustomDashboardView extends ItemView {
 	/** 供插件激活入口精确落页；内部仍走 switchPage 的选择清理与持久化。 */
 	showPage(pageId: string): void {
 		this.switchPage(pageId);
+	}
+
+	toggleZenMode(): void {
+		if (!this.isZenMode && this.editMode) {
+			this.editMode = false;
+			this.clearSelection();
+		}
+		this.isZenMode = !this.isZenMode;
+		this.render();
+		this.app.workspace.requestSaveLayout();
 	}
 
 	private async createPage(): Promise<void> {

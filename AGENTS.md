@@ -109,6 +109,7 @@ Notes:
     - `open-ioto-canvas-picker` (dashboard picker)
     - `open-ioto-canvas-<slug>` (one per dashboard, generated from its id)
     - `toggle-dashboard-quick-search`
+    - `toggle-ioto-canvas-zen-mode` (画布禅模式开关)
 - `open-ioto-dashboard` intentionally keeps the plugin id inside its command id (historical); the lint rule is suppressed inline. Do not rename it — saved hotkeys reference command IDs.
 - Ribbon icons: `columns-3` (dashboard), `check-square` (task view), `sticky-note` (note view). `Shift` opens a new window, `Alt` opens a new tab.
 - All user-facing strings must go through `t()` and be added to every locale file.

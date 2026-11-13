@@ -3,7 +3,7 @@
 对应执行计划：`4-成果/IOTO Dashboard/Plan/Plan-20261108-061254.md` §3。
 本文件只记录已确认、不再讨论的决策，供后续迭代（M5 拖拽、趋势组件）直接引用。
 
-## 1. 20 条决策
+## 1. 21 条决策
 
 1. **项目归属**：`3-任务/<Project>/` 文件夹优先 → frontmatter `Project` → 未分类；其他根目录仍以 frontmatter 为准。
 2. **进度口径**：首版默认 `basis: "file"`（任务笔记全文 checkbox）；`section` 为可选项；UI 必须显示当前口径。
@@ -25,6 +25,7 @@
 18. **一视图一 Dashboard（打开即聚焦）**：**本条废止 #17 中“标题即切换器、在同一 leaf 原地换内容”的交互**。一个标签页只显示一个固定 Dashboard：工具栏标题是纯文本名称，不提供任何切换器；每个 leaf 通过自身的 `dashboardId` 绑定 Dashboard，`activeDashboard` 只做精确匹配，未绑定或 id 失效时由 `resolveLeafTargets()` 兜底并写回。打开入口（Picker、每个 Dashboard 的独占命令）统一为 open-or-focus：用 `workspace.iterateAllLeaves` 在所有窗口里查找已绑定该 Dashboard 的 leaf，命中则 `revealLeaf`，未命中则新开标签；`newTab` 选项因此删除。管理弹窗只负责管理：点击某个仪表盘时，已打开则聚焦其标签、未打开则新开标签，弹窗保持打开并显示「已打开」徽标；新建 / 复制在新标签打开，当前 leaf 不变；删除时关闭其他正在显示该 Dashboard 的标签（操作所在 leaf 除外，回退到剩余第一个 Dashboard），并在确认文案里提示会关闭 N 个标签。`activeDashboardId` 语义收窄为「ribbon / 命令的默认落点」，不再承担「当前页」含义。
 19. **无查询组件与 Markdown 卡片**：(1) `queryless: true` 的组件不解析查询、不请求数据、不参与数据版本重建，`statusOf` 直接返回 ready，添加流程短路、不提示「请先创建查询」。(2) Markdown 内容存 `config.options.markdown`，不升级 schema；图片一律用 `![[...]]` / `![](url)` 引用而非 base64，单卡内容不宜过长（随 `data.json` 回写）。(3) 查看模式只渲染不可编辑；编辑只发生在画布编辑态的 `textarea`，失焦或 `Cmd/Ctrl+Enter` 提交，输入过程只更新内存草稿。(4) `options.hideTitle` 为全组件共享设置，查看模式隐藏标题但保留 header 作为右上角浮层，搜索等 header 操作不丢失。
 20. **按钮组件（Action）**：(1) 按钮是 `queryless` 组件，不解析查询、不请求数据，配置全部存 `config.options` 标量，`schemaVersion` 保持 5。(2) 一卡一动作，多按钮用网格拼排；`target` 设置种类只有一种（`picker: note | command | page`），由视图统一打开选择器。(3) URL 仅放行 `http/https/mailto`，无 scheme 补 `https://`，显式拒绝 `javascript:` / `data:` / `file:`；编辑态按钮 `disabled` + `pointer-events: none`，点击穿透给卡片选中；命令失败以 Notice 反馈，不做配置期预检，系统命令可选中并打标。(4) 页面 id 全局唯一，允许跨 Dashboard 跳转；跳转会把目标 Dashboard 的 `lastPageId` 更新为落点页。
+21. **画布禅模式（Zen Mode）**：只作用于画布视图自身，隐藏顶部工具栏（仪表盘名 / 管理 / 编辑），保留页签并常驻右侧退出图标，不隐藏 Obsidian 标签栏、侧栏、异常横幅或空仪表盘 CTA。隐藏方式为在 `contentEl` 挂 `is-zen` 类、由 CSS 控制显隐，不删 DOM；页面栏拆为「外层 row + 内层滚动 strip + 右侧固定退出按钮」，`syncPagesBar()` 只清空内层，退出按钮只在 `ensureShell()` 创建一次。状态字段与状态键统一为 `isZenMode`，随 leaf 布局持久化（`getState/setState` + `requestSaveLayout()`），不进 `data.json`，`schemaVersion` 仍为 5。进入前先退出编辑态并清选中；编辑态不渲染进入按钮；Escape 有选中先取消、无选中才退出；另提供 `toggle-ioto-canvas-zen-mode` 命令便于移动端与快捷键。
 
 ## 2. 存储落位
 
