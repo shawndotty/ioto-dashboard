@@ -1557,6 +1557,36 @@
     height: 20px;
 }
 
+/* ---- Unified card header height ---- */
+/* 标题行与控制件共用 24px 内容行；42 = 24 + 上下 padding 16 + 发丝边框 + 余量。
+   用 min-height 而非 height，放大字体/主题加宽头部时不被裁切。 */
+.ioto-custom-dashboard-view
+    .ioto-dashboard-card
+    > .ioto-dashboard-card-header:not(.is-title-overlay) {
+    min-height: 42px;
+}
+
+/* 只约束头部直属图标按钮（搜索/拖拽/重命名/删除）；
+   搜索框内部的 20px 关闭键不参与，避免把输入框撑大。 */
+.ioto-custom-dashboard-view
+    .ioto-dashboard-card-header:not(.is-title-overlay)
+    > .clickable-icon {
+    height: 24px;
+    padding-block: 0;
+}
+
+/* 拖拽手柄是文本按钮，需显式行高才能与图标按钮同高。 */
+.ioto-custom-dashboard-view
+    .ioto-dashboard-card-header
+    .ioto-card-drag-handle {
+    line-height: 24px;
+}
+
+/* 搜索展开时输入框不再把头部顶高（原 26px，此规则需位于其之后）。 */
+.ioto-custom-dashboard-view .ioto-card-search input[type="search"] {
+    height: 24px;
+}
+
 /* ---- Modal shell (shared) ---- */
 .modal.ioto-dashboard-modal {
     width: min(720px, 92vw);

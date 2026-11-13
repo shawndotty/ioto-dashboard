@@ -7,6 +7,11 @@ import type {
 import { BUILTIN_TASKS_ALL } from "../../query/builtins";
 import type { ComponentDefinition } from "../registry";
 import type { DashboardComponentConfig } from "../types";
+import {
+	cardSearchText,
+	mountCardSearch,
+	type CardSearchHandle,
+} from "../ui/card-search";
 
 export function percentText(ratio: number | null): string {
 	if (ratio === null) return "—";
@@ -60,6 +65,51 @@ export function arrangeGroups(
 	}
 	const limit = config.limit ?? 0;
 	return limit > 0 ? sorted.slice(0, limit) : sorted;
+}
+
+interface ProgressCardState {
+	queryId: string;
+	rows: Array<{ el: HTMLElement; name: string }>;
+	search?: CardSearchHandle;
+	emptyEl?: HTMLElement;
+}
+
+const cardStates = new WeakMap<DashboardComponentConfig, ProgressCardState>();
+
+function stateOf(config: DashboardComponentConfig): ProgressCardState {
+	let state = cardStates.get(config);
+	if (!state || state.queryId !== config.queryId) {
+		state = { queryId: config.queryId, rows: [] };
+		cardStates.set(config, state);
+	}
+	return state;
+}
+
+/** 空关键词视为全部命中；只匹配行上显示的项目名（含本地化的"未分类"）。 */
+export function matchesProjectGroup(name: string, query: string): boolean {
+	const needle = query.trim().toLocaleLowerCase();
+	return needle.length === 0 || name.toLocaleLowerCase().includes(needle);
+}
+
+function applyFilter(
+	state: ProgressCardState,
+	config: DashboardComponentConfig,
+): void {
+	const text = state.search?.text ?? cardSearchText(config);
+	const query = text.trim();
+	const isFiltering = query.length > 0;
+	let visible = 0;
+	for (const row of state.rows) {
+		const show = !isFiltering || matchesProjectGroup(row.name, text);
+		row.el.toggle(show);
+		if (show) visible += 1;
+	}
+	if (state.emptyEl) {
+		state.emptyEl.toggle(isFiltering && visible === 0);
+		if (isFiltering) {
+			state.emptyEl.setText(t("PROJECT_PROGRESS_NO_MATCH", [query]));
+		}
+	}
 }
 
 export const projectProgressComponent: ComponentDefinition = {
@@ -169,6 +219,11 @@ export const projectProgressComponent: ComponentDefinition = {
 	isEmpty: (result, config) => visibleGroups(result, config).length === 0,
 	render: (el, ctx) => {
 		el.addClass("ioto-project-progress");
+		const state = stateOf(ctx.config);
+		// 卡片重建前的行与手柄都指向旧 DOM，先清空再按本轮渲染重新登记。
+		state.rows = [];
+		state.search = undefined;
+		state.emptyEl = undefined;
 		const groups = arrangeGroups(ctx.result, ctx.config);
 		if (groups.length === 0) {
 			el.createDiv({ cls: "ioto-empty-state", text: t("PROJECT_PROGRESS_EMPTY") });
@@ -181,6 +236,7 @@ export const projectProgressComponent: ComponentDefinition = {
 			const name = group.nameKey
 				? t(group.nameKey as Parameters<typeof t>[0])
 				: group.name;
+			state.rows.push({ el: row, name });
 			row.setAttr("role", "button");
 			row.setAttr("tabindex", "0");
 			row.setAttr("aria-label", t("PROJECT_PROGRESS_ROW_HINT", [name]));
@@ -233,5 +289,24 @@ export const projectProgressComponent: ComponentDefinition = {
 			}
 			row.createDiv({ cls: "ioto-progress-meta", text: parts.join(" · ") });
 		}
+		state.emptyEl = el.createDiv({
+			cls: "ioto-empty-state ioto-progress-no-match",
+		});
+		state.emptyEl.hide();
+		if (cardSearchText(ctx.config).length > 0) applyFilter(state, ctx.config);
+	},
+	renderHeaderActions: (header, ctx) => {
+		const state = stateOf(ctx.config);
+		// 空卡片本身就是空态，没有内容可过滤。
+		if (state.rows.length === 0) return;
+		state.search = mountCardSearch(header, {
+			config: ctx.config,
+			labels: {
+				toggle: t("PROJECT_PROGRESS_SEARCH_TOGGLE"),
+				placeholder: t("PROJECT_PROGRESS_SEARCH_PLACEHOLDER"),
+				close: t("PROJECT_PROGRESS_SEARCH_CLOSE"),
+			},
+			onChange: () => applyFilter(state, ctx.config),
+		});
 	},
 };
