@@ -2107,7 +2107,7 @@
     color: var(--text-muted);
 }
 
-/* 列表：与卡片共用 13px 主字阶；横向 8px 内边距配负外边距，文字 x 不变 */
+/* 列表：与卡片共用 13px 主字阶；12px 内边距与搜索框同宽，不再用负外边距 */
 .ioto-dashboard-modal .ioto-modal-collection .setting-item-name {
     font-size: var(--font-ui-small);
     font-weight: 500;
@@ -2121,8 +2121,7 @@
 }
 
 .ioto-dashboard-modal .ioto-modal-collection .setting-item:not(.setting-item-heading) {
-    padding: 12px 8px;
-    margin-inline: -8px;
+    padding: 12px;
     border-top-color: var(--background-modifier-border);
 }
 
