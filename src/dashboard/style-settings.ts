@@ -33,6 +33,19 @@ export function cardSurfaceOf(
 	return isSurface(value) ? value : "card";
 }
 
+/**
+ * `hideTitle` 查看态始终生效；带嵌套网格的容器在编辑态也必须生效，
+ * 否则父级标题栏会挤压嵌套网格，使编辑排版与最终呈现不一致。
+ */
+export function titleHiddenInMode(
+	options: Record<string, string | number | boolean> | undefined,
+	editMode: boolean,
+	hasNestedGrid: boolean,
+): boolean {
+	if (options?.hideTitle !== true) return false;
+	return !editMode || hasNestedGrid;
+}
+
 function isAlignment(value: unknown): value is TextAlign {
 	return (
 		typeof value === "string" &&
@@ -77,6 +90,7 @@ export const STYLE_SETTINGS: ComponentSetting[] = [
 		fallback: "left",
 		target: "options",
 		when: (config) =>
+			config.type !== "container" &&
 			config.type !== "line-chart" &&
 			config.type !== "bar-chart" &&
 			config.type !== "pie-chart" &&
@@ -136,6 +150,75 @@ export interface CardStyleVars {
 	align?: TextAlign;
 	/** 恒有值；缺省或非法值回落 `card`。 */
 	surface: CardSurface;
+}
+
+/** Container layout defaults; `createConfig` writes the same values. */
+export const CONTAINER_DEFAULTS = {
+	columns: 12,
+	rowHeight: 56,
+	gap: 8,
+	padding: 8,
+	borderWidth: 1,
+	radius: 10,
+} as const;
+
+export interface ContainerVars {
+	columns: number;
+	rowHeight: number;
+	gap: number;
+	padding: number;
+	borderWidth: number;
+	radius: number;
+	borderColor?: string;
+}
+
+const CONTAINER_LIMITS = {
+	columns: [4, 24],
+	rowHeight: [40, 120],
+	gap: [0, 24],
+	padding: [0, 24],
+	borderWidth: [0, 4],
+	radius: [0, 24],
+} as const;
+
+function containerNumber(
+	options: Record<string, string | number | boolean> | undefined,
+	key: keyof typeof CONTAINER_LIMITS,
+): number {
+	const raw = options?.[key];
+	const parsed =
+		typeof raw === "number"
+			? raw
+			: typeof raw === "string" && raw.trim() !== ""
+				? Number(raw)
+				: Number.NaN;
+	const [min, max] = CONTAINER_LIMITS[key];
+	if (!Number.isFinite(parsed)) return CONTAINER_DEFAULTS[key];
+	return Math.min(max, Math.max(min, Math.round(parsed)));
+}
+
+/** Container column count (4–24); sub-card `maxW` follows it. */
+export function containerColumnsOf(
+	options: Record<string, string | number | boolean> | undefined,
+): number {
+	return containerNumber(options, "columns");
+}
+
+/** Reads every container option with the usual invalid-value fallback. */
+export function containerVarsOf(
+	options: Record<string, string | number | boolean> | undefined,
+): ContainerVars {
+	const vars: ContainerVars = {
+		columns: containerNumber(options, "columns"),
+		rowHeight: containerNumber(options, "rowHeight"),
+		gap: containerNumber(options, "gap"),
+		padding: containerNumber(options, "padding"),
+		borderWidth: containerNumber(options, "borderWidth"),
+		radius: containerNumber(options, "radius"),
+	};
+	const borderColor = options?.borderColor;
+	if (isColor(borderColor)) vars.borderColor = borderColor;
+	return vars;
 }
 
 /**

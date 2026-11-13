@@ -19,6 +19,11 @@ export interface ComponentInspectorTarget {
 	pageName: string;
 	index: number;
 	total: number;
+	/** Container id the component lives in; `null` at page level. */
+	parentId: string | null;
+	depth: number;
+	/** True when the page has at least one page-level container. */
+	hasContainers: boolean;
 	config: Readonly<DashboardComponentConfig>;
 	/** `undefined` = unregistered type (renders "unknown component", read-only). */
 	definition: ComponentDefinition | undefined;
@@ -59,6 +64,12 @@ export interface ComponentInspectorController extends InspectorControllerBase {
 	move(offset: -1 | 1): void;
 	duplicate(): void;
 	moveTo(): void;
+	/** Opens the container picker for the selected page-level component. */
+	moveIntoContainer(): void;
+	/** Pulls the selected child back onto the page. */
+	moveOutOfContainer(): void;
+	/** Removes the selected container frame, keeping its children. */
+	dissolveContainer(): void;
 	remove(): void;
 	openPageSettings(): void;
 	/** 打开对应选择器，选中后由视图写回该 setting.key。 */

@@ -2,7 +2,7 @@ import type { CountBasis } from "../metrics/types";
 import type { MeasureId, ViewId } from "./dataset/types";
 import type { QueryDefinition } from "../query/types";
 
-export const DASHBOARD_SCHEMA_VERSION = 5;
+export const DASHBOARD_SCHEMA_VERSION = 6;
 export const DASHBOARD_STORE_KEY = "dashboardStore";
 export const DEFAULT_DASHBOARD_ID = "dashboard:default";
 export const DEFAULT_PAGE_ID = "page:default";
@@ -25,6 +25,8 @@ export interface DashboardComponentConfig {
 	y?: number;
 	w?: number;
 	h?: number;
+	/** Only `acceptsChildren` components use this; first version caps depth at 1. */
+	children?: DashboardComponentConfig[];
 }
 
 export interface DashboardPage {

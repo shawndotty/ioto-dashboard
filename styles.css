@@ -588,6 +588,39 @@
     align-items: stretch;
 }
 
+/* ---- Container component ---- */
+.ioto-custom-dashboard-view .ioto-dashboard-card.is-container {
+    border-color: var(--ioto-container-border-color, var(--background-modifier-border));
+    border-width: var(--ioto-container-border-width, 1px);
+    border-radius: var(--ioto-container-radius, 10px);
+}
+
+/* Container body never scrolls; the nested grid owns scrolling (one bar only). */
+.ioto-custom-dashboard-view
+    .ioto-dashboard-card.is-container
+    > .ioto-dashboard-card-body {
+    display: flex;
+    flex-direction: column;
+    padding: var(--ioto-container-padding, 8px);
+    overflow: hidden;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-grid.is-nested {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    align-content: start;
+    gap: var(--ioto-container-gap, 8px);
+}
+
+.ioto-custom-dashboard-view .ioto-container-empty {
+    margin: auto;
+    padding: 8px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    text-align: center;
+}
+
 .ioto-custom-dashboard-view .ioto-dashboard-card {
     position: relative;
     display: flex;
@@ -2194,6 +2227,17 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     display: none;
 }
 
+/* Nested grids collapse to one column; spans must reset or cards get squashed. */
+.ioto-custom-dashboard-view.is-narrow .ioto-dashboard-grid.is-nested {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.ioto-custom-dashboard-view.is-narrow
+    .ioto-dashboard-grid.is-nested
+    > .ioto-dashboard-card {
+    grid-column: span 1 !important;
+}
+
 /* The drag ghost is attached to <body>; it also carries the view class so the
    card's inner layout rules apply. Keep this block last so the overrides win. */
 .ioto-drag-ghost {
@@ -3649,6 +3693,37 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     .ioto-custom-dashboard-view.is-editing
         .ioto-dashboard-card.is-surface-bare.is-selected
         > .ioto-dashboard-card-header {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+/* 容器隐藏标题：编辑态 header 脱流，平时透明，悬停/选中/键盘聚焦时才出现。 */
+.ioto-custom-dashboard-view.is-editing
+    .ioto-dashboard-card.is-container:not(.ioto-drag-ghost)
+    > .ioto-dashboard-card-header.is-title-overlay {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+}
+
+.ioto-custom-dashboard-view.is-editing
+    .ioto-dashboard-card.is-container:not(.ioto-drag-ghost):hover
+    > .ioto-dashboard-card-header.is-title-overlay,
+.ioto-custom-dashboard-view.is-editing
+    .ioto-dashboard-card.is-container:not(.ioto-drag-ghost):focus-within
+    > .ioto-dashboard-card-header.is-title-overlay,
+.ioto-custom-dashboard-view.is-editing
+    .ioto-dashboard-card.is-container.is-selected
+    > .ioto-dashboard-card-header.is-title-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (hover: none) {
+    .ioto-custom-dashboard-view.is-editing
+        .ioto-dashboard-card.is-container.is-selected
+        > .ioto-dashboard-card-header.is-title-overlay {
         opacity: 1;
         pointer-events: auto;
     }

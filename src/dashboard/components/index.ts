@@ -1,3 +1,4 @@
+import { containerComponent } from "./container";
 import { projectProgressComponent } from "./project-progress";
 import { kpiComponent } from "./kpi";
 import { taskListComponent } from "./task-list";
@@ -13,6 +14,7 @@ import { ComponentRegistry } from "../registry";
 
 export function createComponentRegistry(): ComponentRegistry {
 	const registry = new ComponentRegistry();
+	registry.register(containerComponent);
 	registry.register(kpiComponent);
 	registry.register(projectProgressComponent);
 	registry.register(taskListComponent);

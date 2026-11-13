@@ -1,4 +1,12 @@
 import { MEASURE_IDS, VIEW_IDS } from "./dataset/types";
+import {
+	MAX_CONTAINER_DEPTH,
+	cloneWithFreshIds,
+	collectComponentIds,
+	containsComponent,
+	findComponentLocation,
+	walkComponents,
+} from "./hierarchy";
 import type {
 	DashboardComponentConfig,
 	DashboardPage,
@@ -94,7 +102,10 @@ const LEGACY_COMPONENT_TYPES: Record<string, string> = {
 };
 
 /** Whitelists stored fields so unknown/dirty keys never survive a load. */
-function toComponent(value: unknown): DashboardComponentConfig | null {
+function toComponent(
+	value: unknown,
+	depth = 0,
+): DashboardComponentConfig | null {
 	if (!isComponent(value)) return null;
 	const legacyType = LEGACY_COMPONENT_TYPES[value.type];
 	const component: DashboardComponentConfig = {
@@ -126,6 +137,13 @@ function toComponent(value: unknown): DashboardComponentConfig | null {
 		if (typeof raw === "number" && Number.isFinite(raw)) {
 			component[axis] = raw;
 		}
+	}
+	// Only the page level keeps children; deeper nesting is dropped on load.
+	if (Array.isArray(value.children) && depth < MAX_CONTAINER_DEPTH) {
+		const children = value.children
+			.map((child) => toComponent(child, depth + 1))
+			.filter((item): item is DashboardComponentConfig => item !== null);
+		if (children.length > 0) component.children = children;
 	}
 	return component;
 }
@@ -404,9 +422,9 @@ export class DashboardRepository {
 	): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
 			const page = this.findPage(store, pageId)?.page;
-			const component = page?.components.find(
-				(item) => item.id === componentId,
-			);
+			const component = page
+				? findComponentLocation(page.components, componentId)?.config
+				: undefined;
 			if (component) {
 				const { options, ...rest } = patch;
 				Object.assign(component, rest);
@@ -436,25 +454,37 @@ export class DashboardRepository {
 		});
 	}
 
+	/**
+	 * Reorders a component inside its own parent (page list or container). The
+	 * optional `parentId` only validates that the caller reordered the right
+	 * level; `null` means the page itself.
+	 */
 	async moveComponent(
 		pageId: string,
 		componentId: string,
 		toIndex: number,
+		parentId?: string | null,
 	): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
 			const page = this.findPage(store, pageId)?.page;
 			if (!page) return;
-			const from = page.components.findIndex(
-				(item) => item.id === componentId,
-			);
-			if (from < 0) return;
+			const location = findComponentLocation(page.components, componentId);
+			if (!location) return;
+			if (
+				parentId !== undefined &&
+				(location.parent?.id ?? null) !== parentId
+			) {
+				return;
+			}
+			const siblings = location.siblings;
+			const from = location.index;
 			const to = Math.min(
-				page.components.length - 1,
+				siblings.length - 1,
 				Math.max(0, Math.trunc(toIndex)),
 			);
 			if (to === from) return;
-			const [moved] = page.components.splice(from, 1);
-			if (moved) page.components.splice(to, 0, moved);
+			const [moved] = siblings.splice(from, 1);
+			if (moved) siblings.splice(to, 0, moved);
 		});
 	}
 
@@ -477,12 +507,10 @@ export class DashboardRepository {
 			const source = this.findPage(data, fromPageId)?.page;
 			const target = this.findPage(data, toPageId)?.page;
 			if (!source || !target) return;
-			const index = source.components.findIndex(
-				(item) => item.id === componentId,
-			);
-			if (index < 0) return;
+			const location = findComponentLocation(source.components, componentId);
+			if (!location || location.depth !== 0) return;
 			if (target.components.some((item) => item.id === componentId)) return;
-			const [component] = source.components.splice(index, 1);
+			const [component] = location.siblings.splice(location.index, 1);
 			if (!component) return;
 			const at =
 				toIndex === undefined
@@ -504,9 +532,10 @@ export class DashboardRepository {
 		return this.mutate((store) => {
 			const page = this.findPage(store, pageId)?.page;
 			if (!page) return;
-			page.components = page.components.filter(
-				(item) => item.id !== componentId,
-			);
+			const location = findComponentLocation(page.components, componentId);
+			if (!location) return;
+			// Removing a container takes its whole subtree with it.
+			location.siblings.splice(location.index, 1);
 		});
 	}
 
@@ -519,25 +548,85 @@ export class DashboardRepository {
 		const store = await this.mutate((data) => {
 			const page = this.findPage(data, pageId)?.page;
 			if (!page) return;
-			const index = page.components.findIndex(
-				(item) => item.id === componentId,
-			);
-			const source = page.components[index];
-			if (index < 0 || !source) return;
+			const location = findComponentLocation(page.components, componentId);
+			if (!location) return;
 			const taken = new Set(
 				data.dashboards.flatMap((item) =>
-					item.pages.flatMap((p) => p.components.map((c) => c.id)),
+					item.pages.flatMap((p) => collectComponentIds(p.components)),
 				),
 			);
-			newId = uniqueId(`component:${Date.now()}`, taken);
-			const copy: DashboardComponentConfig = {
-				...structuredClone(source),
-				id: newId,
-			};
+			const copy = cloneWithFreshIds(location.config, () => {
+				const id = uniqueId(`component:${Date.now()}`, taken);
+				taken.add(id);
+				return id;
+			});
+			newId = copy.id;
 			if (title !== undefined) copy.title = title;
-			page.components.splice(index + 1, 0, copy);
+			location.siblings.splice(location.index + 1, 0, copy);
 		});
 		return newId ? { store, componentId: newId } : null;
+	}
+
+	/**
+	 * Moves a top-level component into a top-level container (`targetContainerId`)
+	 * or a child back to the page end (`null`). Guards keep the tree at depth 1:
+	 * the target must be a page-level container, containers never nest, and a
+	 * component can never move into its own subtree.
+	 */
+	async reparentComponent(
+		pageId: string,
+		componentId: string,
+		targetContainerId: string | null,
+	): Promise<DashboardStoreData | null> {
+		let moved = false;
+		const store = await this.mutate((data) => {
+			const page = this.findPage(data, pageId)?.page;
+			if (!page) return;
+			const source = findComponentLocation(page.components, componentId);
+			if (!source) return;
+			if (targetContainerId === componentId) return;
+			if (targetContainerId === null) {
+				// Only children can leave a container.
+				if (!source.parent) return;
+				source.siblings.splice(source.index, 1);
+				page.components.push(source.config);
+				moved = true;
+				return;
+			}
+			const target = findComponentLocation(page.components, targetContainerId);
+			if (!target || target.depth !== 0) return;
+			if (target.config.type !== "container") return;
+			// A container is itself a subtree and must stay at page level.
+			if (source.config.type === "container") return;
+			if (containsComponent(source.config, targetContainerId)) return;
+			if (source.parent?.id === targetContainerId) return;
+			source.siblings.splice(source.index, 1);
+			const children =
+				target.config.children ?? (target.config.children = []);
+			children.push(source.config);
+			moved = true;
+		});
+		return moved ? store : null;
+	}
+
+	/** Removes a container frame and re-appends its children to the page. */
+	async dissolveContainer(
+		pageId: string,
+		containerId: string,
+	): Promise<DashboardStoreData | null> {
+		let dissolved = false;
+		const store = await this.mutate((data) => {
+			const page = this.findPage(data, pageId)?.page;
+			if (!page) return;
+			const location = findComponentLocation(page.components, containerId);
+			if (!location || location.depth !== 0) return;
+			if (location.config.type !== "container") return;
+			const children = location.config.children ?? [];
+			location.siblings.splice(location.index, 1);
+			page.components.push(...children);
+			dissolved = true;
+		});
+		return dissolved ? store : null;
 	}
 
 	/**
@@ -565,7 +654,7 @@ export class DashboardRepository {
 			const takenComponentIds = new Set(
 				data.dashboards.flatMap((item) =>
 					item.pages.flatMap((p) =>
-						p.components.map((c) => c.id),
+						collectComponentIds(p.components),
 					),
 				),
 			);
@@ -573,14 +662,16 @@ export class DashboardRepository {
 			const pageBase = `page:${Date.now()}`;
 			newPageId = uniqueId(pageBase, takenPageIds);
 			takenPageIds.add(newPageId);
-			const components = page.components.map((component) => {
-				const componentId = uniqueId(
-					`component:${Date.now()}`,
-					takenComponentIds,
-				);
-				takenComponentIds.add(componentId);
-				return { ...structuredClone(component), id: componentId };
-			});
+			const components = page.components.map((component) =>
+				cloneWithFreshIds(component, () => {
+					const componentId = uniqueId(
+						`component:${Date.now()}`,
+						takenComponentIds,
+					);
+					takenComponentIds.add(componentId);
+					return componentId;
+				}),
+			);
 			const copy: DashboardPage = {
 				...structuredClone(page),
 				id: newPageId,
@@ -729,7 +820,7 @@ export class DashboardRepository {
 			const takenComponentIds = new Set(
 				store.dashboards.flatMap((item) =>
 					item.pages.flatMap((page) =>
-						page.components.map((component) => component.id),
+						collectComponentIds(page.components),
 					),
 				),
 			);
@@ -743,18 +834,15 @@ export class DashboardRepository {
 						takenPageIds,
 					);
 					takenPageIds.add(pageId);
-					const components = page.components.map(
-						(component, componentIndex) => {
+					const components = page.components.map((component) =>
+						cloneWithFreshIds(component, () => {
 							const componentId = uniqueId(
-								`component:${timestamp}-${pageIndex + 1}-${componentIndex + 1}`,
+								`component:${timestamp}-${pageIndex + 1}`,
 								takenComponentIds,
 							);
 							takenComponentIds.add(componentId);
-							return {
-								...structuredClone(component),
-								id: componentId,
-							};
-						},
+							return componentId;
+						}),
 					);
 					return { ...structuredClone(page), id: pageId, components };
 				},
@@ -824,8 +912,9 @@ export class DashboardRepository {
 				dashboard.pages.reduce(
 					(sum, page) =>
 						sum +
-						page.components.filter(
-							(component) => component.queryId === queryId,
+						walkComponents(page.components).filter(
+							(location) =>
+								location.config.queryId === queryId,
 						).length,
 					0,
 				),

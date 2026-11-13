@@ -42,6 +42,9 @@ export interface ComponentInspectorDeps {
 	move(offset: -1 | 1): void;
 	duplicate(): void;
 	moveTo(): void;
+	moveIntoContainer?(): void;
+	moveOutOfContainer?(): void;
+	dissolveContainer?(): void;
 	remove(): void;
 	openPageSettings?(): void;
 	pickTarget?(picker: TargetPickerKind, key: string): void;
@@ -1169,6 +1172,7 @@ export class ComponentInspector {
 		const state = this.state;
 		if (!state?.editable || !state.target.definition) return;
 		const componentId = state.target.config.id;
+		const target = state.target;
 		const menu = new Menu();
 		menu.addItem((item) => {
 			item.setTitle(t("DASHBOARD_DUPLICATE_COMPONENT"))
@@ -1178,14 +1182,51 @@ export class ComponentInspector {
 					this.deps.duplicate();
 				});
 		});
-		menu.addItem((item) => {
-			item.setTitle(t("DASHBOARD_MOVE_COMPONENT"))
-				.setIcon("arrow-right-left")
-				.onClick(() => {
-					if (this.state?.target.config.id !== componentId) return;
-					this.deps.moveTo();
-				});
-		});
+		// Children cannot change pages on their own; the container moves as a whole.
+		if (target.depth === 0) {
+			menu.addItem((item) => {
+				item.setTitle(t("DASHBOARD_MOVE_COMPONENT"))
+					.setIcon("arrow-right-left")
+					.onClick(() => {
+						if (this.state?.target.config.id !== componentId) return;
+						this.deps.moveTo();
+					});
+			});
+		}
+		if (
+			target.depth === 0 &&
+			target.hasContainers &&
+			target.config.type !== "container"
+		) {
+			menu.addItem((item) => {
+				item.setTitle(t("DASHBOARD_MOVE_INTO_CONTAINER"))
+					.setIcon("panel-top-open")
+					.onClick(() => {
+						if (this.state?.target.config.id !== componentId) return;
+						this.deps.moveIntoContainer?.();
+					});
+			});
+		}
+		if (target.parentId !== null) {
+			menu.addItem((item) => {
+				item.setTitle(t("DASHBOARD_MOVE_OUT_OF_CONTAINER"))
+					.setIcon("panel-top-close")
+					.onClick(() => {
+						if (this.state?.target.config.id !== componentId) return;
+						this.deps.moveOutOfContainer?.();
+					});
+			});
+		}
+		if (target.config.type === "container") {
+			menu.addItem((item) => {
+				item.setTitle(t("DASHBOARD_DISSOLVE_CONTAINER"))
+					.setIcon("ungroup")
+					.onClick(() => {
+						if (this.state?.target.config.id !== componentId) return;
+						this.deps.dissolveContainer?.();
+					});
+			});
+		}
 		menu.addSeparator();
 		menu.addItem((item) => {
 			item.setTitle(t("DASHBOARD_CONFIG_REMOVE"))

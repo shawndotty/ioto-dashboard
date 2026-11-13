@@ -581,7 +581,7 @@ test('reference counts span dashboards and survive dashboard deletion', async ()
 	assert.deepEqual(store.queries.map((item) => item.id), ['user:1']);
 });
 
-test('importing v3 / v2 JSON upgrades it to the v5 shape', async () => {
+test('importing v3 / v2 JSON upgrades it to the v6 shape', async () => {
 	const repository = new DashboardRepository(makeHost());
 	const v3 = JSON.stringify({
 		schemaVersion: 3,
@@ -597,11 +597,11 @@ test('importing v3 / v2 JSON upgrades it to the v5 shape', async () => {
 	});
 
 	const importedV3 = repository.importJson(v3);
-	assert.equal(importedV3.schemaVersion, 5);
+	assert.equal(importedV3.schemaVersion, DASHBOARD_SCHEMA_VERSION);
 	assert.equal(importedV3.dashboards[0].pages[0].id, 'page:home');
 
 	const importedV2 = repository.importJson(v2);
-	assert.equal(importedV2.schemaVersion, 5);
+	assert.equal(importedV2.schemaVersion, DASHBOARD_SCHEMA_VERSION);
 	assert.equal(importedV2.dashboards[0].pages[0].id, 'dashboard:default');
 	assert.deepEqual(importedV2.queries, [query()]);
 });
@@ -1519,4 +1519,327 @@ test('legacy unfinished-tasks components migrate to task-list and drop measure',
 	assert.equal('measure' in plain, false);
 
 	assert.equal(host.writes, 0, 'migration happens in memory only');
+});
+
+function nestedComponent(id, overrides = {}) {
+	return {
+		id,
+		type: 'kpi',
+		queryId: 'builtin:tasks-all',
+		w: 3,
+		h: 2,
+		...overrides,
+	};
+}
+
+function containerComponent(id, children = [], overrides = {}) {
+	return {
+		id,
+		type: 'container',
+		queryId: '',
+		w: 6,
+		h: 4,
+		children,
+		...overrides,
+	};
+}
+
+test('nested mutations update, reorder and remove inside a container', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [
+							nestedComponent('component:a'),
+							nestedComponent('component:b'),
+						]),
+						nestedComponent('component:c'),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	const { store } = await repository.load();
+
+	await repository.updateComponent('page:1', 'component:a', { title: 'A' });
+	await repository.moveComponent('page:1', 'component:b', 0, 'component:box');
+	await repository.removeComponent('page:1', 'component:b');
+
+	const [box, c] = currentPage(host.data.dashboardStore).components;
+	assert.equal(box.children[0].title, 'A');
+	assert.deepEqual(box.children.map((child) => child.id), ['component:a']);
+	assert.equal(c.id, 'component:c');
+});
+
+test('moveComponent validates the parent id when provided', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [
+							nestedComponent('component:a'),
+							nestedComponent('component:b'),
+						]),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	await repository.moveComponent('page:1', 'component:b', 0, null);
+	let box = currentPage(host.data.dashboardStore).components[0];
+	assert.deepEqual(box.children.map((child) => child.id), ['component:a', 'component:b']);
+
+	await repository.moveComponent('page:1', 'component:b', 0, 'component:box');
+	box = currentPage(host.data.dashboardStore).components[0];
+	assert.deepEqual(box.children.map((child) => child.id), ['component:b', 'component:a']);
+});
+
+test('duplicateComponent regenerates every descendant id', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [
+							nestedComponent('component:a'),
+							nestedComponent('component:b'),
+						]),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const result = await repository.duplicateComponent('page:1', 'component:box');
+	const components = currentPage(host.data.dashboardStore).components;
+	const copy = components.find((item) => item.id === result.componentId);
+
+	assert.equal(components.length, 2);
+	assert.ok(copy);
+	assert.equal(copy.type, 'container');
+	assert.equal(copy.children.length, 2);
+	assert.notEqual(copy.children[0].id, 'component:a');
+	assert.notEqual(copy.children[1].id, 'component:b');
+	const ids = components.flatMap((item) => [
+		item.id,
+		...(item.children ?? []).map((child) => child.id),
+	]);
+	assert.equal(new Set(ids).size, ids.length);
+});
+
+test('duplicatePage regenerates nested ids', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [
+							nestedComponent('component:a'),
+						]),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const result = await repository.duplicatePage('page:1');
+	const pages = host.data.dashboardStore.dashboards[0].pages;
+	const copy = pages.find((item) => item.id === result.pageId);
+
+	assert.ok(copy);
+	assert.notEqual(copy.components[0].id, 'component:box');
+	assert.notEqual(copy.components[0].children[0].id, 'component:a');
+});
+
+test('reparentComponent guards keep the tree at depth one', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [
+							nestedComponent('component:a'),
+						]),
+						containerComponent('component:other', []),
+						nestedComponent('component:c'),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	// A container cannot move into itself or into another container.
+	assert.equal(await repository.reparentComponent('page:1', 'component:box', 'component:box'), null);
+	assert.equal(await repository.reparentComponent('page:1', 'component:box', 'component:other'), null);
+	// A child cannot become a container for another component.
+	assert.equal(await repository.reparentComponent('page:1', 'component:c', 'component:a'), null);
+	// Unknown target.
+	assert.equal(await repository.reparentComponent('page:1', 'component:c', 'component:missing'), null);
+
+	const moved = await repository.reparentComponent('page:1', 'component:c', 'component:box');
+	assert.ok(moved);
+	const [box] = currentPage(moved).components;
+	assert.deepEqual(box.children.map((child) => child.id), ['component:a', 'component:c']);
+});
+
+test('reparentComponent moves a child back to the page end', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [
+							nestedComponent('component:a'),
+							nestedComponent('component:b'),
+						]),
+						nestedComponent('component:c'),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const moved = await repository.reparentComponent('page:1', 'component:a', null);
+	assert.ok(moved);
+	const components = currentPage(moved).components;
+	assert.deepEqual(components.map((item) => item.id), [
+		'component:box',
+		'component:c',
+		'component:a',
+	]);
+	assert.deepEqual(components[0].children.map((child) => child.id), ['component:b']);
+});
+
+test('dissolveContainer appends children in order and removes the frame', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [
+							nestedComponent('component:a'),
+							nestedComponent('component:b'),
+						]),
+						nestedComponent('component:c'),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const dissolved = await repository.dissolveContainer('page:1', 'component:box');
+	assert.ok(dissolved);
+	assert.deepEqual(
+		currentPage(dissolved).components.map((item) => item.id),
+		['component:c', 'component:a', 'component:b'],
+	);
+	assert.equal(await repository.dissolveContainer('page:1', 'component:c'), null);
+});
+
+test('reparentComponent accepts a first child into a container without a children key', async () => {
+	const empty = { id: 'component:empty', type: 'container', queryId: '', w: 6, h: 4 };
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [empty, nestedComponent('component:kpi')],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	const { store } = await repository.load();
+
+	// Normalization still drops an empty children array on load.
+	const loaded = currentPage(store).components.find((item) => item.id === 'component:empty');
+	assert.equal('children' in loaded, false);
+
+	const moved = await repository.reparentComponent('page:1', 'component:kpi', 'component:empty');
+	assert.ok(moved);
+	const components = currentPage(moved).components;
+	assert.deepEqual(components.map((item) => item.id), ['component:empty']);
+	assert.deepEqual(components[0].children.map((child) => child.id), ['component:kpi']);
+});
+
+test('dissolveContainer removes a container frame that has no children key', async () => {
+	const empty = { id: 'component:empty', type: 'container', queryId: '', w: 6, h: 4 };
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [empty, nestedComponent('component:kpi')],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const dissolved = await repository.dissolveContainer('page:1', 'component:empty');
+	assert.ok(dissolved);
+	assert.deepEqual(
+		currentPage(dissolved).components.map((item) => item.id),
+		['component:kpi'],
+	);
+});
+
+test('referenceCount counts queries used by nested components', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [
+							nestedComponent('component:a', { queryId: 'user:1' }),
+						]),
+						nestedComponent('component:c', { queryId: 'user:1' }),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	const { store } = await repository.load();
+
+	assert.equal(repository.referenceCount(store, 'user:1'), 2);
+});
+
+test('children survive an export / import round trip', async () => {
+	const host = v4({}, [
+		dashboard({
+			pages: [
+				page({
+					components: [
+						containerComponent('component:box', [
+							nestedComponent('component:a', { title: 'A' }),
+						]),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	const { store } = await repository.load();
+
+	const imported = repository.importJson(repository.exportJson(store));
+	const box = imported.dashboards[0].pages[0].components[0];
+	assert.equal(imported.schemaVersion, DASHBOARD_SCHEMA_VERSION);
+	assert.equal(box.children.length, 1);
+	assert.equal(box.children[0].title, 'A');
 });

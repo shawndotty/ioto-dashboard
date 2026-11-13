@@ -224,6 +224,8 @@ export interface ComponentDefinition {
 	category?: ComponentCategory;
 	/** Skips query resolution, data requests and version-driven rebuilds. */
 	queryless?: boolean;
+	/** The view builds a nested grid inside the card; children render themselves. */
+	acceptsChildren?: boolean;
 	/** Component picker icon (Lucide name); defaults to layout-dashboard. */
 	icon?: string;
 	/** Query targets this component understands (picker hints). */

@@ -10,6 +10,7 @@ const {
 	cardSurfaceOf,
 	cardStyleVars,
 	settingsOf,
+	titleHiddenInMode,
 } = await load('../../src/dashboard/style-settings.ts');
 const { kpiComponent } = await load('../../src/dashboard/components/kpi.ts');
 const { projectProgressComponent } = await load(
@@ -228,4 +229,27 @@ test('settingsOf appends style settings and hides alignment where unsupported', 
 			`${component.type} alignment visibility`,
 		);
 	}
+});
+
+test('titleHiddenInMode ignores a missing or false hideTitle', () => {
+	assert.equal(titleHiddenInMode(undefined, false, false), false);
+	assert.equal(titleHiddenInMode(undefined, true, true), false);
+	assert.equal(titleHiddenInMode({}, false, false), false);
+	assert.equal(titleHiddenInMode({}, true, true), false);
+	assert.equal(titleHiddenInMode({ hideTitle: false }, false, true), false);
+	assert.equal(titleHiddenInMode({ hideTitle: false }, true, true), false);
+	assert.equal(titleHiddenInMode({ hideTitle: 'true' }, false, true), false);
+});
+
+test('titleHiddenInMode hides the title in view mode for every card', () => {
+	assert.equal(titleHiddenInMode({ hideTitle: true }, false, false), true);
+	assert.equal(titleHiddenInMode({ hideTitle: true }, false, true), true);
+});
+
+test('titleHiddenInMode keeps the title in edit mode for plain cards', () => {
+	assert.equal(titleHiddenInMode({ hideTitle: true }, true, false), false);
+});
+
+test('titleHiddenInMode hides the title in edit mode for containers', () => {
+	assert.equal(titleHiddenInMode({ hideTitle: true }, true, true), true);
 });

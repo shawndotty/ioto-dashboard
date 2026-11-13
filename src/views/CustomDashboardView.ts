@@ -18,6 +18,12 @@ import type IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { createComponentRegistry } from "../dashboard/components";
 import { DataHub } from "../dashboard/data-hub";
+import {
+	MAX_CONTAINER_DEPTH,
+	containsComponent,
+	findComponentLocation,
+	walkComponents,
+} from "../dashboard/hierarchy";
 import { datasetKey, type DatasetRequest } from "../dashboard/dataset/types";
 import type {
 	ComponentInspectorController,
@@ -47,7 +53,13 @@ import {
 	type SizeBounds,
 	type TargetPickerKind,
 } from "../dashboard/registry";
-import { cardStyleVars, cardSurfaceOf } from "../dashboard/style-settings";
+import {
+	cardStyleVars,
+	cardSurfaceOf,
+	containerColumnsOf,
+	containerVarsOf,
+	titleHiddenInMode,
+} from "../dashboard/style-settings";
 import {
 	activeDashboard as activeDashboardOf,
 	activePageOf,
@@ -63,6 +75,7 @@ import type { QueryDefinition, QueryTarget } from "../query/types";
 import { ChartBucketModal } from "../ui/chart-bucket-modal";
 import { ComponentPickerModal } from "../ui/component-picker";
 import { ConfirmModal } from "../ui/ConfirmModal";
+import { ContainerPickerModal, type ContainerTarget } from "../ui/container-picker";
 import {
 	DashboardManagerModal,
 	uniqueDashboardName,
@@ -1012,6 +1025,14 @@ export class CustomDashboardView extends ItemView {
 		event.preventDefault();
 		// duplicate/move 读取 selectedComponentId，先同步选中再打开菜单。
 		this.selectComponent(config.id);
+		const page = this.activePage;
+		const location = page
+			? findComponentLocation(page.components, config.id)
+			: undefined;
+		const depth = location?.depth ?? 0;
+		const parentId = location?.parent?.id ?? null;
+		const hasContainers =
+			page?.components.some((item) => item.type === "container") ?? false;
 		const menu = new Menu();
 		menu.addItem((item) =>
 			item
@@ -1025,12 +1046,38 @@ export class CustomDashboardView extends ItemView {
 				.setIcon("copy")
 				.onClick(() => void this.duplicateSelectedComponent()),
 		);
-		menu.addItem((item) =>
-			item
-				.setTitle(t("DASHBOARD_MOVE_COMPONENT"))
-				.setIcon("folder-symlink")
-				.onClick(() => void this.moveSelectedComponent()),
-		);
+		if (depth === 0) {
+			menu.addItem((item) =>
+				item
+					.setTitle(t("DASHBOARD_MOVE_COMPONENT"))
+					.setIcon("folder-symlink")
+					.onClick(() => void this.moveSelectedComponent()),
+			);
+		}
+		if (depth === 0 && config.type !== "container" && hasContainers) {
+			menu.addItem((item) =>
+				item
+					.setTitle(t("DASHBOARD_MOVE_INTO_CONTAINER"))
+					.setIcon("panel-top-open")
+					.onClick(() => void this.moveSelectedIntoContainer()),
+			);
+		}
+		if (parentId !== null) {
+			menu.addItem((item) =>
+				item
+					.setTitle(t("DASHBOARD_MOVE_OUT_OF_CONTAINER"))
+					.setIcon("panel-top-close")
+					.onClick(() => void this.moveSelectedOutOfContainer()),
+			);
+		}
+		if (config.type === "container") {
+			menu.addItem((item) =>
+				item
+					.setTitle(t("DASHBOARD_DISSOLVE_CONTAINER"))
+					.setIcon("ungroup")
+					.onClick(() => void this.dissolveSelectedContainer()),
+			);
+		}
 		menu.addItem((item) =>
 			item
 				.setTitle(t("DASHBOARD_RESET_SIZE"))
@@ -1116,6 +1163,10 @@ export class CustomDashboardView extends ItemView {
 		const size = clampSize(config.w, config.h, this.boundsFor(config));
 		// Queryless cards never rebuild on data/query versions (keeps editor focus).
 		const queryless = this.registry.get(config.type)?.queryless === true;
+		// Child changes rebuild the whole container (single-level reconciliation).
+		const childSignature = (config.children ?? [])
+			.map((child) => `${child.id}:${this.cardSignature(child)}`)
+			.join(",");
 		return [
 			config.type,
 			queryless ? "" : config.queryId,
@@ -1130,6 +1181,7 @@ export class CustomDashboardView extends ItemView {
 			this.editMode ? "edit" : "view",
 			queryless ? "" : String(this.dataVersion),
 			queryless ? "" : String(this.queriesVersion),
+			childSignature,
 		].join("|");
 	}
 
@@ -1172,6 +1224,9 @@ export class CustomDashboardView extends ItemView {
 		card.style.gridRow = `span ${size.h}`;
 		if (this.editMode) {
 			card.addEventListener("click", (event) => {
+				// Nested cards handle their own selection; the container ignores it.
+				const owner = this.cardOwnerOf(event);
+				if (owner && owner !== card) return;
 				const target = event.target as HTMLElement | null;
 				if (
 					target?.closest(
@@ -1184,8 +1239,11 @@ export class CustomDashboardView extends ItemView {
 			});
 		}
 
-		const hideTitle =
-			!this.editMode && config.options?.hideTitle === true;
+		const hideTitle = titleHiddenInMode(
+			config.options,
+			this.editMode,
+			definition?.acceptsChildren === true,
+		);
 		const header = card.createDiv({ cls: "ioto-dashboard-card-header" });
 		header.toggleClass("is-title-overlay", hideTitle);
 		card.toggleClass("is-title-hidden", hideTitle);
@@ -1208,14 +1266,25 @@ export class CustomDashboardView extends ItemView {
 			this.renderRemoveButton(header, config);
 		}
 		if (this.editMode) {
-			card.addEventListener("contextmenu", (event) =>
-				this.openCardMenu(event, config),
-			);
+			card.addEventListener("contextmenu", (event) => {
+				const owner = this.cardOwnerOf(event);
+				if (owner && owner !== card) return;
+				this.openCardMenu(event, config);
+			});
 		}
 
 		const body = card.createDiv({ cls: "ioto-dashboard-card-body" });
 		if (this.editMode) {
 			this.renderResizeHandle(card, grid, config);
+		}
+		if (definition?.acceptsChildren) {
+			// Only the page level nests; a container inside a container stays flat.
+			const depth =
+				findComponentLocation(this.activePage?.components ?? [], config.id)
+					?.depth ?? 0;
+			if (depth < MAX_CONTAINER_DEPTH) {
+				this.renderContainerBody(card, body, config);
+			}
 		}
 		if (!definition) {
 			this.registry.placeholder(body, config.type);
@@ -1299,6 +1368,48 @@ export class CustomDashboardView extends ItemView {
 			definition.renderHeaderActions?.(header, ctx);
 		}
 		return card;
+	}
+
+	/** Innermost card under the event target; containers ignore nested events. */
+	private cardOwnerOf(event: Event): HTMLElement | null {
+		const target = event.target as HTMLElement | null;
+		return target?.closest<HTMLElement>("[data-component-id]") ?? null;
+	}
+
+	/**
+	 * Builds the nested grid before `render` runs, so the container component
+	 * itself only adds the edit-mode empty hint.
+	 */
+	private renderContainerBody(
+		card: HTMLElement,
+		body: HTMLElement,
+		config: DashboardComponentConfig,
+	): void {
+		const vars = containerVarsOf(config.options);
+		card.addClass("is-container");
+		card.style.setProperty("--ioto-dashboard-columns", String(vars.columns));
+		card.style.setProperty(
+			"--ioto-dashboard-row-height",
+			`${vars.rowHeight}px`,
+		);
+		card.style.setProperty("--ioto-container-gap", `${vars.gap}px`);
+		card.style.setProperty("--ioto-container-padding", `${vars.padding}px`);
+		card.style.setProperty(
+			"--ioto-container-border-width",
+			`${vars.borderWidth}px`,
+		);
+		card.style.setProperty("--ioto-container-radius", `${vars.radius}px`);
+		if (vars.borderColor) {
+			card.style.setProperty(
+				"--ioto-container-border-color",
+				vars.borderColor,
+			);
+		}
+		const nested = body.createDiv({
+			cls: "ioto-dashboard-grid is-nested",
+		});
+		nested.setAttr("aria-label", t("CONTAINER_CONTENT_ARIA"));
+		this.syncCards(nested, config.children ?? []);
 	}
 
 	private statusOf(
@@ -1446,7 +1557,13 @@ export class CustomDashboardView extends ItemView {
 		page: DashboardPage | undefined = this.activePage,
 	): SizeBounds {
 		const bounds = boundsForType(this.registry, config.type);
-		const columns = page?.columns ?? 12;
+		const parent = page
+			? findComponentLocation(page.components, config.id)?.parent
+			: null;
+		// A child's width cap follows the container columns, not the page.
+		const columns = parent
+			? containerColumnsOf(parent.options)
+			: (page?.columns ?? 12);
 		return { ...bounds, maxW: Math.max(bounds.minW, columns) };
 	}
 
@@ -1465,7 +1582,9 @@ export class CustomDashboardView extends ItemView {
 		direction: -1 | 1,
 	): Promise<void> {
 		const page = this.activePage;
-		const config = page?.components.find((item) => item.id === componentId);
+		const config = page
+			? findComponentLocation(page.components, componentId)?.config
+			: undefined;
 		if (!page || !config) return;
 		const bounds = this.boundsFor(config);
 		const current = clampSize(config.w, config.h, bounds);
@@ -1481,7 +1600,9 @@ export class CustomDashboardView extends ItemView {
 
 	private async resetComponentSize(componentId: string): Promise<void> {
 		const page = this.activePage;
-		const config = page?.components.find((item) => item.id === componentId);
+		const config = page
+			? findComponentLocation(page.components, componentId)?.config
+			: undefined;
 		if (!page || !config) return;
 		const bounds = this.boundsFor(config);
 		const current = clampSize(config.w, config.h, bounds);
@@ -1501,13 +1622,16 @@ export class CustomDashboardView extends ItemView {
 	): Promise<void> {
 		const page = this.activePage;
 		if (!page) return;
-		const from = page.components.findIndex((item) => item.id === componentId);
+		const location = findComponentLocation(page.components, componentId);
+		if (!location) return;
+		const from = location.index;
 		const to = from + offset;
-		if (from < 0 || to < 0 || to >= page.components.length) return;
+		if (to < 0 || to >= location.siblings.length) return;
 		this.store = await this.plugin.dashboardRepository.moveComponent(
 			page.id,
 			componentId,
 			to,
+			location.parent?.id ?? null,
 		);
 		this.render();
 	}
@@ -1571,8 +1695,9 @@ export class CustomDashboardView extends ItemView {
 
 	private selectedBareComponent(): DashboardComponentConfig | null {
 		const id = this.selectedComponentId;
-		if (!id) return null;
-		const config = this.activePage?.components.find((item) => item.id === id);
+		const page = this.activePage;
+		if (!id || !page) return null;
+		const config = findComponentLocation(page.components, id)?.config;
 		if (!config) return null;
 		return cardSurfaceOf(config.options) === "card" ? null : config;
 	}
@@ -1608,7 +1733,8 @@ export class CustomDashboardView extends ItemView {
 	private syncSelectionState(): void {
 		const id = this.selectedComponentId;
 		if (id) {
-			if (this.activePage?.components.some((item) => item.id === id)) return;
+			const page = this.activePage;
+			if (page && findComponentLocation(page.components, id)) return;
 			this.selectedComponentId = null;
 			this.plugin.inspectorService.clear(this.leafId);
 			return;
@@ -1623,8 +1749,10 @@ export class CustomDashboardView extends ItemView {
 	private syncSelectionClasses(): void {
 		const grid = this.gridEl;
 		if (grid) {
-			for (const child of Array.from(grid.children)) {
-				const element = child as HTMLElement;
+			// Includes nested cards; selecting a container never marks its children.
+			for (const element of Array.from(
+				grid.querySelectorAll<HTMLElement>("[data-component-id]"),
+			)) {
 				const id = element.dataset.componentId;
 				if (!id) continue;
 				element.toggleClass("is-selected", id === this.selectedComponentId);
@@ -1686,6 +1814,12 @@ export class CustomDashboardView extends ItemView {
 					move: (offset) => this.controller?.move(offset),
 					duplicate: () => this.controller?.duplicate(),
 					moveTo: () => this.controller?.moveTo(),
+					moveIntoContainer: () =>
+						this.controller?.moveIntoContainer(),
+					moveOutOfContainer: () =>
+						this.controller?.moveOutOfContainer(),
+					dissolveContainer: () =>
+						this.controller?.dissolveContainer(),
 					remove: () => this.controller?.remove(),
 					openPageSettings: () => {
 						const page = this.activePage;
@@ -1786,6 +1920,9 @@ export class CustomDashboardView extends ItemView {
 			},
 			duplicate: () => void this.duplicateSelectedComponent(),
 			moveTo: () => void this.moveSelectedComponent(),
+			moveIntoContainer: () => void this.moveSelectedIntoContainer(),
+			moveOutOfContainer: () => void this.moveSelectedOutOfContainer(),
+			dissolveContainer: () => void this.dissolveSelectedContainer(),
 			remove: () => this.confirmRemoveSelected(),
 			openPageSettings: () => {
 				const page = this.activePage;
@@ -1863,15 +2000,20 @@ export class CustomDashboardView extends ItemView {
 		const page = this.activePage;
 		const id = this.selectedComponentId;
 		if (!page || !id) return null;
-		const index = page.components.findIndex((item) => item.id === id);
-		const config = index >= 0 ? page.components[index] : undefined;
-		if (!config) return null;
+		const location = findComponentLocation(page.components, id);
+		if (!location) return null;
+		const config = location.config;
 		const bounds = this.boundsFor(config);
 		return {
 			kind: "component",
 			pageName: page.name,
-			index,
-			total: page.components.length,
+			index: location.index,
+			total: location.siblings.length,
+			parentId: location.parent?.id ?? null,
+			depth: location.depth,
+			hasContainers: page.components.some(
+				(component) => component.type === "container",
+			),
 			config,
 			definition: this.registry.get(config.type),
 			bounds,
@@ -1901,27 +2043,27 @@ export class CustomDashboardView extends ItemView {
 
 	canDuplicateSelected(): boolean {
 		const id = this.selectedComponentId;
+		const page = this.activePage;
 		return Boolean(
 			this.editMode &&
 				id &&
-				this.activePage?.components.some((item) => item.id === id),
+				page &&
+				findComponentLocation(page.components, id),
 		);
 	}
 
 	async duplicateSelectedComponent(): Promise<void> {
 		if (!this.canDuplicateSelected()) return;
-		const pageId = this.activePage?.id;
+		const page = this.activePage;
 		const id = this.selectedComponentId;
-		if (!pageId || !id) return;
-		const source = this.activePage?.components.find(
-			(item) => item.id === id,
-		);
+		if (!page || !id) return;
+		const source = findComponentLocation(page.components, id)?.config;
 		if (!source) return;
 		const suffix = t("DASHBOARD_COMPONENT_COPY_SUFFIX");
 		const base = this.componentDisplayName(source);
 		const title = base.endsWith(suffix.trim()) ? base : `${base}${suffix}`;
 		const result = await this.plugin.dashboardRepository.duplicateComponent(
-			pageId,
+			page.id,
 			id,
 			title,
 		);
@@ -1991,10 +2133,13 @@ export class CustomDashboardView extends ItemView {
 
 	private async moveSelectedComponent(): Promise<void> {
 		const page = this.activePage;
-		const config = page?.components.find(
-			(item) => item.id === this.selectedComponentId,
-		);
-		if (!page || !config || !this.store) return;
+		const id = this.selectedComponentId;
+		const location = page && id
+			? findComponentLocation(page.components, id)
+			: undefined;
+		if (!page || !location || !this.store) return;
+		if (location.depth > 0) return;
+		const config = location.config;
 		const targets = this.pageTargets(page.id);
 		if (targets.length === 0) {
 			new Notice(t("DASHBOARD_MOVE_COMPONENT_FAILED"));
@@ -2052,6 +2197,80 @@ export class CustomDashboardView extends ItemView {
 		);
 	}
 
+	private async moveSelectedIntoContainer(): Promise<void> {
+		const page = this.activePage;
+		const id = this.selectedComponentId;
+		if (!page || !id) return;
+		const location = findComponentLocation(page.components, id);
+		if (!location || location.depth !== 0) return;
+		if (location.config.type === "container") return;
+		const targets: ContainerTarget[] = page.components
+			.filter((component) => component.type === "container")
+			.map((component) => ({
+				id: component.id,
+				label: this.componentDisplayName(component),
+			}));
+		if (targets.length === 0) return;
+		new ContainerPickerModal(this.app, targets, (target) => {
+			void this.reparentSelectedComponent(target.id);
+		}).open();
+	}
+
+	private async moveSelectedOutOfContainer(): Promise<void> {
+		await this.reparentSelectedComponent(null);
+	}
+
+	private async reparentSelectedComponent(
+		targetContainerId: string | null,
+	): Promise<void> {
+		const page = this.activePage;
+		const id = this.selectedComponentId;
+		if (!page || !id) return;
+		const location = findComponentLocation(page.components, id);
+		if (!location) return;
+		const name = this.componentDisplayName(location.config);
+		const targetConfig =
+			targetContainerId === null
+				? undefined
+				: findComponentLocation(page.components, targetContainerId)?.config;
+		const targetName = targetConfig
+			? this.componentDisplayName(targetConfig)
+			: "";
+		const result =
+			await this.plugin.dashboardRepository.reparentComponent(
+				page.id,
+				id,
+				targetContainerId,
+			);
+		if (!result) {
+			new Notice(t("DASHBOARD_MOVE_COMPONENT_FAILED"));
+			return;
+		}
+		this.store = result;
+		this.render();
+		this.selectComponent(id);
+		new Notice(
+			targetContainerId === null
+				? t("DASHBOARD_MOVED_OUT_OF_CONTAINER", [name])
+				: t("DASHBOARD_MOVED_INTO_CONTAINER", [name, targetName]),
+		);
+	}
+
+	private async dissolveSelectedContainer(): Promise<void> {
+		const page = this.activePage;
+		const id = this.selectedComponentId;
+		if (!page || !id) return;
+		const store = await this.plugin.dashboardRepository.dissolveContainer(
+			page.id,
+			id,
+		);
+		if (!store) return;
+		this.store = store;
+		this.selectedComponentId = null;
+		this.plugin.inspectorService.clear(this.leafId);
+		this.render();
+	}
+
 	private confirmRemoveSelected(): void {
 		const id = this.selectedComponentId;
 		if (!id) return;
@@ -2059,22 +2278,35 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private confirmRemove(componentId: string): void {
-		new ConfirmModal(
-			this.app,
-			t("INSPECTOR_TITLE"),
-			t("INSPECTOR_REMOVE_CONFIRM"),
-			() => void this.removeComponent(componentId),
+		const page = this.activePage;
+		const config = page
+			? findComponentLocation(page.components, componentId)?.config
+			: undefined;
+		const count = config?.children?.length ?? 0;
+		const message =
+			count > 0
+				? t("DASHBOARD_CONTAINER_REMOVE_CONFIRM", [String(count)])
+				: t("INSPECTOR_REMOVE_CONFIRM");
+		new ConfirmModal(this.app, t("INSPECTOR_TITLE"), message, () =>
+			void this.removeComponent(componentId),
 		).open();
 	}
 
 	private async removeComponent(componentId: string): Promise<void> {
-		const pageId = this.activePage?.id;
-		if (!pageId) return;
+		const page = this.activePage;
+		if (!page) return;
+		const target = findComponentLocation(page.components, componentId);
+		const selected = this.selectedComponentId;
+		const selectedRemoved =
+			selected !== null &&
+			(selected === componentId ||
+				(target !== null &&
+					containsComponent(target.config, selected)));
 		this.store = await this.plugin.dashboardRepository.removeComponent(
-			pageId,
+			page.id,
 			componentId,
 		);
-		if (this.selectedComponentId === componentId) {
+		if (selectedRemoved) {
 			this.selectedComponentId = null;
 			this.plugin.inspectorService.clear(this.leafId);
 		}
@@ -2411,9 +2643,9 @@ export class CustomDashboardView extends ItemView {
 			if (id) order.push(id);
 		}
 		const toIndex = order.indexOf(componentId);
-		const fromIndex = page.components.findIndex(
-			(item) => item.id === componentId,
-		);
+		const location = findComponentLocation(page.components, componentId);
+		const fromIndex = location?.index ?? -1;
+		const parentId = location?.parent?.id ?? null;
 		const changed =
 			toIndex >= 0 && fromIndex >= 0 && toIndex !== fromIndex;
 		if (changed) {
@@ -2421,6 +2653,7 @@ export class CustomDashboardView extends ItemView {
 				pageId,
 				componentId,
 				toIndex,
+				parentId,
 			);
 		}
 		const rendered = this.endInteraction();
@@ -2430,6 +2663,7 @@ export class CustomDashboardView extends ItemView {
 	private readGridMetrics(grid: HTMLElement): GridMetrics {
 		let gap = 12;
 		let rowHeight = 72;
+		let columns = this.activePage?.columns === 24 ? 24 : 12;
 		const style = grid.ownerDocument.defaultView?.getComputedStyle(grid);
 		if (style) {
 			const parsedGap = Number.parseFloat(
@@ -2440,13 +2674,16 @@ export class CustomDashboardView extends ItemView {
 				style.getPropertyValue("grid-auto-rows"),
 			);
 			if (Number.isFinite(parsedRow) && parsedRow > 0) rowHeight = parsedRow;
+			// Nested grids inherit their own column count from the container card.
+			const parsedColumns = Number.parseInt(
+				style.getPropertyValue("--ioto-dashboard-columns"),
+				10,
+			);
+			if (Number.isFinite(parsedColumns) && parsedColumns > 0) {
+				columns = parsedColumns;
+			}
 		}
-		return gridMetrics(
-			grid.clientWidth,
-			this.activePage?.columns === 24 ? 24 : 12,
-			gap,
-			rowHeight,
-		);
+		return gridMetrics(grid.clientWidth, columns, gap, rowHeight);
 	}
 
 	private startResize(
@@ -2593,7 +2830,8 @@ export class CustomDashboardView extends ItemView {
 		const seen = new Set<string>();
 		for (const dashboard of this.store.dashboards) {
 			for (const page of dashboard.pages) {
-				for (const config of page.components) {
+				for (const location of walkComponents(page.components)) {
+					const config = location.config;
 					const definition = this.registry.get(config.type);
 					if (!definition?.toMetricRequest) continue;
 					const request = definition.toMetricRequest(
@@ -2618,7 +2856,8 @@ export class CustomDashboardView extends ItemView {
 		const seen = new Set<string>();
 		for (const dashboard of this.store.dashboards) {
 			for (const page of dashboard.pages) {
-				for (const config of page.components) {
+				for (const location of walkComponents(page.components)) {
+					const config = location.config;
 					const definition = this.registry.get(config.type);
 					if (!definition?.toDatasetRequest) continue;
 					const request = definition.toDatasetRequest(
@@ -3038,15 +3277,25 @@ function uniqueCopyName(name: string, taken: Set<string>): string {
  */
 function signatureOf(store: DashboardStoreData | null): string {
 	if (!store) return "";
+	const componentSignature = (
+		components: readonly DashboardComponentConfig[],
+	): string =>
+		components
+			.map((component) =>
+				component.children === undefined
+					? component.id
+					: `${component.id}(${componentSignature(component.children)})`,
+			)
+			.join(",");
 	return store.dashboards
 		.map(
 			(dashboard) =>
 				`${dashboard.id}:${dashboard.name}[${dashboard.pages
 					.map(
 						(page) =>
-							`${page.id}:${page.name}(${page.components
-								.map((component) => component.id)
-								.join(",")})`,
+							`${page.id}:${page.name}(${componentSignature(
+								page.components,
+							)})`,
 					)
 					.join(",")}]`,
 		)
