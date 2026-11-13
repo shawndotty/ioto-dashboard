@@ -105,6 +105,49 @@ function pageSelection(overrides = {}) {
 	return { kind: 'page', leafId: 'canvas:a', pageId: 'page:1', ...overrides };
 }
 
+function makePagesTarget(overrides = {}) {
+	return {
+		kind: 'pages',
+		dashboardId: 'dashboard:1',
+		dashboardName: 'Dashboard 1',
+		activePageId: 'page:1',
+		pages: [
+			{ id: 'page:1', name: 'Page 1', componentCount: 2, isActive: true, canDelete: true },
+			{ id: 'page:2', name: 'Page 2', componentCount: 0, isActive: false, canDelete: true },
+		],
+		...overrides,
+	};
+}
+
+function makePagesController(overrides = {}) {
+	const controller = {
+		kind: 'pages',
+		leafId: 'canvas:a',
+		target: makePagesTarget(),
+		editable: true,
+		moved: [],
+		isEditable() {
+			return controller.editable;
+		},
+		getTarget() {
+			return controller.target;
+		},
+		switchPage() {},
+		createPage() {},
+		duplicatePage() {},
+		renamePage() {},
+		removePage() {},
+		movePage(id, target) {
+			controller.moved.push([id, target]);
+		},
+	};
+	return Object.assign(controller, overrides);
+}
+
+function pagesSelection(overrides = {}) {
+	return { kind: 'pages', leafId: 'canvas:a', dashboardId: 'dashboard:1', ...overrides };
+}
+
 test('select stores the selection/controller and notifies listeners', () => {
 	const service = new DashboardInspectorService();
 	const controller = makeController();
@@ -298,4 +341,61 @@ test('resolveInspectorHost: auto follows the platform, explicit values win', () 
 	assert.equal(resolveInspectorHost('auto', true), 'inline');
 	assert.equal(resolveInspectorHost('sidebar', true), 'sidebar');
 	assert.equal(resolveInspectorHost('inline', false), 'inline');
+});
+
+test('snapshot builds the pages state and carries the editable flag', () => {
+	const service = new DashboardInspectorService();
+	const controller = makePagesController({ editable: false });
+	service.select(pagesSelection(), controller);
+
+	const snapshot = service.snapshot();
+	assert.deepEqual(snapshot, {
+		kind: 'pages',
+		editable: false,
+		target: makePagesTarget(),
+	});
+	assert.equal('queries' in snapshot, false);
+	assert.equal('focus' in snapshot, false);
+});
+
+test('pages selections are cleared per leaf and dropped when the target vanishes', () => {
+	const service = new DashboardInspectorService();
+	const controller = makePagesController();
+	service.select(pagesSelection(), controller);
+	let notified = 0;
+	service.subscribe(() => notified++);
+
+	service.clear('canvas:other');
+	assert.ok(service.current());
+
+	service.clear('canvas:a');
+	assert.equal(service.current(), null);
+	assert.equal(notified, 1);
+
+	controller.target = null;
+	service.select(pagesSelection(), controller);
+	assert.equal(service.snapshot(), null);
+	service.refresh();
+	assert.equal(service.current(), null);
+});
+
+test('the last selection wins across component, page and pages kinds', () => {
+	const service = new DashboardInspectorService();
+	const component = makeController();
+	const page = makePageController();
+	const pages = makePagesController();
+
+	service.select(selection(), component);
+	service.select(pageSelection(), page);
+	service.select(pagesSelection(), pages, { focus: 'name' });
+
+	assert.equal(service.current().controller, pages);
+	assert.equal(service.current().selection.kind, 'pages');
+	assert.equal(service.consumeFocus(), 'name');
+
+	service.select(selection(), component);
+	assert.equal(service.current().selection.kind, 'component');
+
+	service.select(pagesSelection(), pages);
+	assert.equal(service.current().selection.kind, 'pages');
 });

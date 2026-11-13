@@ -289,6 +289,15 @@ export default {
 	PAGE_NAME_PLACEHOLDER: "頁面名稱",
 	PAGE_DEFAULT_NAME: "頁面 {0}",
 
+	// Pages panel
+	DASHBOARD_PAGES_TITLE: "頁面管理",
+	DASHBOARD_PAGES_ADD: "新增頁面",
+	DASHBOARD_PAGES_HINT: "拖曳可排序，順序自動儲存",
+	PAGE_MOVE_UP: "上移",
+	PAGE_MOVE_DOWN: "下移",
+	PAGE_MOVE_DRAG: "拖曳排序",
+	PAGE_MOVE_ANNOUNCE: "{0}：第 {1} 頁，共 {2} 頁",
+
 	// Components
 	COMPONENT_PICKER_TITLE: "新增元件",
 	COMPONENT_KPI_NAME: "KPI",

@@ -52,6 +52,29 @@ export function dropIndex(
 	return entries.length;
 }
 
+/**
+ * Horizontal insertion index for a tab strip. The dragged tab is skipped but
+ * keeps its slot, so callers can use the result against the filtered list.
+ */
+export function dropIndexX(
+	rects: readonly CardRect[],
+	x: number,
+	draggedId: string,
+): number {
+	const entries: Array<{ rect: CardRect; index: number }> = [];
+	let index = 0;
+	for (const rect of rects) {
+		if (rect.id === draggedId) continue;
+		entries.push({ rect, index });
+		index += 1;
+	}
+	if (entries.length === 0) return 0;
+	for (const { rect, index: slot } of entries) {
+		if (x < rect.left + rect.width / 2) return slot;
+	}
+	return entries.length;
+}
+
 /** Moves one entry; returns a new array, never mutates the input. */
 export function moveItem<T>(
 	list: readonly T[],

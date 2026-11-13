@@ -12,7 +12,8 @@ export type InspectorFocus = "title" | "first" | "name" | "layout";
 
 export type InspectorSelection =
 	| { kind: "component"; leafId: string; pageId: string; componentId: string }
-	| { kind: "page"; leafId: string; pageId: string };
+	| { kind: "page"; leafId: string; pageId: string }
+	| { kind: "pages"; leafId: string; dashboardId: string };
 
 export interface ComponentInspectorTarget {
 	kind: "component";
@@ -44,7 +45,24 @@ export interface PageInspectorTarget {
 	canDelete: boolean;
 }
 
-export type InspectorTarget = ComponentInspectorTarget | PageInspectorTarget;
+export interface DashboardPagesInspectorTarget {
+	kind: "pages";
+	dashboardId: string;
+	dashboardName: string;
+	activePageId: string;
+	pages: Array<{
+		id: string;
+		name: string;
+		componentCount: number;
+		isActive: boolean;
+		canDelete: boolean;
+	}>;
+}
+
+export type InspectorTarget =
+	| ComponentInspectorTarget
+	| PageInspectorTarget
+	| DashboardPagesInspectorTarget;
 
 interface InspectorControllerBase {
 	/** The canvas view that made the selection; used to scope `clear()`. */
@@ -87,9 +105,22 @@ export interface PageInspectorController extends InspectorControllerBase {
 	removePage(): void;
 }
 
+export interface PagesInspectorController extends InspectorControllerBase {
+	kind: "pages";
+	getTarget(): DashboardPagesInspectorTarget | null;
+	switchPage(pageId: string): void;
+	createPage(): void;
+	duplicatePage(pageId: string): void;
+	renamePage(pageId: string): void;
+	removePage(pageId: string): void;
+	/** `mode: "index"` targets a position; `"step"` moves by ±1. */
+	movePage(pageId: string, target: number, mode: "index" | "step"): void;
+}
+
 export type InspectorController =
 	| ComponentInspectorController
-	| PageInspectorController;
+	| PageInspectorController
+	| PagesInspectorController;
 
 export interface InspectorState {
 	kind: "component";
@@ -107,9 +138,17 @@ export interface PageInspectorState {
 	focus: InspectorFocus | null;
 }
 
+export interface PagesInspectorState {
+	kind: "pages";
+	editable: boolean;
+	target: DashboardPagesInspectorTarget;
+	focus: InspectorFocus | null;
+}
+
 export type InspectorSnapshot =
 	| Omit<InspectorState, "focus">
-	| Omit<PageInspectorState, "focus">;
+	| Omit<PageInspectorState, "focus">
+	| Omit<PagesInspectorState, "focus">;
 
 export function resolveInspectorHost(
 	host: InspectorHost,
@@ -192,6 +231,13 @@ export class DashboardInspectorService {
 		if (controller.kind === "page" && target.kind === "page") {
 			return {
 				kind: "page",
+				editable: controller.isEditable(),
+				target,
+			};
+		}
+		if (controller.kind === "pages" && target.kind === "pages") {
+			return {
+				kind: "pages",
 				editable: controller.isEditable(),
 				target,
 			};

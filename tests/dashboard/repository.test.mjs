@@ -505,6 +505,85 @@ test('the last page of a dashboard is never removed', async () => {
 	assert.equal(store.dashboards[0].pages[0].id, DEFAULT_PAGE_ID);
 });
 
+test('movePage reorders within a dashboard and clamps the target index', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [
+				page({ id: 'page:p1' }),
+				page({ id: 'page:p2' }),
+				page({ id: 'page:p3' }),
+			],
+			lastPageId: 'page:p2',
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	let store = await repository.movePage('page:p3', 0);
+	assert.deepEqual(store.dashboards[0].pages.map((item) => item.id), [
+		'page:p3',
+		'page:p1',
+		'page:p2',
+	]);
+	assert.equal(store.dashboards[0].lastPageId, 'page:p2');
+
+	store = await repository.movePage('page:p3', 2);
+	assert.deepEqual(store.dashboards[0].pages.map((item) => item.id), [
+		'page:p1',
+		'page:p2',
+		'page:p3',
+	]);
+
+	store = await repository.movePage('page:p1', -5);
+	assert.deepEqual(store.dashboards[0].pages.map((item) => item.id), [
+		'page:p1',
+		'page:p2',
+		'page:p3',
+	]);
+
+	store = await repository.movePage('page:p1', 99);
+	assert.deepEqual(store.dashboards[0].pages.map((item) => item.id), [
+		'page:p2',
+		'page:p3',
+		'page:p1',
+	]);
+});
+
+test('movePage ignores unknown ids and keeps other dashboards untouched', async () => {
+	const host = v4({}, [
+		dashboard({
+			id: 'dashboard:a',
+			pages: [page({ id: 'page:a1' }), page({ id: 'page:a2' })],
+		}),
+		dashboard({
+			id: 'dashboard:b',
+			pages: [page({ id: 'page:b1' }), page({ id: 'page:b2' })],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+
+	const store = await repository.movePage('page:missing', 0);
+	assert.deepEqual(store.dashboards[0].pages.map((item) => item.id), [
+		'page:a1',
+		'page:a2',
+	]);
+	assert.deepEqual(store.dashboards[1].pages.map((item) => item.id), [
+		'page:b1',
+		'page:b2',
+	]);
+
+	const moved = await repository.movePage('page:b2', 0);
+	assert.deepEqual(moved.dashboards[0].pages.map((item) => item.id), [
+		'page:a1',
+		'page:a2',
+	]);
+	assert.deepEqual(moved.dashboards[1].pages.map((item) => item.id), [
+		'page:b2',
+		'page:b1',
+	]);
+});
+
 test('removing the last page falls back to the first remaining page', async () => {
 	const host = v4({}, [
 		dashboard({

@@ -4,6 +4,7 @@ import { load } from '../data/helpers.mjs';
 
 const {
 	dropIndex,
+	dropIndexX,
 	moveItem,
 	moveById,
 	stepSize,
@@ -219,4 +220,32 @@ test('dropIndex ignores the dragged rect and returns an index in the filtered li
 	assert.equal(dropIndex(rects, 0, 10, 'dragged'), 0);
 	assert.equal(dropIndex(rects, 200, 10, 'dragged'), 1);
 	assert.equal(dropIndex(rects, 400, 10, 'dragged'), 2);
+});
+
+test('dropIndexX maps a horizontal pointer to an insertion index', () => {
+	const rects = [rect('a', 0, 0), rect('b', 0, 112), rect('c', 0, 224)];
+
+	assert.equal(dropIndexX([], 0, 'a'), 0);
+	assert.equal(dropIndexX(rects, 0, 'dragged'), 0);
+	assert.equal(dropIndexX(rects, 160, 'dragged'), 1);
+	assert.equal(dropIndexX(rects, 200, 'dragged'), 2);
+	assert.equal(dropIndexX(rects, 999, 'dragged'), 3);
+});
+
+test('dropIndexX skips the dragged rect but keeps its slot', () => {
+	const rects = [
+		rect('a', 0, 0),
+		rect('dragged', 0, 112),
+		rect('c', 0, 224),
+	];
+
+	assert.equal(dropIndexX(rects, 0, 'dragged'), 0);
+	assert.equal(dropIndexX(rects, 160, 'dragged'), 1);
+	assert.equal(dropIndexX(rects, 400, 'dragged'), 2);
+});
+
+test('dropIndexX handles single-element and empty strips', () => {
+	assert.equal(dropIndexX([rect('a', 0, 0)], 0, 'other'), 0);
+	assert.equal(dropIndexX([rect('a', 0, 0)], 999, 'other'), 1);
+	assert.equal(dropIndexX([rect('a', 0, 0)], 999, 'a'), 0);
 });

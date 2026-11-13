@@ -60,6 +60,10 @@ export class CustomInspectorView extends ItemView {
 			const current = controller();
 			return current?.kind === "page" ? current : null;
 		};
+		const pages = () => {
+			const current = controller();
+			return current?.kind === "pages" ? current : null;
+		};
 		return {
 			component: {
 				patch: (patch) => component()?.patch(patch),
@@ -81,6 +85,14 @@ export class CustomInspectorView extends ItemView {
 				setLayout: (columns, rowHeight) =>
 					page()?.setPageLayout(columns, rowHeight),
 				remove: () => page()?.removePage(),
+			},
+			pages: {
+				switchTo: (id) => pages()?.switchPage(id),
+				create: () => pages()?.createPage(),
+				duplicate: (id) => pages()?.duplicatePage(id),
+				rename: (id) => pages()?.renamePage(id),
+				remove: (id) => pages()?.removePage(id),
+				move: (id, target, mode) => pages()?.movePage(id, target, mode),
 			},
 		};
 	}

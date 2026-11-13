@@ -1,4 +1,5 @@
 import { MEASURE_IDS, VIEW_IDS } from "./dataset/types";
+import { moveItem } from "./layout";
 import {
 	MAX_CONTAINER_DEPTH,
 	cloneWithFreshIds,
@@ -485,6 +486,25 @@ export class DashboardRepository {
 			if (to === from) return;
 			const [moved] = siblings.splice(from, 1);
 			if (moved) siblings.splice(to, 0, moved);
+		});
+	}
+
+	/**
+	 * Reorders a page inside its dashboard. `lastPageId` is intentionally
+	 * untouched: order and the remembered page are independent concerns.
+	 */
+	async movePage(pageId: string, toIndex: number): Promise<DashboardStoreData> {
+		return this.mutate((store) => {
+			const hit = this.findPage(store, pageId);
+			if (!hit) return;
+			const { dashboard, page } = hit;
+			const from = dashboard.pages.indexOf(page);
+			const to = Math.min(
+				dashboard.pages.length - 1,
+				Math.max(0, Math.trunc(toIndex)),
+			);
+			if (to === from) return;
+			dashboard.pages = moveItem(dashboard.pages, from, to);
 		});
 	}
 

@@ -290,6 +290,15 @@ export default {
 	PAGE_NAME_PLACEHOLDER: "Page name",
 	PAGE_DEFAULT_NAME: "Page {0}",
 
+	// Pages panel
+	DASHBOARD_PAGES_TITLE: "Pages",
+	DASHBOARD_PAGES_ADD: "New page",
+	DASHBOARD_PAGES_HINT: "Drag to reorder. Changes save automatically.",
+	PAGE_MOVE_UP: "Move up",
+	PAGE_MOVE_DOWN: "Move down",
+	PAGE_MOVE_DRAG: "Drag to reorder",
+	PAGE_MOVE_ANNOUNCE: "{0}: page {1} of {2}",
+
 	// Components
 	COMPONENT_PICKER_TITLE: "Add component",
 	COMPONENT_KPI_NAME: "KPI",
