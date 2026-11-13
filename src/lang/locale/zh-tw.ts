@@ -298,6 +298,20 @@ export default {
 	PAGE_MOVE_DRAG: "拖曳排序",
 	PAGE_MOVE_ANNOUNCE: "{0}：第 {1} 頁，共 {2} 頁",
 
+	// Subpages
+	PAGE_SUBPAGE_NEW: "新增子頁面",
+	PAGE_SUBPAGE_MOVE_TO: "移動到…",
+	PAGE_SUBPAGE_MOVE_OUT: "移出子頁面",
+	PAGE_SUBPAGES_MENU: "子頁面",
+	PAGE_SETTINGS_PARENT_LABEL: "上層頁面",
+	PAGE_SETTINGS_PARENT_DESC: "只支援一層子頁面。",
+	PAGE_SETTINGS_PARENT_NONE: "頂層頁面",
+	PAGE_SETTINGS_PARENT_HAS_CHILDREN:
+		"此頁面已有子頁面，不能移到其他頁面下。",
+	PAGE_DELETE_SUBPAGES_MSG:
+		"刪除「{0}」及其 {1} 個元件？其 {2} 個子頁面將一併刪除，不會影響筆記內容。",
+	PAGE_MOVE_PICKER_PLACEHOLDER: "選擇目標頁面",
+
 	// Components
 	COMPONENT_PICKER_TITLE: "新增元件",
 	COMPONENT_KPI_NAME: "KPI",

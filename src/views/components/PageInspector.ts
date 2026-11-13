@@ -6,6 +6,7 @@ export interface PageInspectorDeps {
 	rename(name: string): void;
 	duplicate(): void;
 	setLayout(columns: 12 | 24, rowHeight: number): void;
+	setParent(parentId: string | null): void;
 	remove(): void;
 }
 
@@ -22,6 +23,9 @@ export class PageInspector {
 	private dashboardCrumbEl: HTMLElement | null = null;
 	private pageCrumbEl: HTMLElement | null = null;
 	private nameInput: HTMLInputElement | null = null;
+	private parentSelect: HTMLSelectElement | null = null;
+	private parentHintEl: HTMLElement | null = null;
+	private parentPathEl: HTMLElement | null = null;
 	private positionEl: HTMLElement | null = null;
 	private componentsEl: HTMLElement | null = null;
 	private columnsSelect: HTMLSelectElement | null = null;
@@ -73,6 +77,9 @@ export class PageInspector {
 			String(target.total),
 			String(target.componentCount),
 			target.canDelete ? "delete" : "locked",
+			target.parentId ?? "",
+			target.canSetParent ? "set-parent" : "no-parent",
+			target.parentOptions.map((option) => option.id).join(","),
 		].join("|");
 	}
 
@@ -263,6 +270,8 @@ export class PageInspector {
 		});
 		this.nameInput = input;
 
+		this.buildParentField(section, state);
+
 		const meta = section.createDiv({ cls: "ioto-inspector-meta" });
 		this.positionEl = meta.createSpan({
 			cls: "ioto-inspector-meta-item",
@@ -270,6 +279,56 @@ export class PageInspector {
 		this.componentsEl = meta.createSpan({
 			cls: "ioto-inspector-meta-item",
 		});
+	}
+
+	private buildParentField(
+		section: HTMLElement,
+		state: PageInspectorState,
+	): void {
+		const target = state.target;
+		const field = section.createDiv({ cls: "ioto-inspector-field" });
+		field.createEl("label", { text: t("PAGE_SETTINGS_PARENT_LABEL") });
+		const select = field.createEl("select", { cls: "dropdown" });
+		select.createEl("option", {
+			value: "",
+			text: t("PAGE_SETTINGS_PARENT_NONE"),
+		});
+		for (const option of target.parentOptions) {
+			select.createEl("option", {
+				value: option.id,
+				text: option.name,
+			});
+		}
+		select.value = target.parentId ?? "";
+		select.disabled = !state.editable || !target.canSetParent;
+		select.addEventListener("change", () => {
+			this.deps.setParent(select.value || null);
+		});
+		this.parentHintEl = field.createDiv({ cls: "ioto-inspector-hint" });
+		this.parentSelect = select;
+		if (target.parentPath) {
+			this.parentPathEl = section.createDiv({
+				cls: "ioto-inspector-meta ioto-inspector-page-path",
+			});
+		}
+		this.syncParentField(state);
+	}
+
+	private syncParentField(state: PageInspectorState): void {
+		const target = state.target;
+		if (this.parentSelect) {
+			if (this.parentSelect.value !== (target.parentId ?? "")) {
+				this.parentSelect.value = target.parentId ?? "";
+			}
+			this.parentSelect.disabled =
+				!state.editable || !target.canSetParent;
+		}
+		this.parentHintEl?.setText(
+			target.canSetParent
+				? t("PAGE_SETTINGS_PARENT_DESC")
+				: t("PAGE_SETTINGS_PARENT_HAS_CHILDREN"),
+		);
+		this.parentPathEl?.setText(target.parentPath ?? "");
 	}
 
 	private buildLayoutSection(state: PageInspectorState): void {
@@ -366,6 +425,7 @@ export class PageInspector {
 			this.rowHeightInput.disabled = !state.editable;
 		}
 		this.rowHeightValueEl?.setText(`${target.rowHeight}px`);
+		this.syncParentField(state);
 		if (this.menuButtonEl) {
 			this.menuButtonEl.disabled = !state.editable;
 		}
@@ -398,6 +458,9 @@ export class PageInspector {
 		this.dashboardCrumbEl = null;
 		this.pageCrumbEl = null;
 		this.nameInput = null;
+		this.parentSelect = null;
+		this.parentHintEl = null;
+		this.parentPathEl = null;
 		this.positionEl = null;
 		this.componentsEl = null;
 		this.columnsSelect = null;

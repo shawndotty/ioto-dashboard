@@ -3997,3 +3997,108 @@ body.is-mobile .ioto-pages-handle {
     white-space: nowrap;
     border: 0;
 }
+
+/* Subpages */
+.ioto-custom-dashboard-view .ioto-dashboard-subpages {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+    margin: -8px 0 10px;
+    padding: 0 2px;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-subpages-scroll {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-subpages-scroll::-webkit-scrollbar {
+    height: 3px;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-subpage-tab {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    max-width: 200px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    user-select: none;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-subpage-tab:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-subpage-tab.is-active {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+    font-weight: var(--font-medium);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-subpage-tab:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 1px;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-subpages-toggle {
+    display: none;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-page-tab-chevron {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    color: var(--text-faint);
+}
+
+.ioto-custom-dashboard-view .ioto-dashboard-page-tab-chevron .svg-icon {
+    width: 12px;
+    height: 12px;
+}
+
+.ioto-pages-row.is-child {
+    padding-left: 24px;
+}
+
+.ioto-pages-chevron {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    color: var(--text-faint);
+}
+
+.ioto-pages-chevron .svg-icon {
+    width: 12px;
+    height: 12px;
+}
+
+@container ioto-dashboard (max-width: 520px) {
+    .ioto-custom-dashboard-view .ioto-dashboard-subpages-scroll {
+        display: none;
+    }
+
+    .ioto-custom-dashboard-view .ioto-dashboard-subpages-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+}

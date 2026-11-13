@@ -38,7 +38,7 @@ function container(id, children, overrides = {}) {
 test('v5 data loads as the current schema and keeps no children', () => {
 	const imported = repository().importJson(store([kpi('component:1')], 5));
 	assert.equal(imported.schemaVersion, DASHBOARD_SCHEMA_VERSION);
-	assert.equal(imported.schemaVersion, 6);
+	assert.equal(imported.schemaVersion, 7);
 	assert.equal('children' in imported.dashboards[0].pages[0].components[0], false);
 });
 

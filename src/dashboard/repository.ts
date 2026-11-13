@@ -1,6 +1,10 @@
 import { MEASURE_IDS, VIEW_IDS } from "./dataset/types";
 import { moveItem } from "./layout";
 import {
+	descendantsOf,
+	normalizePageTree,
+} from "./page-tree";
+import {
 	MAX_CONTAINER_DEPTH,
 	cloneWithFreshIds,
 	collectComponentIds,
@@ -178,6 +182,9 @@ function toPage(value: unknown): DashboardPage | null {
 			.map(toComponent)
 			.filter((item): item is DashboardComponentConfig => item !== null),
 	};
+	if (typeof value.parentId === "string" && value.parentId.length > 0) {
+		page.parentId = value.parentId;
+	}
 	if (value.columns === 12 || value.columns === 24) {
 		page.columns = value.columns;
 	}
@@ -224,7 +231,7 @@ export class DashboardRepository {
 			const page = toPage(candidate);
 			if (page) pages.push(page);
 		}
-		return pages;
+		return normalizePageTree(pages);
 	}
 
 	private normalizeDashboard(
@@ -492,19 +499,94 @@ export class DashboardRepository {
 	/**
 	 * Reorders a page inside its dashboard. `lastPageId` is intentionally
 	 * untouched: order and the remembered page are independent concerns.
+	 *
+	 * `toIndex` is an index within the page's own layer: a group index for a
+	 * top-level page (its children travel with it), or a sibling index for a
+	 * subpage (clamped to its own group).
 	 */
 	async movePage(pageId: string, toIndex: number): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
 			const hit = this.findPage(store, pageId);
 			if (!hit) return;
 			const { dashboard, page } = hit;
-			const from = dashboard.pages.indexOf(page);
-			const to = Math.min(
-				dashboard.pages.length - 1,
-				Math.max(0, Math.trunc(toIndex)),
-			);
-			if (to === from) return;
-			dashboard.pages = moveItem(dashboard.pages, from, to);
+			const pages = dashboard.pages;
+			const target = Math.trunc(toIndex);
+
+			if (page.parentId) {
+				const parentIndex = pages.findIndex(
+					(item) => item.id === page.parentId,
+				);
+				if (parentIndex < 0) return;
+				const siblings = pages.filter(
+					(item) => item.parentId === page.parentId,
+				);
+				const from = siblings.indexOf(page);
+				const to = Math.min(
+					siblings.length - 1,
+					Math.max(0, target),
+				);
+				if (from < 0 || to === from) return;
+				dashboard.pages = moveItem(
+					pages,
+					parentIndex + 1 + from,
+					parentIndex + 1 + to,
+				);
+				return;
+			}
+
+			const groups = pages.filter((item) => !item.parentId);
+			const from = groups.indexOf(page);
+			const to = Math.min(groups.length - 1, Math.max(0, target));
+			if (from < 0 || to === from) return;
+			const blockIds = new Set([
+				page.id,
+				...descendantsOf(pages, page.id).map((item) => item.id),
+			]);
+			const block = pages.filter((item) => blockIds.has(item.id));
+			const rest = pages.filter((item) => !blockIds.has(item.id));
+			// After removing the block, `to` still means "the group at that visual
+			// position"; clamp to the end when the position no longer exists.
+			const restGroups = rest.filter((item) => !item.parentId);
+			const anchor = restGroups[to];
+			const insertAt = anchor ? rest.indexOf(anchor) : rest.length;
+			dashboard.pages = [
+				...rest.slice(0, insertAt),
+				...block,
+				...rest.slice(insertAt),
+			];
+		});
+	}
+
+	/**
+	 * Moves a page under `parentId` (top level only, one level deep) or back to
+	 * the top level with `null`. Invalid requests are silently ignored.
+	 */
+	async setPageParent(
+		pageId: string,
+		parentId: string | null,
+	): Promise<DashboardStoreData> {
+		return this.mutate((store) => {
+			const hit = this.findPage(store, pageId);
+			if (!hit) return;
+			const { dashboard, page } = hit;
+			if (parentId === null) {
+				if (!page.parentId) return;
+				delete page.parentId;
+				dashboard.pages = normalizePageTree(dashboard.pages);
+				return;
+			}
+			if (parentId === pageId) return;
+			const parent = dashboard.pages.find((item) => item.id === parentId);
+			if (!parent || parent.parentId) return;
+			if (descendantsOf(dashboard.pages, pageId).length > 0) return;
+			const rest = dashboard.pages.filter((item) => item.id !== pageId);
+			const childCount = rest.filter(
+				(item) => item.parentId === parentId,
+			).length;
+			const end = rest.indexOf(parent) + 1 + childCount;
+			page.parentId = parentId;
+			rest.splice(end, 0, page);
+			dashboard.pages = normalizePageTree(rest);
 		});
 	}
 
@@ -699,7 +781,12 @@ export class DashboardRepository {
 			};
 			const trimmed = name?.trim();
 			if (trimmed) copy.name = trimmed;
-			dashboard.pages.splice(index + 1, 0, copy);
+			// A page copy never carries subpages: parent copies land after the
+			// whole source group, subpage copies right after the source page.
+			const insertAt = page.parentId
+				? index + 1
+				: index + 1 + descendantsOf(dashboard.pages, page.id).length;
+			dashboard.pages.splice(insertAt, 0, copy);
 		});
 		return newPageId ? { store, pageId: newPageId } : null;
 	}
@@ -714,7 +801,23 @@ export class DashboardRepository {
 			);
 			if (!dashboard) return;
 			if (this.findPage(store, page.id)) return;
-			dashboard.pages.push(page);
+			const parent = page.parentId
+				? dashboard.pages.find((item) => item.id === page.parentId)
+				: undefined;
+			if (parent && !parent.parentId) {
+				const childCount = dashboard.pages.filter(
+					(item) => item.parentId === parent.id,
+				).length;
+				dashboard.pages.splice(
+					dashboard.pages.indexOf(parent) + 1 + childCount,
+					0,
+					page,
+				);
+			} else {
+				delete page.parentId;
+				dashboard.pages.push(page);
+			}
+			dashboard.pages = normalizePageTree(dashboard.pages);
 			dashboard.lastPageId = page.id;
 		});
 	}
@@ -749,12 +852,19 @@ export class DashboardRepository {
 			const hit = this.findPage(store, pageId);
 			if (!hit) return;
 			const { dashboard } = hit;
-			// The last page of a dashboard is never removed: it needs a canvas.
-			if (dashboard.pages.length <= 1) return;
+			// Deleting a parent takes its subpages with it.
+			const removed = new Set([
+				pageId,
+				...descendantsOf(dashboard.pages, pageId).map(
+					(page) => page.id,
+				),
+			]);
+			// The dashboard always needs a canvas: judge by what is left.
+			if (dashboard.pages.length - removed.size <= 0) return;
 			dashboard.pages = dashboard.pages.filter(
-				(page) => page.id !== pageId,
+				(page) => !removed.has(page.id),
 			);
-			if (dashboard.lastPageId === pageId) {
+			if (dashboard.lastPageId && removed.has(dashboard.lastPageId)) {
 				dashboard.lastPageId = dashboard.pages[0]?.id;
 			}
 		});

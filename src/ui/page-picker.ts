@@ -16,9 +16,17 @@ export class PagePickerModal extends FuzzySuggestModal<PageTarget> {
 		app: App,
 		private targets: PageTarget[],
 		private onChooseTarget: (target: PageTarget) => void,
+		private options: {
+			/** Overrides the `dashboard / page` default label (e.g. a breadcrumb). */
+			describe?: (target: PageTarget) => string;
+			placeholder?: string;
+		} = {},
 	) {
 		super(app);
-		this.setPlaceholder(t("DASHBOARD_MOVE_COMPONENT_PLACEHOLDER"));
+		this.setPlaceholder(
+			options.placeholder ??
+				t("DASHBOARD_MOVE_COMPONENT_PLACEHOLDER"),
+		);
 	}
 
 	getItems(): PageTarget[] {
@@ -26,7 +34,10 @@ export class PagePickerModal extends FuzzySuggestModal<PageTarget> {
 	}
 
 	getItemText(target: PageTarget): string {
-		return `${target.dashboard.name} / ${target.page.name}`;
+		return (
+			this.options.describe?.(target) ??
+			`${target.dashboard.name} / ${target.page.name}`
+		);
 	}
 
 	onChooseItem(target: PageTarget): void {

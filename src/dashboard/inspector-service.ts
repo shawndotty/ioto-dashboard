@@ -43,6 +43,14 @@ export interface PageInspectorTarget {
 	columns: 12 | 24;
 	rowHeight: number;
 	canDelete: boolean;
+	/** Parent page id; `null` for a top-level page. */
+	parentId: string | null;
+	/** Candidate parents: top-level pages of this dashboard except itself. */
+	parentOptions: Array<{ id: string; name: string }>;
+	/** False when the page has subpages (it cannot move under another page). */
+	canSetParent: boolean;
+	/** `parent / page` breadcrumb for subpages; `null` at the top level. */
+	parentPath: string | null;
 }
 
 export interface DashboardPagesInspectorTarget {
@@ -53,6 +61,7 @@ export interface DashboardPagesInspectorTarget {
 	pages: Array<{
 		id: string;
 		name: string;
+		parentId: string | null;
 		componentCount: number;
 		isActive: boolean;
 		canDelete: boolean;
@@ -102,6 +111,7 @@ export interface PageInspectorController extends InspectorControllerBase {
 	renamePage(name: string): void;
 	duplicatePage(): void;
 	setPageLayout(columns: 12 | 24, rowHeight: number): void;
+	setPageParent(parentId: string | null): void;
 	removePage(): void;
 }
 
@@ -110,9 +120,14 @@ export interface PagesInspectorController extends InspectorControllerBase {
 	getTarget(): DashboardPagesInspectorTarget | null;
 	switchPage(pageId: string): void;
 	createPage(): void;
+	/** Creates an empty page under `pageId` and switches to it. */
+	createSubpage(pageId: string): void;
 	duplicatePage(pageId: string): void;
 	renamePage(pageId: string): void;
 	removePage(pageId: string): void;
+	setPageParent(pageId: string, parentId: string | null): void;
+	/** Opens the page picker for 「移动到…」. */
+	pickParent(pageId: string): void;
 	/** `mode: "index"` targets a position; `"step"` moves by ±1. */
 	movePage(pageId: string, target: number, mode: "index" | "step"): void;
 }

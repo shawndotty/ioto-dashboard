@@ -299,6 +299,20 @@ export default {
 	PAGE_MOVE_DRAG: "拖动排序",
 	PAGE_MOVE_ANNOUNCE: "{0}：第 {1} 页，共 {2} 页",
 
+	// Subpages
+	PAGE_SUBPAGE_NEW: "新建子页面",
+	PAGE_SUBPAGE_MOVE_TO: "移动到…",
+	PAGE_SUBPAGE_MOVE_OUT: "移出子页面",
+	PAGE_SUBPAGES_MENU: "子页面",
+	PAGE_SETTINGS_PARENT_LABEL: "上级页面",
+	PAGE_SETTINGS_PARENT_DESC: "只支持一层子页面。",
+	PAGE_SETTINGS_PARENT_NONE: "顶层页面",
+	PAGE_SETTINGS_PARENT_HAS_CHILDREN:
+		"该页面已有子页面，不能移到其他页面下。",
+	PAGE_DELETE_SUBPAGES_MSG:
+		"删除「{0}」及其 {1} 个组件？其 {2} 个子页面将一并删除，不会影响笔记内容。",
+	PAGE_MOVE_PICKER_PLACEHOLDER: "选择目标页面",
+
 	// Components
 	COMPONENT_PICKER_TITLE: "添加组件",
 	COMPONENT_KPI_NAME: "KPI",

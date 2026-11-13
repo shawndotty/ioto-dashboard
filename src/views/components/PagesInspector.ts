@@ -4,12 +4,18 @@ import type { PagesInspectorState } from "../../dashboard/inspector-service";
 import { dropIndex, type CardRect } from "../../dashboard/layout";
 import { armPointerDrag, bindPointerSession } from "../../ui/pointer-session";
 
+type PageRow = PagesInspectorState["target"]["pages"][number];
+
 export interface PagesInspectorDeps {
 	switchTo(pageId: string): void;
 	create(): void;
+	createSubpage(pageId: string): void;
 	duplicate(pageId: string): void;
 	rename(pageId: string): void;
 	remove(pageId: string): void;
+	setParent(pageId: string, parentId: string | null): void;
+	/** Opens the page picker for 「移动到…」. */
+	pickParent(pageId: string): void;
 	/** `mode: "index"` targets a position; `"step"` moves by ±1. */
 	move(pageId: string, target: number, mode: "index" | "step"): void;
 }
@@ -63,7 +69,7 @@ export class PagesInspector {
 			target.pages
 				.map(
 					(page) =>
-						`${page.id}:${page.name}:${page.componentCount}:${
+						`${page.id}:${page.name}:${page.parentId ?? ""}:${page.componentCount}:${
 							page.isActive ? "a" : "-"
 						}:${page.canDelete ? "d" : "-"}`,
 				)
@@ -123,84 +129,146 @@ export class PagesInspector {
 
 		const list = this.root.createDiv({ cls: "ioto-pages-list" });
 		this.listEl = list;
-		state.target.pages.forEach((page, index) => {
-			const total = state.target.pages.length;
-			const row = list.createDiv({
-				cls: `ioto-pages-row${page.isActive ? " is-active" : ""}`,
-				attr: {
-					"data-page-id": page.id,
-					role: "button",
-					tabindex: "0",
-					...(page.isActive ? { "aria-current": "page" } : {}),
-				},
+		const groups: Array<{
+			page: PageRow;
+			children: PageRow[];
+		}> = [];
+		const byId = new Map<
+			string,
+			{ page: PageRow; children: PageRow[] }
+		>();
+		for (const page of state.target.pages) {
+			if (page.parentId !== null) continue;
+			const group = { page, children: [] };
+			groups.push(group);
+			byId.set(page.id, group);
+		}
+		for (const page of state.target.pages) {
+			if (page.parentId === null) continue;
+			byId.get(page.parentId)?.children.push(page);
+		}
+		groups.forEach((group, groupIndex) => {
+			this.createRow(
+				list,
+				group.page,
+				groupIndex,
+				groups.length,
+				group.children.length,
+				state,
+			);
+			group.children.forEach((child, childIndex) => {
+				this.createRow(
+					list,
+					child,
+					childIndex,
+					group.children.length,
+					0,
+					state,
+				);
 			});
-			const handle = row.createDiv({
-				cls: "ioto-pages-handle",
-				attr: { title: t("PAGE_MOVE_DRAG"), "aria-hidden": "true" },
-			});
-			setIcon(handle, "grip-vertical");
+		});
+	}
 
-			row.createDiv({ cls: "ioto-pages-name", text: page.name });
-			row.createSpan({
-				cls: "ioto-pages-count",
-				text: t("PAGE_SETTINGS_COMPONENTS", [
-					String(page.componentCount),
-				]),
-			});
+	private createRow(
+		list: HTMLElement,
+		page: PagesInspectorState["target"]["pages"][number],
+		index: number,
+		total: number,
+		childCount: number,
+		state: PagesInspectorState,
+	): void {
+		const isChild = page.parentId !== null;
+		const row = list.createDiv({
+			cls: [
+				"ioto-pages-row",
+				page.isActive ? "is-active" : "",
+				isChild ? "is-child" : "",
+			]
+				.filter(Boolean)
+				.join(" "),
+			attr: {
+				"data-page-id": page.id,
+				role: "button",
+				tabindex: "0",
+				"aria-posinset": String(index + 1),
+				"aria-setsize": String(total),
+				...(page.isActive ? { "aria-current": "page" } : {}),
+			},
+		});
+		const handle = row.createDiv({
+			cls: "ioto-pages-handle",
+			attr: { title: t("PAGE_MOVE_DRAG"), "aria-hidden": "true" },
+		});
+		setIcon(handle, "grip-vertical");
 
-			row.addEventListener("click", (event) => {
-				if (this.suppressRowClick) return;
+		if (childCount > 0) {
+			const chevron = row.createSpan({
+				cls: "ioto-pages-chevron",
+				attr: { "aria-hidden": "true" },
+			});
+			setIcon(chevron, "chevron-down");
+		}
+		row.createDiv({ cls: "ioto-pages-name", text: page.name });
+		row.createSpan({
+			cls: "ioto-pages-count",
+			text: t("PAGE_SETTINGS_COMPONENTS", [
+				String(page.componentCount),
+			]),
+		});
+
+		row.addEventListener("click", (event) => {
+			if (this.suppressRowClick) return;
+			if ((event.target as HTMLElement | null)?.closest("button")) {
+				return;
+			}
+			this.deps.switchTo(page.id);
+		});
+		row.addEventListener("keydown", (event) => {
+			if (event.target !== row) return;
+			if (event.key !== "Enter" && event.key !== " ") return;
+			event.preventDefault();
+			this.deps.switchTo(page.id);
+		});
+
+		if (Platform.isMobile) {
+			this.createMoveButton(
+				row,
+				page.id,
+				index,
+				total,
+				-1,
+				"arrow-up",
+				t("PAGE_MOVE_UP"),
+				state.editable,
+			);
+			this.createMoveButton(
+				row,
+				page.id,
+				index,
+				total,
+				1,
+				"arrow-down",
+				t("PAGE_MOVE_DOWN"),
+				state.editable,
+			);
+		}
+		this.createMenuButton(
+			row,
+			page,
+			index,
+			total,
+			childCount,
+			state.editable,
+		);
+
+		if (!Platform.isMobile && state.editable) {
+			row.addEventListener("pointerdown", (event) => {
 				if ((event.target as HTMLElement | null)?.closest("button")) {
 					return;
 				}
-				this.deps.switchTo(page.id);
+				this.armRowDrag(row, event);
 			});
-			row.addEventListener("keydown", (event) => {
-				if (event.target !== row) return;
-				if (event.key !== "Enter" && event.key !== " ") return;
-				event.preventDefault();
-				this.deps.switchTo(page.id);
-			});
-
-			if (Platform.isMobile) {
-				this.createMoveButton(
-					row,
-					page.id,
-					index,
-					total,
-					-1,
-					"arrow-up",
-					t("PAGE_MOVE_UP"),
-					state.editable,
-				);
-				this.createMoveButton(
-					row,
-					page.id,
-					index,
-					total,
-					1,
-					"arrow-down",
-					t("PAGE_MOVE_DOWN"),
-					state.editable,
-				);
-			}
-			this.createMenuButton(
-				row,
-				page,
-				index,
-				total,
-				state.editable,
-			);
-
-			if (!Platform.isMobile && state.editable) {
-				row.addEventListener("pointerdown", (event) => {
-					if ((event.target as HTMLElement | null)?.closest("button")) {
-						return;
-					}
-					this.armRowDrag(row, event);
-				});
-			}
-		});
+		}
 	}
 
 	private createMoveButton(
@@ -230,6 +298,7 @@ export class PagesInspector {
 		page: PagesInspectorState["target"]["pages"][number],
 		index: number,
 		total: number,
+		childCount: number,
 		editable: boolean,
 	): void {
 		const button = row.createEl("button", {
@@ -244,7 +313,7 @@ export class PagesInspector {
 		setTooltip(button, t("INSPECTOR_MORE_ACTIONS"));
 		button.disabled = !editable;
 		button.onClickEvent((event) =>
-			this.openMenu(event, button, page, index, total),
+			this.openMenu(event, button, page, index, total, childCount),
 		);
 	}
 
@@ -254,9 +323,32 @@ export class PagesInspector {
 		page: PagesInspectorState["target"]["pages"][number],
 		index: number,
 		total: number,
+		childCount: number,
 	): void {
 		if (!this.state?.editable) return;
+		const isChild = page.parentId !== null;
 		const menu = new Menu();
+		if (!isChild) {
+			menu.addItem((item) => {
+				item.setTitle(t("PAGE_SUBPAGE_NEW"))
+					.setIcon("corner-down-right")
+					.onClick(() => this.deps.createSubpage(page.id));
+			});
+		}
+		menu.addItem((item) => {
+			item.setTitle(t("PAGE_SUBPAGE_MOVE_TO"))
+				.setIcon("folder-symlink")
+				.setDisabled(!isChild && childCount > 0)
+				.onClick(() => this.deps.pickParent(page.id));
+		});
+		if (isChild) {
+			menu.addItem((item) => {
+				item.setTitle(t("PAGE_SUBPAGE_MOVE_OUT"))
+					.setIcon("corner-up-left")
+					.onClick(() => this.deps.setParent(page.id, null));
+			});
+		}
+		menu.addSeparator();
 		menu.addItem((item) => {
 			item.setTitle(t("PAGE_RENAME"))
 				.setIcon("pencil")
@@ -393,14 +485,28 @@ export class PagesInspector {
 						".ioto-pages-row[data-page-id]",
 					),
 				);
-				const target = rows.findIndex(
-					(element) => element.dataset.pageId === pageId,
-				);
-				if (target < 0) return;
-				const from = this.state?.target.pages.findIndex(
-					(page) => page.id === pageId,
-				);
-				if (from === target) return;
+				const pages = this.state?.target.pages ?? [];
+				const page = pages.find((item) => item.id === pageId);
+				if (!page) return;
+				// Cross-layer drops are neutralised: only pages of the same layer
+				// (same parent) count towards the target position.
+				const layerIds = rows
+					.map((element) => element.dataset.pageId ?? "")
+					.filter((id) => {
+						const other = pages.find((item) => item.id === id);
+						return (
+							other !== undefined &&
+							(other.parentId ?? null) === (page.parentId ?? null)
+						);
+					});
+				const target = layerIds.indexOf(pageId);
+				const from = pages
+					.filter(
+						(item) =>
+							(item.parentId ?? null) === (page.parentId ?? null),
+					)
+					.findIndex((item) => item.id === pageId);
+				if (target < 0 || from < 0 || from === target) return;
 				this.deps.move(pageId, target, "index");
 			},
 		});

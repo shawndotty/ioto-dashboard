@@ -299,6 +299,20 @@ export default {
 	PAGE_MOVE_DRAG: "Drag to reorder",
 	PAGE_MOVE_ANNOUNCE: "{0}: page {1} of {2}",
 
+	// Subpages
+	PAGE_SUBPAGE_NEW: "New subpage",
+	PAGE_SUBPAGE_MOVE_TO: "Move to…",
+	PAGE_SUBPAGE_MOVE_OUT: "Move out of subpage",
+	PAGE_SUBPAGES_MENU: "Subpages",
+	PAGE_SETTINGS_PARENT_LABEL: "Parent page",
+	PAGE_SETTINGS_PARENT_DESC: "Only one level of subpages is supported.",
+	PAGE_SETTINGS_PARENT_NONE: "Top-level page",
+	PAGE_SETTINGS_PARENT_HAS_CHILDREN:
+		"This page has subpages and cannot move under another page.",
+	PAGE_DELETE_SUBPAGES_MSG:
+		"Delete “{0}” and its {1} component(s)? Its {2} subpage(s) will be deleted too. Notes are not affected.",
+	PAGE_MOVE_PICKER_PLACEHOLDER: "Choose a target page",
+
 	// Components
 	COMPONENT_PICKER_TITLE: "Add component",
 	COMPONENT_KPI_NAME: "KPI",

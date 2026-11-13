@@ -37,6 +37,12 @@ import type {
 } from "../dashboard/inspector-service";
 import { resolveInspectorHost } from "../dashboard/inspector-service";
 import {
+	descendantsOf,
+	groupOf,
+	groupsOf,
+	pagePath,
+} from "../dashboard/page-tree";
+import {
 	dropIndex,
 	dropIndexX,
 	gridMetrics,
@@ -131,6 +137,10 @@ export class CustomDashboardView extends ItemView {
 	private pagesEl: HTMLElement | null = null;
 	private pagesScrollEl: HTMLElement | null = null;
 	private pagesLiveEl: HTMLElement | null = null;
+	private subpagesEl: HTMLElement | null = null;
+	private subpagesScrollEl: HTMLElement | null = null;
+	private subpagesToggleEl: HTMLElement | null = null;
+	private subpagesSignature = "";
 	private suppressPageTabClick = false;
 	private pageTabDragGhost: HTMLElement | null = null;
 	private emptyEl: HTMLElement | null = null;
@@ -377,10 +387,14 @@ export class CustomDashboardView extends ItemView {
 		this.bannerEl = null;
 		this.pagesEl = null;
 		this.pagesScrollEl = null;
+		this.subpagesEl = null;
+		this.subpagesScrollEl = null;
+		this.subpagesToggleEl = null;
 		this.emptyEl = null;
 		this.gridEl = null;
 		this.toolbarSignature = "";
 		this.pagesSignature = "";
+		this.subpagesSignature = "";
 	}
 
 	private render(): void {
@@ -392,6 +406,7 @@ export class CustomDashboardView extends ItemView {
 		this.syncToolbar();
 		this.syncBanner();
 		this.syncPagesBar();
+		this.syncSubpagesBar();
 
 		const page = this.activePage;
 		if (!page || page.components.length === 0) {
@@ -445,6 +460,33 @@ export class CustomDashboardView extends ItemView {
 			setIcon(exit, "minimize");
 			setTooltip(exit, t("ZEN_MODE_OFF"));
 			exit.onClickEvent(() => this.toggleZenMode());
+		}
+		if (!this.subpagesEl) {
+			this.subpagesEl = this.contentEl.createDiv({
+				cls: "ioto-dashboard-subpages",
+			});
+			this.subpagesEl.hide();
+			this.pagesEl?.insertAdjacentElement("afterend", this.subpagesEl);
+			this.subpagesScrollEl = this.subpagesEl.createDiv({
+				cls: "ioto-dashboard-subpages-scroll",
+				attr: { role: "tablist" },
+			});
+			this.subpagesScrollEl.addEventListener("keydown", (event) =>
+				this.handlePagesKeydown(event),
+			);
+			this.subpagesToggleEl = this.subpagesEl.createEl("button", {
+				cls: "ioto-dashboard-subpages-toggle clickable-icon",
+				attr: {
+					type: "button",
+					"aria-label": t("PAGE_SUBPAGES_MENU"),
+					"aria-haspopup": "menu",
+				},
+			});
+			setIcon(this.subpagesToggleEl, "chevron-down");
+			setTooltip(this.subpagesToggleEl, t("PAGE_SUBPAGES_MENU"));
+			this.subpagesToggleEl.onClickEvent((event) =>
+				this.openSubpagesMenu(event),
+			);
 		}
 	}
 
@@ -727,34 +769,57 @@ export class CustomDashboardView extends ItemView {
 
 	private syncPagesBar(): void {
 		const pages = this.activeDashboard?.pages ?? [];
+		const groups = groupsOf(pages);
+		const activeId = this.activePage?.id ?? "";
+		const activeGroupId = groupOf(pages, activeId)?.page.id ?? "";
 		const signature = [
 			this.editMode ? "edit" : "view",
-			this.activePage?.id ?? "",
-			pages.map((page) => `${page.id}:${page.name}`).join("|"),
+			activeId,
+			groups
+				.map((group) =>
+					[
+						`${group.page.id}:${group.page.name}`,
+						...group.children.map(
+							(child) => `${child.id}:${child.name}`,
+						),
+					].join(","),
+				)
+				.join("|"),
 		].join("#");
 		if (signature === this.pagesSignature) return;
 		this.pagesSignature = signature;
 		const strip = this.pagesScrollEl;
 		if (!strip) return;
 		strip.empty();
-		const total = pages.length;
-		pages.forEach((page, index) => {
-			const active = page.id === this.activePage?.id;
+		const total = groups.length;
+		groups.forEach((group, index) => {
+			const page = group.page;
+			const active = page.id === activeGroupId;
 			const tab = strip.createDiv({
 				cls: `ioto-dashboard-page-tab${active ? " is-active" : ""}`,
 				attr: {
 					role: "tab",
 					tabindex: active ? "0" : "-1",
-					"aria-selected": active ? "true" : "false",
+					"aria-selected": page.id === activeId ? "true" : "false",
 					"aria-posinset": String(index + 1),
 					"aria-setsize": String(total),
 					"data-page-id": page.id,
+					...(group.children.length > 0
+						? { "aria-expanded": "true" }
+						: {}),
 				},
 			});
 			tab.createSpan({
 				cls: "ioto-dashboard-page-tab-label",
 				text: page.name,
 			});
+			if (group.children.length > 0) {
+				const chevron = tab.createSpan({
+					cls: "ioto-dashboard-page-tab-chevron",
+					attr: { "aria-hidden": "true" },
+				});
+				setIcon(chevron, "chevron-down");
+			}
 			tab.onClickEvent(() => {
 				if (this.suppressPageTabClick) {
 					this.suppressPageTabClick = false;
@@ -782,18 +847,212 @@ export class CustomDashboardView extends ItemView {
 						}
 						this.armPageTabDrag(tab, page, event);
 					});
+					tab.addEventListener("contextmenu", (event) => {
+						if ((event.target as HTMLElement | null)?.closest("button")) {
+							return;
+						}
+						event.preventDefault();
+						this.openPageContextMenu(event, page);
+					});
 				}
 				this.renderPageTabTools(tab, page);
 			}
 		});
 	}
 
-	private handlePagesKeydown(event: KeyboardEvent): void {
+	private syncSubpagesBar(): void {
 		const pages = this.activeDashboard?.pages ?? [];
-		if (pages.length === 0) return;
-		const index = pages.findIndex(
-			(page) => page.id === this.activePage?.id,
+		const activeId = this.activePage?.id ?? "";
+		const group = groupOf(pages, activeId);
+		const children = group?.children ?? [];
+		const signature = [
+			this.editMode ? "edit" : "view",
+			activeId,
+			children.map((page) => `${page.id}:${page.name}`).join("|"),
+		].join("#");
+		if (signature === this.subpagesSignature) return;
+		this.subpagesSignature = signature;
+		const root = this.subpagesEl;
+		const strip = this.subpagesScrollEl;
+		if (!root || !strip) return;
+		strip.empty();
+		if (children.length === 0) {
+			root.hide();
+			return;
+		}
+		root.show();
+		const total = children.length;
+		children.forEach((page, index) => {
+			const active = page.id === activeId;
+			const tab = strip.createDiv({
+				cls: `ioto-dashboard-subpage-tab${active ? " is-active" : ""}`,
+				attr: {
+					role: "tab",
+					tabindex: active ? "0" : "-1",
+					"aria-selected": active ? "true" : "false",
+					"aria-posinset": String(index + 1),
+					"aria-setsize": String(total),
+					"data-page-id": page.id,
+				},
+			});
+			tab.createSpan({ text: page.name });
+			tab.onClickEvent(() => {
+				if (this.suppressPageTabClick) {
+					this.suppressPageTabClick = false;
+					return;
+				}
+				if (this.editMode && !Platform.isMobile) {
+					this.openPageSettings(page);
+					return;
+				}
+				this.switchPage(page.id);
+			});
+			if (!this.editMode || Platform.isMobile) return;
+			tab.addEventListener("pointerdown", (event) => {
+				if ((event.target as HTMLElement | null)?.closest("button")) {
+					return;
+				}
+				this.armPageTabDrag(tab, page, event, strip);
+			});
+			tab.addEventListener("contextmenu", (event) => {
+				event.preventDefault();
+				this.openPageContextMenu(event, page);
+			});
+		});
+	}
+
+	private openSubpagesMenu(event: MouseEvent): void {
+		const pages = this.activeDashboard?.pages ?? [];
+		const group = groupOf(pages, this.activePage?.id ?? "");
+		if (!group || group.children.length === 0) return;
+		const menu = new Menu();
+		for (const child of group.children) {
+			menu.addItem((item) => {
+				item.setTitle(child.name).onClick(() =>
+					this.switchPage(child.id),
+				);
+				if (child.id === this.activePage?.id) {
+					item.setIcon("check");
+				}
+			});
+		}
+		if (event.detail > 0) {
+			menu.showAtMouseEvent(event);
+			return;
+		}
+		const rect = (event.target as HTMLElement).getBoundingClientRect();
+		menu.showAtPosition({ x: rect.left, y: rect.bottom });
+	}
+
+	private openPageContextMenu(event: MouseEvent, page: DashboardPage): void {
+		if (!this.editMode || Platform.isMobile) return;
+		const dashboard = this.activeDashboard;
+		if (!dashboard) return;
+		const pages = dashboard.pages;
+		const hasChildren = descendantsOf(pages, page.id).length > 0;
+		const menu = new Menu();
+		if (!page.parentId) {
+			menu.addItem((item) => {
+				item.setTitle(t("PAGE_SUBPAGE_NEW"))
+					.setIcon("corner-down-right")
+					.onClick(() => void this.createPageWithParent(page.id));
+			});
+		}
+		menu.addItem((item) => {
+			item.setTitle(t("PAGE_SUBPAGE_MOVE_TO"))
+				.setIcon("folder-symlink")
+				.setDisabled(!page.parentId && hasChildren)
+				.onClick(() => this.pickPageParent(page));
+		});
+		if (page.parentId) {
+			menu.addItem((item) => {
+				item.setTitle(t("PAGE_SUBPAGE_MOVE_OUT"))
+					.setIcon("corner-up-left")
+					.onClick(() => void this.applyPageParent(page.id, null));
+			});
+		}
+		if (event.detail > 0) {
+			menu.showAtMouseEvent(event);
+			return;
+		}
+		const rect = (event.target as HTMLElement).getBoundingClientRect();
+		menu.showAtPosition({ x: rect.left, y: rect.bottom });
+	}
+
+	private pickPageParent(page: DashboardPage): void {
+		const pages = this.activeDashboard?.pages ?? [];
+		const hasChildren = descendantsOf(pages, page.id).length > 0;
+		if (!page.parentId && hasChildren) return;
+		const candidates = pages
+			.filter(
+				(item) =>
+					!item.parentId && item.id !== page.id && item.id !== page.parentId,
+			)
+			.map((item) => ({
+				dashboard: this.activeDashboard!,
+				page: item,
+			}));
+		if (candidates.length === 0) {
+			new Notice(t("PICKER_NO_PAGES_FOUND"));
+			return;
+		}
+		new PagePickerModal(
+			this.app,
+			candidates,
+			(target) => void this.applyPageParent(page.id, target.page.id),
+			{
+				describe: (target) => this.describePagePath(target),
+				placeholder: t("PAGE_MOVE_PICKER_PLACEHOLDER"),
+			},
+		).open();
+	}
+
+	private async applyPageParent(
+		pageId: string,
+		parentId: string | null,
+	): Promise<void> {
+		this.store = await this.plugin.dashboardRepository.setPageParent(
+			pageId,
+			parentId,
 		);
+		this.render();
+		this.app.workspace.requestSaveLayout();
+	}
+
+	private describePagePath(target: PageTarget): string {
+		const pages = target.dashboard.pages;
+		const path = pagePath(pages, target.page.id);
+		return [target.dashboard.name, ...path.map((page) => page.name)].join(
+			" / ",
+		);
+	}
+
+	private pageSiblingsOf(pageId: string): DashboardPage[] {
+		const pages = this.activeDashboard?.pages ?? [];
+		const page = pages.find((item) => item.id === pageId);
+		if (!page) return [];
+		if (page.parentId) {
+			return groupOf(pages, page.id)?.children ?? [];
+		}
+		return pages.filter((item) => !item.parentId);
+	}
+
+	private handlePagesKeydown(event: KeyboardEvent): void {
+		const inSubpages =
+			event.currentTarget === this.subpagesScrollEl;
+		const active = this.activePage;
+		if (!active) return;
+		const siblings = this.layerSiblings(active, inSubpages);
+		if (siblings.length === 0) return;
+		// The top strip keeps working while a subpage is active: it anchors on
+		// the active subpage's parent page.
+		const anchorId = inSubpages
+			? active.id
+			: (groupOf(
+					this.activeDashboard?.pages ?? [],
+					active.id,
+				)?.page.id ?? active.id);
+		const index = siblings.findIndex((page) => page.id === anchorId);
 		if (index < 0) return;
 		if (
 			this.editMode &&
@@ -802,78 +1061,100 @@ export class CustomDashboardView extends ItemView {
 			(event.key === "ArrowLeft" || event.key === "ArrowRight")
 		) {
 			event.preventDefault();
-			void this.moveActivePage(event.key === "ArrowLeft" ? -1 : 1);
+			void this.moveActivePage(
+				event.key === "ArrowLeft" ? -1 : 1,
+				inSubpages,
+			);
 			return;
 		}
 		let next: number;
 		switch (event.key) {
 			case "ArrowRight":
-				next = (index + 1) % pages.length;
+				next = (index + 1) % siblings.length;
 				break;
 			case "ArrowLeft":
-				next = (index - 1 + pages.length) % pages.length;
+				next = (index - 1 + siblings.length) % siblings.length;
 				break;
 			case "Home":
 				next = 0;
 				break;
 			case "End":
-				next = pages.length - 1;
+				next = siblings.length - 1;
 				break;
 			default:
 				return;
 		}
-		const target = pages[next];
+		const target = siblings[next];
 		if (!target) return;
 		event.preventDefault();
 		this.switchPage(target.id);
 		this.focusPageTab(target.id);
 	}
 
+	private layerSiblings(
+		page: DashboardPage,
+		inSubpages: boolean,
+	): DashboardPage[] {
+		const pages = this.activeDashboard?.pages ?? [];
+		if (inSubpages) {
+			return page.parentId
+				? (groupOf(pages, page.id)?.children ?? [])
+				: [];
+		}
+		return pages.filter((item) => !item.parentId);
+	}
+
 	private focusPageTab(pageId: string): void {
-		const strip = this.pagesScrollEl;
-		if (!strip) return;
 		const escaped = CSS.escape(pageId);
-		const tab = strip.querySelector<HTMLElement>(
-			`[role="tab"][data-page-id="${escaped}"]`,
-		);
+		const selector = `[role="tab"][data-page-id="${escaped}"]`;
+		const tab =
+			this.pagesScrollEl?.querySelector<HTMLElement>(selector) ??
+			this.subpagesScrollEl?.querySelector<HTMLElement>(selector);
 		tab?.focus();
 		tab?.scrollIntoView({ block: "nearest", inline: "nearest" });
 	}
 
-	private async moveActivePage(offset: -1 | 1): Promise<void> {
-		const dashboard = this.activeDashboard;
+	private async moveActivePage(
+		offset: -1 | 1,
+		inSubpages = Boolean(this.activePage?.parentId),
+	): Promise<void> {
 		const page = this.activePage;
-		if (!dashboard || !page) return;
-		const index = dashboard.pages.findIndex(
-			(item) => item.id === page.id,
-		);
+		if (!page) return;
+		const siblings = this.layerSiblings(page, inSubpages);
+		const moving = inSubpages
+			? page
+			: (groupOf(this.activeDashboard?.pages ?? [], page.id)?.page ??
+				page);
+		const index = siblings.findIndex((item) => item.id === moving.id);
 		if (index < 0) return;
 		const to = Math.min(
-			dashboard.pages.length - 1,
+			siblings.length - 1,
 			Math.max(0, index + offset),
 		);
 		if (to === index) return;
 		this.store = await this.plugin.dashboardRepository.movePage(
-			page.id,
+			moving.id,
 			to,
 		);
 		this.render();
-		this.focusPageTab(page.id);
-		this.announcePageMove(page.id);
+		this.focusPageTab(moving.id);
+		this.announcePageMove(moving.id);
 	}
 
 	private announcePageMove(pageId: string): void {
-		const dashboard = this.activeDashboard;
 		const live = this.pagesLiveEl;
-		if (!dashboard || !live) return;
-		const index = dashboard.pages.findIndex((page) => page.id === pageId);
-		const page = dashboard.pages[index];
-		if (!page) return;
+		const page = this.activeDashboard?.pages.find(
+			(item) => item.id === pageId,
+		);
+		if (!live || !page) return;
+		const siblings = this.layerSiblings(page, Boolean(page.parentId));
+		const index = siblings.findIndex((item) => item.id === pageId);
+		if (index < 0) return;
 		live.setText(
 			t("PAGE_MOVE_ANNOUNCE", [
 				page.name,
 				String(index + 1),
-				String(dashboard.pages.length),
+				String(siblings.length),
 			]),
 		);
 	}
@@ -882,10 +1163,11 @@ export class CustomDashboardView extends ItemView {
 		tab: HTMLElement,
 		page: DashboardPage,
 		event: PointerEvent,
+		strip: HTMLElement | null = this.pagesScrollEl,
 	): void {
 		armPointerDrag(tab, event, {
 			onActivate: (startEvent) =>
-				this.startPageTabDrag(tab, page, startEvent),
+				this.startPageTabDrag(tab, page, startEvent, strip),
 		});
 	}
 
@@ -893,8 +1175,8 @@ export class CustomDashboardView extends ItemView {
 		tab: HTMLElement,
 		page: DashboardPage,
 		startEvent: PointerEvent,
+		strip: HTMLElement | null = this.pagesScrollEl,
 	): void {
-		const strip = this.pagesScrollEl;
 		if (!strip) return;
 		// Guards the click that follows pointerup from opening page settings.
 		this.suppressPageTabClick = true;
@@ -968,7 +1250,7 @@ export class CustomDashboardView extends ItemView {
 					this.abortInteraction();
 					return;
 				}
-				void this.commitPageTabOrder(page.id);
+				void this.commitPageTabOrder(page.id, strip);
 			},
 		});
 	}
@@ -1022,13 +1304,15 @@ export class CustomDashboardView extends ItemView {
 		return strip.scrollLeft - before;
 	}
 
-	private async commitPageTabOrder(pageId: string): Promise<void> {
+	private async commitPageTabOrder(
+		pageId: string,
+		strip: HTMLElement | null = this.pagesScrollEl,
+	): Promise<void> {
 		const dashboard = this.activeDashboard;
 		if (!dashboard) {
 			this.abortInteraction();
 			return;
 		}
-		const strip = this.pagesScrollEl;
 		const order = strip
 			? Array.from(
 					strip.querySelectorAll<HTMLElement>(
@@ -1038,8 +1322,10 @@ export class CustomDashboardView extends ItemView {
 					.map((element) => element.dataset.pageId ?? "")
 					.filter(Boolean)
 			: [];
+		// Tab DOM order is the visible layer, so both branches pass a
+		// layer-local index (group index or sibling index) to the repository.
 		const toIndex = order.indexOf(pageId);
-		const fromIndex = dashboard.pages.findIndex(
+		const fromIndex = this.pageSiblingsOf(pageId).findIndex(
 			(page) => page.id === pageId,
 		);
 		const changed =
@@ -1148,6 +1434,10 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private async createPage(): Promise<void> {
+		await this.createPageWithParent();
+	}
+
+	private async createPageWithParent(parentId?: string): Promise<void> {
 		const dashboard = this.activeDashboard;
 		if (!dashboard) return;
 		const local = this.localSelection();
@@ -1161,16 +1451,18 @@ export class CustomDashboardView extends ItemView {
 		let id = base;
 		let index = 2;
 		while (taken.has(id)) id = `${base}-${index++}`;
+		const siblingNames = dashboard.pages
+			.filter((page) => page.parentId === parentId)
+			.map((page) => page.name);
 		const page: DashboardPage = {
 			id,
 			name: uniqueDashboardName(
-				t("PAGE_DEFAULT_NAME", [
-					String(dashboard.pages.length + 1),
-				]),
-				dashboard.pages.map((item) => item.name),
+				t("PAGE_DEFAULT_NAME", [String(siblingNames.length + 1)]),
+				siblingNames,
 			),
 			components: [],
 		};
+		if (parentId) page.parentId = parentId;
 		this.store = await this.plugin.dashboardRepository.addPage(
 			dashboard.id,
 			page,
@@ -1233,26 +1525,45 @@ export class CustomDashboardView extends ItemView {
 
 	private confirmRemovePage(page: DashboardPage): void {
 		const dashboard = this.activeDashboard;
-		if (!dashboard || dashboard.pages.length <= 1) {
+		if (!dashboard) return;
+		const descendants = descendantsOf(dashboard.pages, page.id);
+		const remaining =
+			dashboard.pages.length - 1 - descendants.length;
+		if (remaining <= 0) {
 			new Notice(t("PAGE_LAST_CANNOT_DELETE"));
 			return;
 		}
+		const message =
+			descendants.length > 0
+				? t("PAGE_DELETE_SUBPAGES_MSG", [
+						page.name,
+						String(page.components.length),
+						String(descendants.length),
+					])
+				: t("PAGE_DELETE_MSG", [
+						page.name,
+						String(page.components.length),
+					]);
 		new ConfirmModal(
 			this.app,
 			t("PAGE_DELETE_TITLE"),
-			t("PAGE_DELETE_MSG", [page.name, String(page.components.length)]),
+			message,
 			() => {
 				void (async () => {
+					const removed = new Set([
+						page.id,
+						...descendants.map((item) => item.id),
+					]);
 					this.store =
 						await this.plugin.dashboardRepository.removePage(page.id);
 					const selection = this.localSelection();
 					if (
 						selection?.kind === "page" &&
-						selection.pageId === page.id
+						removed.has(selection.pageId)
 					) {
 						this.plugin.inspectorService.clear(this.leafId);
 					}
-					if (this.leafPageId === page.id) {
+					if (this.leafPageId && removed.has(this.leafPageId)) {
 						this.leafPageId =
 							activePageOf(this.activeDashboard)?.id ?? null;
 					}
@@ -2181,6 +2492,12 @@ export class CustomDashboardView extends ItemView {
 							controller.setPageLayout(columns, rowHeight);
 						}
 					},
+					setParent: (parentId) => {
+						const controller = service.current()?.controller;
+						if (controller?.kind === "page") {
+							controller.setPageParent(parentId);
+						}
+					},
 					remove: () => {
 						const controller = service.current()?.controller;
 						if (controller?.kind === "page") {
@@ -2199,6 +2516,24 @@ export class CustomDashboardView extends ItemView {
 						const controller = service.current()?.controller;
 						if (controller?.kind === "pages") {
 							controller.createPage();
+						}
+					},
+					createSubpage: (id) => {
+						const controller = service.current()?.controller;
+						if (controller?.kind === "pages") {
+							controller.createSubpage(id);
+						}
+					},
+					pickParent: (id) => {
+						const controller = service.current()?.controller;
+						if (controller?.kind === "pages") {
+							controller.pickParent(id);
+						}
+					},
+					setParent: (id, parentId) => {
+						const controller = service.current()?.controller;
+						if (controller?.kind === "pages") {
+							controller.setPageParent(id, parentId);
 						}
 					},
 					duplicate: (id) => {
@@ -2340,6 +2675,7 @@ export class CustomDashboardView extends ItemView {
 					this.render();
 				})();
 			},
+			setPageParent: (parentId) => void this.applyPageParent(pageId, parentId),
 			removePage: () => {
 				const page = this.activeDashboard?.pages.find(
 					(item) => item.id === pageId,
@@ -2398,19 +2734,30 @@ export class CustomDashboardView extends ItemView {
 		const dashboard = this.activeDashboard;
 		const page = this.activePage;
 		if (!dashboard || page?.id !== pageId) return null;
-		const index = dashboard.pages.findIndex((item) => item.id === pageId);
+		const pages = dashboard.pages;
+		const index = pages.findIndex((item) => item.id === pageId);
 		if (index < 0) return null;
+		const path = pagePath(pages, pageId);
 		return {
 			kind: "page",
 			pageId,
 			pageName: page.name,
 			dashboardName: dashboard.name,
 			index,
-			total: dashboard.pages.length,
+			total: pages.length,
 			componentCount: page.components.length,
 			columns: page.columns === 24 ? 24 : 12,
 			rowHeight: page.rowHeight ?? 72,
-			canDelete: dashboard.pages.length > 1,
+			canDelete: pages.length - 1 - descendantsOf(pages, pageId).length > 0,
+			parentId: page.parentId ?? null,
+			parentOptions: pages
+				.filter((item) => !item.parentId && item.id !== pageId)
+				.map((item) => ({ id: item.id, name: item.name })),
+			canSetParent: descendantsOf(pages, pageId).length === 0,
+			parentPath:
+				path.length > 1
+					? path.map((item) => item.name).join(" / ")
+					: null,
 		};
 	}
 
@@ -2438,9 +2785,14 @@ export class CustomDashboardView extends ItemView {
 			pages: dashboard.pages.map((page) => ({
 				id: page.id,
 				name: page.name,
+				parentId: page.parentId ?? null,
 				componentCount: page.components.length,
 				isActive: page.id === activeId,
-				canDelete: dashboard.pages.length > 1,
+				canDelete:
+					dashboard.pages.length -
+						1 -
+						descendantsOf(dashboard.pages, page.id).length >
+					0,
 			})),
 		};
 	}
@@ -2452,9 +2804,7 @@ export class CustomDashboardView extends ItemView {
 			this.activeDashboard?.pages.find((page) => page.id === id);
 		const moveTo = (pageId: string, target: number): void => {
 			void (async () => {
-				const dashboard = this.activeDashboard;
-				if (!dashboard) return;
-				const from = dashboard.pages.findIndex(
+				const from = this.pageSiblingsOf(pageId).findIndex(
 					(page) => page.id === pageId,
 				);
 				if (from < 0 || target === from) return;
@@ -2475,6 +2825,14 @@ export class CustomDashboardView extends ItemView {
 					: null,
 			switchPage: (pageId) => this.switchPage(pageId),
 			createPage: () => void this.createPage(),
+			createSubpage: (pageId) =>
+				void this.createPageWithParent(pageId),
+			setPageParent: (pageId, parentId) =>
+				void this.applyPageParent(pageId, parentId),
+			pickParent: (pageId) => {
+				const page = pageById(pageId);
+				if (page) this.pickPageParent(page);
+			},
 			duplicatePage: (pageId) => {
 				const page = pageById(pageId);
 				if (page) void this.duplicatePage(page);
@@ -2492,11 +2850,10 @@ export class CustomDashboardView extends ItemView {
 					moveTo(pageId, target);
 					return;
 				}
-				const dashboard = this.activeDashboard;
-				const from =
-					dashboard?.pages.findIndex((page) => page.id === pageId) ??
-					-1;
-				if (!dashboard || from < 0) return;
+				const from = this.pageSiblingsOf(pageId).findIndex(
+					(page) => page.id === pageId,
+				);
+				if (from < 0) return;
 				moveTo(pageId, from + target);
 			},
 		};
@@ -2587,8 +2944,11 @@ export class CustomDashboardView extends ItemView {
 			new Notice(t("PICKER_NO_PAGES_FOUND"));
 			return;
 		}
-		new PagePickerModal(this.app, targets, (target) =>
-			apply(target.page.id),
+		new PagePickerModal(
+			this.app,
+			targets,
+			(target) => apply(target.page.id),
+			{ describe: (target) => this.describePagePath(target) },
 		).open();
 	}
 
@@ -2606,9 +2966,14 @@ export class CustomDashboardView extends ItemView {
 			new Notice(t("DASHBOARD_MOVE_COMPONENT_FAILED"));
 			return;
 		}
-		new PagePickerModal(this.app, targets, (target) => {
-			void this.transferSelectedComponent(config, page.id, target);
-		}).open();
+		new PagePickerModal(
+			this.app,
+			targets,
+			(target) => {
+				void this.transferSelectedComponent(config, page.id, target);
+			},
+			{ describe: (target) => this.describePagePath(target) },
+		).open();
 	}
 
 	private async transferSelectedComponent(

@@ -2,7 +2,7 @@ import type { CountBasis } from "../metrics/types";
 import type { MeasureId, ViewId } from "./dataset/types";
 import type { QueryDefinition } from "../query/types";
 
-export const DASHBOARD_SCHEMA_VERSION = 6;
+export const DASHBOARD_SCHEMA_VERSION = 7;
 export const DASHBOARD_STORE_KEY = "dashboardStore";
 export const DEFAULT_DASHBOARD_ID = "dashboard:default";
 export const DEFAULT_PAGE_ID = "page:default";
@@ -32,6 +32,8 @@ export interface DashboardComponentConfig {
 export interface DashboardPage {
 	id: string;
 	name: string;
+	/** Parent page id: a top-level page of the same dashboard. Omitted = top level. One level only. */
+	parentId?: string;
 	/** Page-level layout: 12 (default) or 24 columns. */
 	columns?: 12 | 24;
 	/** Page-level row height in px. */
