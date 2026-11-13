@@ -31,6 +31,9 @@ export type ViewId =
 	| "progress"
 	| "bar"
 	| "line"
+	| "pie"
+	| "donut"
+	| "scatter"
 	| "markdown";
 
 export const DATA_OBJECTS: DataObject[] = [
@@ -59,6 +62,9 @@ export const VIEW_IDS: ViewId[] = [
 	"progress",
 	"bar",
 	"line",
+	"pie",
+	"donut",
+	"scatter",
 	"markdown",
 ];
 

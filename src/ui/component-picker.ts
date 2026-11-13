@@ -126,7 +126,7 @@ export class ComponentPickerModal extends Modal {
 			const container = body.createDiv({ cls: "ioto-picker-group" });
 			const items: CollectionItem[] = definitions.map((definition) => ({
 				id: definition.type,
-				icon: "layout-dashboard",
+				icon: definition.icon ?? "layout-dashboard",
 				title: this.labelOf(definition),
 				description: this.descriptionOf(definition),
 				primaryLabel: t("DASHBOARD_ADD_COMPONENT"),

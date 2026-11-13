@@ -13,6 +13,7 @@ import type {
 	TimelineBucket,
 	ViewId,
 } from "./dataset/types";
+import type { FieldAxis } from "./dataset/field-roles";
 import type { TimelineSourceRef } from "./dataset/timeline";
 import type { DashboardComponentConfig } from "./types";
 
@@ -100,6 +101,14 @@ export type ComponentSetting = SettingBase &
 		  }
 		| {
 				key: string;
+				kind: "textarea";
+				group: ComponentSettingGroup;
+				labelKey?: string;
+				placeholderKey?: string;
+				target?: "config" | "options";
+		  }
+		| {
+				key: string;
 				kind: "select";
 				group: ComponentSettingGroup;
 				labelKey: string;
@@ -133,6 +142,8 @@ export type ComponentSetting = SettingBase &
 				group: ComponentSettingGroup;
 				labelKey: string;
 				role: "x" | "y";
+				/** Overrides the role default: x → category, y → number. */
+				axisType?: FieldAxis;
 				fallback: string;
 				target?: "config" | "options";
 		  }
@@ -175,6 +186,10 @@ export interface ComponentRenderContext {
 		markdown: string,
 		sourcePath: string,
 	): Promise<void>;
+	/** Renders a free-form Markdown fragment and wires its links/hover previews. */
+	renderMarkdownFragment?(el: HTMLElement, markdown: string): Promise<void>;
+	/** Lets a component patch its own config from inside the canvas. */
+	patchComponent?(patch: Partial<DashboardComponentConfig>): void;
 }
 
 export interface SizeBounds {
@@ -189,6 +204,10 @@ export interface ComponentDefinition {
 	labelKey: string;
 	descriptionKey: string;
 	category?: ComponentCategory;
+	/** Skips query resolution, data requests and version-driven rebuilds. */
+	queryless?: boolean;
+	/** Component picker icon (Lucide name); defaults to layout-dashboard. */
+	icon?: string;
 	/** Query targets this component understands (picker hints). */
 	objects?: DataObject[];
 	/** Query types this component can consume; derived from `objects` when absent. */
@@ -310,6 +329,15 @@ export function coerceSettingValue(
 			return setting.target === "options"
 				? optionPatch(setting.key, trimmed || undefined)
 				: ({ [setting.key]: trimmed || undefined } as Partial<DashboardComponentConfig>);
+		}
+		case "textarea": {
+			if (typeof raw !== "string") return {};
+			// Keep inner whitespace/indentation; only \r\n is normalised.
+			const normalized = raw.replace(/\r\n?/g, "\n");
+			const value = normalized.trim() === "" ? undefined : normalized;
+			return setting.target === "options"
+				? optionPatch(setting.key, value)
+				: ({ [setting.key]: value } as Partial<DashboardComponentConfig>);
 		}
 		case "field": {
 			if (typeof raw !== "string" || raw.trim() === "") return {};

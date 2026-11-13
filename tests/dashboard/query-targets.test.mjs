@@ -17,6 +17,12 @@ const { lineChartComponent } = await load(
 const { barChartComponent } = await load(
 	'../../src/dashboard/components/bar-chart.ts',
 );
+const { pieChartComponent, donutChartComponent } = await load(
+	'../../src/dashboard/components/pie-chart.ts',
+);
+const { scatterChartComponent } = await load(
+	'../../src/dashboard/components/scatter-chart.ts',
+);
 const { projectProgressComponent } = await load(
 	'../../src/dashboard/components/project-progress.ts',
 );
@@ -47,6 +53,23 @@ test('registration components declare explicit query targets', () => {
 		'task',
 		'note',
 		'file',
+		'folder',
+	]);
+	assert.deepEqual(queryTargetsFor(pieChartComponent), [
+		'task',
+		'note',
+		'file',
+		'folder',
+	]);
+	assert.deepEqual(queryTargetsFor(donutChartComponent), [
+		'task',
+		'note',
+		'file',
+		'folder',
+	]);
+	assert.deepEqual(queryTargetsFor(scatterChartComponent), [
+		'task',
+		'note',
 		'folder',
 	]);
 	assert.deepEqual(queryTargetsFor(projectProgressComponent), ['task']);

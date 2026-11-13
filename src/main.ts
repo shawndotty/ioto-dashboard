@@ -131,6 +131,16 @@ export default class IotoDashboardPlugin extends Plugin {
 		this.registerView(TASK_VIEW_TYPE, (leaf) => new TaskView(leaf, this));
 		this.registerView(NOTE_VIEW_TYPE, (leaf) => new NoteView(leaf, this));
 
+		this.registerHoverLinkSource(CUSTOM_DASHBOARD_VIEW_TYPE, {
+			display: t("RIBBON_CUSTOM_DASHBOARD_TITLE"),
+			defaultMod: true,
+		});
+		// MiddleSection triggers hover-link with DASHBOARD_VIEW_TYPE as source.
+		this.registerHoverLinkSource(DASHBOARD_VIEW_TYPE, {
+			display: t("RIBBON_ICON_TITLE"),
+			defaultMod: true,
+		});
+
 		// Ribbon Icon
 		this.addRibbonIcon(
 			"columns-3",

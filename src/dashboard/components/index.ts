@@ -5,6 +5,9 @@ import { noteListComponent } from "./note-list";
 import { tableComponent } from "./table";
 import { lineChartComponent } from "./line-chart";
 import { barChartComponent } from "./bar-chart";
+import { donutChartComponent, pieChartComponent } from "./pie-chart";
+import { scatterChartComponent } from "./scatter-chart";
+import { markdownComponent } from "./markdown";
 import { ComponentRegistry } from "../registry";
 
 export function createComponentRegistry(): ComponentRegistry {
@@ -16,5 +19,9 @@ export function createComponentRegistry(): ComponentRegistry {
 	registry.register(tableComponent);
 	registry.register(lineChartComponent);
 	registry.register(barChartComponent);
+	registry.register(pieChartComponent);
+	registry.register(donutChartComponent);
+	registry.register(scatterChartComponent);
+	registry.register(markdownComponent);
 	return registry;
 }

@@ -15,6 +15,8 @@ const {
 	arcRatio,
 	nearestIndex,
 	nearestBandIndex,
+	polarPoint,
+	arcPath,
 } = await load('../../src/dashboard/dataset/charts/geometry.ts');
 
 test('scaleLinear maps a domain onto a range', () => {
@@ -151,4 +153,44 @@ test('nearestBandIndex rounds by slot and clamps to the plot', () => {
 	// 2 slots of 50px: the midpoint belongs to the right slot.
 	assert.equal(nearestBandIndex(49, 0, 100, 2), 0);
 	assert.equal(nearestBandIndex(51, 0, 100, 2), 1);
+});
+
+test('polarPoint starts at 12 o’clock and turns clockwise', () => {
+	const top = polarPoint(100, 100, 10, 0);
+	assert.ok(Math.abs(top.x - 100) < 1e-9);
+	assert.ok(Math.abs(top.y - 90) < 1e-9);
+
+	const right = polarPoint(100, 100, 10, Math.PI / 2);
+	assert.ok(Math.abs(right.x - 110) < 1e-9);
+	assert.ok(Math.abs(right.y - 100) < 1e-9);
+
+	const bottom = polarPoint(100, 100, 10, Math.PI);
+	assert.ok(Math.abs(bottom.x - 100) < 1e-9);
+	assert.ok(Math.abs(bottom.y - 110) < 1e-9);
+});
+
+test('arcPath handles pies, rings and degenerate spans', () => {
+	assert.equal(arcPath(100, 100, 50, 0, Math.PI, Math.PI), '');
+	assert.equal(arcPath(100, 100, 50, 0, 0, 0.0000001), '');
+
+	const wedge = arcPath(100, 100, 50, 0, 0, Math.PI / 2);
+	assert.match(wedge, /^M 100 100 L /);
+	assert.equal((wedge.match(/A /g) ?? []).length, 1);
+
+	const ring = arcPath(100, 100, 50, 30, 0, Math.PI / 2);
+	assert.equal((ring.match(/A /g) ?? []).length, 2);
+	assert.ok(!ring.startsWith('M 100 100'));
+
+	const fullWedge = arcPath(100, 100, 50, 0, 0, Math.PI * 2);
+	assert.equal((fullWedge.match(/A /g) ?? []).length, 2);
+
+	const fullRing = arcPath(100, 100, 50, 30, 0, Math.PI * 2);
+	assert.equal((fullRing.match(/A /g) ?? []).length, 4);
+});
+
+test('arcRatio clamps to 0–1 and guards a zero total', () => {
+	assert.equal(arcRatio(3, 6), 0.5);
+	assert.equal(arcRatio(-1, 6), 0);
+	assert.equal(arcRatio(9, 6), 1);
+	assert.equal(arcRatio(1, 0), 0);
 });

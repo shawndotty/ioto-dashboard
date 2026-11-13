@@ -6,6 +6,7 @@ const { coerceSettingValue } = await load('../../src/dashboard/registry.ts');
 const {
 	STYLE_SETTINGS,
 	STYLE_SETTING_KEYS,
+	DISPLAY_SETTINGS,
 	cardStyleVars,
 	settingsOf,
 } = await load('../../src/dashboard/style-settings.ts');
@@ -28,6 +29,12 @@ const { lineChartComponent } = await load(
 const { barChartComponent } = await load(
 	'../../src/dashboard/components/bar-chart.ts',
 );
+const { pieChartComponent, donutChartComponent } = await load(
+	'../../src/dashboard/components/pie-chart.ts',
+);
+const { scatterChartComponent } = await load(
+	'../../src/dashboard/components/scatter-chart.ts',
+);
 
 const COMPONENTS = [
 	kpiComponent,
@@ -37,6 +44,9 @@ const COMPONENTS = [
 	tableComponent,
 	lineChartComponent,
 	barChartComponent,
+	pieChartComponent,
+	donutChartComponent,
+	scatterChartComponent,
 ];
 
 function styleSetting(key) {
@@ -126,6 +136,9 @@ test('settingsOf appends style settings and hides alignment where unsupported', 
 	const alignmentHidden = new Set([
 		'line-chart',
 		'bar-chart',
+		'pie-chart',
+		'donut-chart',
+		'scatter-chart',
 		'task-list',
 		'note-list',
 		'table',
@@ -134,7 +147,14 @@ test('settingsOf appends style settings and hides alignment where unsupported', 
 		const merged = settingsOf(component);
 		const own = component.settings ?? [];
 		assert.deepEqual(merged.slice(0, own.length), own);
-		assert.deepEqual(merged.slice(own.length), STYLE_SETTINGS);
+		assert.deepEqual(
+			merged.slice(own.length, own.length + DISPLAY_SETTINGS.length),
+			DISPLAY_SETTINGS,
+		);
+		assert.deepEqual(
+			merged.slice(own.length + DISPLAY_SETTINGS.length),
+			STYLE_SETTINGS,
+		);
 
 		const align = merged.find((setting) => setting.key === 'textAlign');
 		const visible = !align.when || align.when({ type: component.type });

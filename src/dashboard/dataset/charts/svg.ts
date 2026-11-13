@@ -1,33 +1,27 @@
 import { t } from "../../../lang/helpers";
 import { nearestBandIndex, nearestIndex } from "./geometry";
-import type { ChartSeries, ChartSpec } from "./spec";
-
-const SVG_NS = "http://www.w3.org/2000/svg";
+import type { ChartSpec, RenderableSpecBase } from "./spec";
+import {
+	label,
+	positionTooltip,
+	renderTooltipRows,
+	seriesClass,
+	setHidden,
+	svgEl,
+} from "./svg-base";
+import type { PieChartSpec } from "./pie-spec";
+import { renderPieChart } from "./svg-pie";
+import type { ScatterChartSpec } from "./scatter-spec";
+import { renderScatterChart } from "./svg-scatter";
 
 export interface ChartInteractions {
-	onActivate?(target: { bucketKey: string; seriesKey?: string }): void;
+	onActivate?(target: {
+		bucketKey: string;
+		seriesKey?: string;
+		/** Pie slices carry their file path so file/folder hosts can open them. */
+		path?: string;
+	}): void;
 	isEnabled?(): boolean;
-}
-
-function svgEl<K extends keyof SVGElementTagNameMap>(
-	doc: Document,
-	tag: K,
-	attrs: Record<string, string | number> = {},
-): SVGElementTagNameMap[K] {
-	const el = doc.createElementNS(SVG_NS, tag);
-	for (const [key, value] of Object.entries(attrs)) {
-		el.setAttribute(key, String(value));
-	}
-	return el;
-}
-
-/** i18n key → display text, tolerant of unknown keys. */
-function label(key: string): string {
-	return t(key as Parameters<typeof t>[0]);
-}
-
-function seriesClass(series: ChartSeries): string {
-	return `ioto-chart-series-${series.colorIndex}`;
 }
 
 function renderAxes(
@@ -247,66 +241,12 @@ function renderValueList(el: HTMLElement, spec: ChartSpec): void {
 	list.style.maxHeight = `${Math.min(spec.valueList.length, 6) * 20}px`;
 	for (const entry of spec.valueList) {
 		const item = list.createDiv({ cls: "ioto-chart-value-item" });
-		item.createSpan({ cls: "ioto-chart-value-label", text: entry.label });
+		item.createSpan({
+			cls: "ioto-chart-value-label",
+			text: entry.labelKey ? label(entry.labelKey) : entry.label,
+		});
 		item.createSpan({ cls: "ioto-chart-value-text", text: entry.text });
 	}
-}
-
-interface TooltipRow {
-	label: string;
-	value: string;
-	seriesIndex: number;
-}
-
-function renderTooltipRows(
-	tooltip: HTMLElement,
-	title: string,
-	rows: TooltipRow[],
-	clickable: boolean,
-): void {
-	tooltip.empty();
-	tooltip.createDiv({ cls: "ioto-chart-tooltip-date", text: title });
-	for (const row of rows) {
-		const el = tooltip.createDiv({ cls: "ioto-chart-tooltip-row" });
-		el.createSpan({
-			cls: `ioto-chart-tooltip-swatch ioto-chart-series-${row.seriesIndex}`,
-		});
-		el.createSpan({ cls: "ioto-chart-tooltip-name", text: row.label });
-		el.createSpan({ cls: "ioto-chart-tooltip-value", text: row.value });
-	}
-	if (clickable) {
-		tooltip.createDiv({
-			cls: "ioto-chart-tooltip-hint",
-			text: label("CHART_TOOLTIP_CLICK_HINT"),
-		});
-	}
-}
-
-/** Places the tooltip above `anchor` in viewBox units, clamped to `el`. */
-function positionTooltip(
-	el: HTMLElement,
-	svg: SVGElement,
-	spec: ChartSpec,
-	anchorX: number,
-	anchorY: number,
-	tooltip: HTMLElement,
-): void {
-	const svgRect = svg.getBoundingClientRect();
-	const rootRect = el.getBoundingClientRect();
-	const scaleX = svgRect.width > 0 ? svgRect.width / spec.width : 1;
-	const scaleY = svgRect.height > 0 ? svgRect.height / spec.height : 1;
-	const localX = svgRect.left - rootRect.left + anchorX * scaleX;
-	const localY = svgRect.top - rootRect.top + anchorY * scaleY;
-	const width = tooltip.offsetWidth;
-	const height = tooltip.offsetHeight;
-	const maxLeft = Math.max(2, rootRect.width - width - 2);
-	tooltip.style.left = `${Math.round(
-		Math.max(2, Math.min(maxLeft, localX - width / 2)),
-	)}px`;
-	const above = localY - height - 10;
-	tooltip.style.top = `${Math.round(
-		above >= 2 ? above : Math.min(localY + 12, rootRect.height - height),
-	)}px`;
 }
 
 function appendInteractionLayer(
@@ -337,9 +277,6 @@ function appendInteractionLayer(
 		y2: bottom,
 		class: "ioto-chart-crosshair",
 	});
-	const setHidden = (node: Element, hidden: boolean): void => {
-		node.classList.toggle("ioto-chart-hidden", hidden);
-	};
 	setHidden(crosshair, true);
 
 	const dots = svgEl(doc, "g", { class: "ioto-chart-hover-dot" });
@@ -410,7 +347,7 @@ function appendInteractionLayer(
 					{
 						label: label(series.label),
 						value: spec.y.format(point.value),
-						seriesIndex: series.colorIndex,
+						className: seriesClass(series),
 					},
 				];
 			}),
@@ -508,7 +445,7 @@ function appendBarInteractionLayer(
 				{
 					label: label(series.label),
 					value: spec.y.format(bar.value),
-					seriesIndex: series.colorIndex,
+					className: seriesClass(series),
 				},
 			],
 			typeof interactions.onActivate === "function",
@@ -559,6 +496,22 @@ function appendBarInteractionLayer(
 }
 
 export function renderChart(
+	el: HTMLElement,
+	spec: RenderableSpecBase,
+	interactions?: ChartInteractions,
+): void {
+	if (spec.kind === "pie" || spec.kind === "donut") {
+		renderPieChart(el, spec as PieChartSpec, interactions);
+		return;
+	}
+	if (spec.kind === "scatter") {
+		renderScatterChart(el, spec as ScatterChartSpec, interactions);
+		return;
+	}
+	renderCartesianChart(el, spec as ChartSpec, interactions);
+}
+
+function renderCartesianChart(
 	el: HTMLElement,
 	spec: ChartSpec,
 	interactions?: ChartInteractions,

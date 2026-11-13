@@ -20,6 +20,9 @@ const { lineChartComponent } = await load(
 const { barChartComponent } = await load(
 	'../../src/dashboard/components/bar-chart.ts',
 );
+const { markdownComponent } = await load(
+	'../../src/dashboard/components/markdown.ts',
+);
 
 const COMPONENTS = [
 	kpiComponent,
@@ -29,6 +32,7 @@ const COMPONENTS = [
 	tableComponent,
 	lineChartComponent,
 	barChartComponent,
+	markdownComponent,
 ];
 const CONFIG_KEYS = new Set(['id', 'type', 'queryId', 'basis', 'limit', 'title', 'view', 'measure', 'options', 'x', 'y', 'w', 'h']);
 const QUERY_IDS = new Set(['builtin:tasks-all', 'builtin:tasks-unfinished', 'user:1']);
@@ -36,7 +40,14 @@ const QUERY_IDS = new Set(['builtin:tasks-all', 'builtin:tasks-unfinished', 'use
 test('every component declares settings whose keys are valid config fields', () => {
 	for (const component of COMPONENTS) {
 		assert.ok(Array.isArray(component.settings) && component.settings.length > 0, `${component.type} needs settings`);
-		assert.equal(component.settings[0].kind, 'query', `${component.type} should lead with the query`);
+		if (component.queryless) {
+			assert.ok(
+				!component.settings.some((setting) => setting.kind === 'query'),
+				`${component.type} is queryless and must not declare a query setting`,
+			);
+		} else {
+			assert.equal(component.settings[0].kind, 'query', `${component.type} should lead with the query`);
+		}
 		const keys = component.settings.map((setting) => setting.key);
 		assert.equal(new Set(keys).size, keys.length, `${component.type} has duplicate setting keys`);
 		for (const setting of component.settings) {
@@ -232,6 +243,26 @@ test('the columns setting stores a comma-separated option list', () => {
 		options: { columns: undefined },
 	});
 	assert.deepEqual(coerceSettingValue(setting, 'note', QUERY_IDS), {});
+});
+
+test('the textarea setting keeps newlines and deletes an all-whitespace value', () => {
+	const setting = {
+		key: 'markdown',
+		kind: 'textarea',
+		group: 'display',
+		target: 'options',
+	};
+	assert.deepEqual(coerceSettingValue(setting, 'line 1\r\nline 2', QUERY_IDS), {
+		options: { markdown: 'line 1\nline 2' },
+	});
+	assert.deepEqual(
+		coerceSettingValue(setting, '  indented\n\ntext  ', QUERY_IDS),
+		{ options: { markdown: '  indented\n\ntext  ' } },
+	);
+	assert.deepEqual(coerceSettingValue(setting, '   \n  ', QUERY_IDS), {
+		options: { markdown: undefined },
+	});
+	assert.deepEqual(coerceSettingValue(setting, 7, QUERY_IDS), {});
 });
 
 test('the table writes defaults its settings advertise', () => {

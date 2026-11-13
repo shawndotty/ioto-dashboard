@@ -1,17 +1,9 @@
 import { renderResponsiveChart } from "../dataset/charts/chart-host";
 import { buildBarSpec, type ChartSpec } from "../dataset/charts/spec";
 import { yFormatOptionsForField } from "../dataset/charts/settings";
+import { firstCellPath } from "../dataset/cells";
 import { barObjectForQuery } from "../dataset/object";
-import type { DatasetRow } from "../dataset/types";
 import type { ComponentDefinition } from "../registry";
-
-function firstCellPath(row: DatasetRow | undefined): string | undefined {
-	if (!row) return undefined;
-	for (const cell of Object.values(row.cells)) {
-		if (cell.path) return cell.path;
-	}
-	return undefined;
-}
 
 export const barChartComponent: ComponentDefinition = {
 	type: "bar-chart",

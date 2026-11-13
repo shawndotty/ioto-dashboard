@@ -42,6 +42,9 @@ export const STYLE_SETTINGS: ComponentSetting[] = [
 		when: (config) =>
 			config.type !== "line-chart" &&
 			config.type !== "bar-chart" &&
+			config.type !== "pie-chart" &&
+			config.type !== "donut-chart" &&
+			config.type !== "scatter-chart" &&
 			config.type !== "task-list" &&
 			config.type !== "note-list" &&
 			config.type !== "table",
@@ -64,9 +67,28 @@ export const STYLE_SETTINGS: ComponentSetting[] = [
 	},
 ];
 
-/** A component's own settings followed by the shared style settings. */
+/**
+ * Display settings shared by every component. As with styles, they are merged
+ * into the definition's own settings and never written by `createConfig`.
+ */
+export const DISPLAY_SETTINGS: ComponentSetting[] = [
+	{
+		key: "hideTitle",
+		kind: "toggle",
+		group: "display",
+		labelKey: "SETTING_HIDE_TITLE",
+		fallback: false,
+		target: "options",
+	},
+];
+
+/** A component's own settings, then shared display and style settings. */
 export function settingsOf(definition: ComponentDefinition): ComponentSetting[] {
-	return [...(definition.settings ?? []), ...STYLE_SETTINGS];
+	return [
+		...(definition.settings ?? []),
+		...DISPLAY_SETTINGS,
+		...STYLE_SETTINGS,
+	];
 }
 
 export interface CardStyleVars {

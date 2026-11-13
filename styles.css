@@ -2908,6 +2908,107 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     --ioto-series-color: color-mix(in srgb, var(--interactive-accent) 45%, transparent);
 }
 
+/* Categorical palette for pie/donut slices and scatter groups */
+.ioto-chart-cat-1 {
+    --ioto-series-color: color-mix(in srgb, var(--interactive-accent) 90%, var(--background-primary));
+}
+
+.ioto-chart-cat-2 {
+    --ioto-series-color: color-mix(in srgb, var(--color-blue, var(--interactive-accent)) 75%, var(--background-primary));
+}
+
+.ioto-chart-cat-3 {
+    --ioto-series-color: color-mix(in srgb, var(--color-green, var(--interactive-accent)) 75%, var(--background-primary));
+}
+
+.ioto-chart-cat-4 {
+    --ioto-series-color: color-mix(in srgb, var(--color-orange, var(--interactive-accent)) 80%, var(--background-primary));
+}
+
+.ioto-chart-cat-5 {
+    --ioto-series-color: color-mix(in srgb, var(--color-purple, var(--interactive-accent)) 75%, var(--background-primary));
+}
+
+.ioto-chart-cat-6 {
+    --ioto-series-color: color-mix(in srgb, var(--color-cyan, var(--interactive-accent)) 75%, var(--background-primary));
+}
+
+.ioto-chart-cat-7 {
+    --ioto-series-color: color-mix(in srgb, var(--color-pink, var(--interactive-accent)) 70%, var(--background-primary));
+}
+
+.ioto-chart-cat-8 {
+    --ioto-series-color: color-mix(in srgb, var(--color-yellow, var(--interactive-accent)) 80%, var(--background-primary));
+}
+
+.ioto-chart-cat-other {
+    --ioto-series-color: color-mix(in srgb, var(--text-faint) 55%, var(--background-primary));
+}
+
+/* Pie / donut slices */
+.ioto-chart-slice {
+    fill: var(--ioto-series-color, var(--interactive-accent));
+    stroke: var(--background-primary);
+    stroke-width: 1;
+    transition: opacity 120ms ease;
+}
+
+.ioto-chart-slice:hover,
+.ioto-chart-slice.is-active {
+    opacity: 0.85;
+}
+
+.ioto-chart-slice.is-active {
+    stroke-width: 1.5;
+}
+
+.ioto-chart-slice-label {
+    fill: var(--text-on-accent, var(--text-normal));
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+.ioto-chart-donut-center {
+    fill: var(--text-normal);
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+.ioto-chart-donut-center.is-total {
+    font-size: var(--font-ui-medium);
+    font-weight: var(--font-semibold);
+}
+
+.ioto-chart-donut-center.is-caption {
+    fill: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-chart-legend.is-wrap {
+    gap: 2px 14px;
+}
+
+.ioto-chart-legend-value {
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Scatter dots */
+.ioto-chart-scatter-dot {
+    fill: var(--ioto-series-color, var(--interactive-accent));
+    fill-opacity: 0.55;
+    stroke: var(--ioto-series-color, var(--interactive-accent));
+    stroke-width: 1;
+    pointer-events: none;
+}
+
+.ioto-chart-scatter-dot.is-active {
+    fill-opacity: 0.9;
+    stroke-width: 1.5;
+}
+
 .ioto-chart-path {
     fill: none;
     stroke: var(--ioto-series-color, var(--interactive-accent));
@@ -3247,4 +3348,80 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 
 .ioto-picker-group {
     display: block;
+}
+
+/* ---- Shared hidden title (view mode) ---- */
+.ioto-custom-dashboard-view .ioto-dashboard-card-header.is-title-overlay {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 2;
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+/* Floating header keeps search readable once expanded over the body. */
+.ioto-custom-dashboard-view
+    .ioto-dashboard-card-header.is-title-overlay
+    .ioto-card-search.is-open {
+    background: var(--background-primary);
+    border-radius: 6px;
+    padding: 2px 6px;
+    box-shadow: var(--shadow-s);
+}
+
+/* ---- Markdown component ---- */
+.ioto-custom-dashboard-view .ioto-markdown-editor {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.ioto-custom-dashboard-view .ioto-markdown-input {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    color: var(--text-normal);
+    font-family: var(--font-monospace);
+    font-size: var(--font-text-size);
+    line-height: 1.5;
+    resize: none;
+}
+
+.ioto-custom-dashboard-view .ioto-markdown-input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.ioto-custom-dashboard-view .ioto-markdown-hint {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    margin-top: 6px;
+}
+
+.ioto-custom-dashboard-view .ioto-markdown-body {
+    font-size: var(--font-text-size);
+    line-height: 1.5;
+}
+
+.ioto-custom-dashboard-view .ioto-markdown-body > :first-child {
+    margin-top: 0;
+}
+
+.ioto-custom-dashboard-view .ioto-markdown-body > :last-child {
+    margin-bottom: 0;
+}
+
+.ioto-custom-dashboard-view .ioto-markdown-body img,
+.ioto-custom-dashboard-view .ioto-markdown-body video,
+.ioto-custom-dashboard-view .ioto-markdown-body iframe,
+.ioto-custom-dashboard-view .ioto-markdown-body .internal-embed,
+.ioto-custom-dashboard-view .ioto-markdown-body .markdown-embed {
+    max-width: 100%;
 }

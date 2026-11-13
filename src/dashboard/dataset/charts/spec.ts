@@ -16,6 +16,11 @@ import {
 	type DatasetCellType,
 	type DatasetColumn,
 } from "../types";
+import {
+	columnMatchesAxis,
+	fieldAxisFor,
+	type FieldAxis,
+} from "../field-roles";
 
 export interface ChartSize {
 	w: number;
@@ -80,10 +85,29 @@ export interface ChartSeries {
 	bars?: ChartBar[];
 }
 
-export interface ChartSpec {
-	kind: "line" | "bar";
+export type ChartAriaKey =
+	| "CHART_ARIA_LINE"
+	| "CHART_ARIA_BAR"
+	| "CHART_ARIA_PIE"
+	| "CHART_ARIA_DONUT"
+	| "CHART_ARIA_SCATTER";
+
+/** Everything a renderer needs regardless of the chart family. */
+export interface RenderableSpecBase {
+	kind: string;
 	width: number;
 	height: number;
+	ariaKey: ChartAriaKey;
+	showLegend: boolean;
+	valueList: Array<{ label: string; labelKey?: string; text: string }> | null;
+	hiddenCount: number;
+	interactive?: boolean;
+	/** Non-SVG height reserved below the chart; written by the spec builder. */
+	extrasHeight?: number;
+}
+
+export interface ChartSpec extends RenderableSpecBase {
+	kind: "line" | "bar";
 	ariaKey: "CHART_ARIA_LINE" | "CHART_ARIA_BAR";
 	x: ChartAxisSpec;
 	y: ChartAxisSpec & {
@@ -94,14 +118,9 @@ export interface ChartSpec {
 	};
 	series: ChartSeries[];
 	plot: { left: number; top: number; width: number; height: number };
-	hiddenCount: number;
-	showLegend: boolean;
 	cumulative?: boolean;
 	showValueLabels: boolean;
-	valueList: Array<{ label: string; text: string }> | null;
 	xRotate: 0 | 45 | 90;
-	/** Line and bar charts opt into the hover/click layer. */
-	interactive?: boolean;
 }
 
 const LABEL_FONT = 11;
@@ -151,7 +170,7 @@ interface BarDatum {
 	rowId?: string;
 }
 
-function optionString(
+export function optionString(
 	options: ChartOptions,
 	key: string,
 	fallback: string,
@@ -160,7 +179,7 @@ function optionString(
 	return typeof value === "string" ? value : fallback;
 }
 
-function optionBoolean(
+export function optionBoolean(
 	options: ChartOptions,
 	key: string,
 	fallback: boolean,
@@ -169,42 +188,42 @@ function optionBoolean(
 	return typeof value === "boolean" ? value : fallback;
 }
 
-function optionNumber(options: ChartOptions, key: string): number | undefined {
+export function optionNumber(
+	options: ChartOptions,
+	key: string,
+): number | undefined {
 	const value = options[key];
 	return typeof value === "number" && Number.isFinite(value)
 		? value
 		: undefined;
 }
 
-function columnMatches(column: DatasetColumn, role: "x" | "y"): boolean {
-	if (role === "y") {
-		return (
-			column.type === "number" ||
-			column.type === "percent" ||
-			column.type === "size"
-		);
-	}
-	return (
-		column.type === "text" ||
-		column.type === "date" ||
-		column.type === "path"
+export function columnMatches(
+	column: DatasetColumn,
+	role: "x" | "y",
+	axisType?: FieldAxis,
+): boolean {
+	return columnMatchesAxis(
+		column,
+		fieldAxisFor({ role, axisType }),
 	);
 }
 
-function resolveColumn(
+export function resolveColumn(
 	dataset: Dataset,
 	requested: string,
 	role: "x" | "y",
 	defaultKey: string,
+	axisType?: FieldAxis,
 ): DatasetColumn | undefined {
 	const direct = dataset.columns.find((column) => column.key === requested);
-	if (direct && columnMatches(direct, role)) return direct;
+	if (direct && columnMatches(direct, role, axisType)) return direct;
 	const preferred = dataset.columns.find((column) => column.key === defaultKey);
-	if (preferred && columnMatches(preferred, role)) return preferred;
-	return dataset.columns.find((column) => columnMatches(column, role));
+	if (preferred && columnMatches(preferred, role, axisType)) return preferred;
+	return dataset.columns.find((column) => columnMatches(column, role, axisType));
 }
 
-function cellValue(
+export function cellValue(
 	row: Dataset["rows"][number],
 	key: string,
 ): number {
@@ -217,7 +236,7 @@ function cellValue(
 	return 0;
 }
 
-function cellText(row: Dataset["rows"][number], key: string): string {
+export function cellText(row: Dataset["rows"][number], key: string): string {
 	return row.cells[key]?.text ?? "";
 }
 
@@ -246,7 +265,7 @@ function formatCompact(value: number): string {
 	return formatNumber(value);
 }
 
-function formatterFor(
+export function formatterFor(
 	type: DatasetCellType,
 	mode: string,
 ): (value: number) => string {
@@ -282,6 +301,31 @@ function dateLabel(text: string, format: string): string {
 function rotateOf(options: ChartOptions): 0 | 45 | 90 {
 	const value = optionString(options, "xRotate", "0");
 	return value === "45" ? 45 : value === "90" ? 90 : 0;
+}
+
+export function buildNiceAxis(
+	values: number[],
+	type: DatasetCellType,
+	tickCount: number,
+	mode: string,
+): YAxisResult {
+	const format = formatterFor(type, mode);
+	let dataMax = 0;
+	let dataMin = 0;
+	for (const value of values) {
+		if (value < dataMin) dataMin = value;
+		if (value > dataMax) dataMax = value;
+	}
+	let ticks = niceTicks(dataMin, dataMax, tickCount);
+	let min = ticks[0] ?? 0;
+	let max = ticks[ticks.length - 1] ?? 1;
+	if (!(max > min)) {
+		min = 0;
+		max = 1;
+		ticks = [0, 0.5, 1];
+	}
+	if (ticks.length === 0) ticks = [min, max];
+	return { min, max, ticks, labels: ticks.map(format), format };
 }
 
 function buildYAxis(
@@ -327,7 +371,7 @@ function buildYAxis(
 	return { min, max, ticks, labels: ticks.map(format), format };
 }
 
-function computeLayout(
+export function computeLayout(
 	size: ChartSize,
 	options: ChartOptions,
 	rotate: 0 | 45 | 90,

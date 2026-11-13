@@ -60,8 +60,7 @@ test('v4 data loads as v5 and keeps the new feedback fields', () => {
 	});
 });
 
-test('unknown view/measure values and non-scalar options are dropped', () => {
-	const imported = repository().importJson(
+test('unknown view/measure values and non-scalar options are dropped', () => {	const imported = repository().importJson(
 		store({
 			view: 'hologram',
 			measure: 'telepathy',
@@ -74,6 +73,13 @@ test('unknown view/measure values and non-scalar options are dropped', () => {
 	assert.equal(component.measure, undefined);
 	assert.deepEqual(component.options, { good: 'keep' });
 	assert.equal(component.unknownField, undefined);
+});
+
+test('pie, donut and scatter views survive normalization', () => {
+	for (const view of ['pie', 'donut', 'scatter']) {
+		const imported = repository().importJson(store({ view }));
+		assert.equal(imported.dashboards[0].pages[0].components[0].view, view);
+	}
 });
 
 test('page columns accept only 12/24 and rowHeight is clamped', () => {

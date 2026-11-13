@@ -38,3 +38,35 @@ export function barObjectForQuery(
 			return fallback;
 	}
 }
+
+/**
+ * Scatter charts plot one record per row. Task queries have no numeric detail
+ * columns, so they fall back to per-project aggregation like bar/pie charts.
+ */
+export function scatterObjectForQuery(
+	query: QueryDefinition | undefined,
+	fallback: DataObject = "project",
+): DataObject {
+	switch (query?.target) {
+		case "note":
+			return "note";
+		case "folder":
+			return "folder";
+		case "file":
+			return "file";
+		default:
+			return fallback;
+	}
+}
+
+/** Field-picker object mapping; unknown component types read the query object. */
+export function objectForComponentType(
+	type: string | undefined,
+	query: QueryDefinition | undefined,
+): DataObject {
+	if (type === "bar-chart" || type === "pie-chart" || type === "donut-chart") {
+		return barObjectForQuery(query);
+	}
+	if (type === "scatter-chart") return scatterObjectForQuery(query);
+	return objectForQuery(query);
+}

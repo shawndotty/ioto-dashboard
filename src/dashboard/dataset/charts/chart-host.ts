@@ -1,9 +1,13 @@
 import { t } from "../../../lang/helpers";
-import type { ChartSize, ChartSpec } from "./spec";
+import type {
+	ChartSize,
+	RenderableSpecBase,
+} from "./spec";
 import { renderChart, type ChartInteractions } from "./svg";
 
 /** Height consumed by the HTML legend / value list rendered below the SVG. */
-function extrasHeight(spec: ChartSpec): number {
+function extrasHeight(spec: RenderableSpecBase): number {
+	if (typeof spec.extrasHeight === "number") return spec.extrasHeight;
 	let height = 0;
 	if (spec.showLegend) height += 22;
 	if (spec.valueList && spec.valueList.length > 0) {
@@ -20,7 +24,7 @@ function extrasHeight(spec: ChartSpec): number {
  */
 export function renderResponsiveChart(
 	el: HTMLElement,
-	build: (size: ChartSize) => ChartSpec | null,
+	build: (size: ChartSize) => RenderableSpecBase | null,
 	minHeight = 80,
 	interactions?: ChartInteractions,
 ): void {

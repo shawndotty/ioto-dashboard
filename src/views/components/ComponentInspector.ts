@@ -14,9 +14,13 @@ import {
 	timelineColumnsForObject,
 } from "../../dashboard/dataset/columns";
 import {
-	barObjectForQuery,
+	objectForComponentType,
 	objectForQuery,
 } from "../../dashboard/dataset/object";
+import {
+	columnMatchesAxis,
+	fieldAxisFor,
+} from "../../dashboard/dataset/field-roles";
 import { settingsOf } from "../../dashboard/style-settings";
 import type { DashboardComponentConfig } from "../../dashboard/types";
 import {
@@ -95,7 +99,10 @@ export class ComponentInspector {
 	private basisFallback: "file" | "section" = "file";
 	private inputRefs = new Map<
 		string,
-		{ input: HTMLInputElement; setting: ComponentSetting }
+		{
+			input: HTMLInputElement | HTMLTextAreaElement;
+			setting: ComponentSetting;
+		}
 	>();
 	private colorRefs = new Map<
 		string,
@@ -496,6 +503,49 @@ export class ComponentInspector {
 				this.inputRefs.set(setting.key, { input, setting });
 				return;
 			}
+			case "textarea": {
+				field.createEl("label", {
+					text: t(
+						(setting.labelKey ??
+							"INSPECTOR_TITLE_LABEL") as LabelKey,
+					),
+				});
+				const area = field.createEl("textarea", {
+					cls: "ioto-inspector-textarea",
+					attr: {
+						rows: "6",
+						placeholder: t(
+							(setting.placeholderKey ??
+								"INSPECTOR_TITLE_PLACEHOLDER") as LabelKey,
+						),
+					},
+				});
+				const stored = this.storedSettingValue(state, setting);
+				area.value = typeof stored === "string" ? stored : "";
+				area.disabled = !state.editable;
+				const queryIds = new Set(
+					state.queries.map((query) => query.id),
+				);
+				// textarea's change fires on blur: no rebuild while typing.
+				const commit = (): void => {
+					const patch = coerceSettingValue(
+						setting,
+						area.value,
+						queryIds,
+					);
+					if (Object.keys(patch).length > 0) this.deps.patch(patch);
+				};
+				area.addEventListener("change", commit);
+				area.addEventListener("keydown", (event) => {
+					if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey)) {
+						return;
+					}
+					event.preventDefault();
+					commit();
+				});
+				this.inputRefs.set(setting.key, { input: area, setting });
+				return;
+			}
 			case "field": {
 				field.createEl("label", { text: t(setting.labelKey as LabelKey) });
 				const select = field.createEl("select", { cls: "dropdown" });
@@ -748,24 +798,22 @@ export class ComponentInspector {
 		type: string | undefined,
 		setting: Extract<ComponentSetting, { kind: "field" }>,
 	): Array<{ value: string; labelKey: string }> {
-		// Bars aggregate task/note queries per project; other components read the
-		// query's own object. Line charts read time-series columns, not detail rows.
+		// Bars, pies and donuts aggregate task/note queries per project; scatter
+		// charts read per-record rows. Line charts read time-series columns.
 		const object =
-			type === "bar-chart" ? barObjectForQuery(query) : objectForQuery(query);
+			type === "line-chart"
+				? objectForQuery(query)
+				: objectForComponentType(type, query);
 		const columns =
 			type === "line-chart"
 				? timelineColumnsForObject(object)
 				: columnsForObject(object);
+		const axis = fieldAxisFor({
+			role: setting.role,
+			axisType: setting.axisType,
+		});
 		return columns
-			.filter((column) =>
-				setting.role === "y"
-					? column.type === "number" ||
-						column.type === "percent" ||
-						column.type === "size"
-					: column.type === "text" ||
-						column.type === "date" ||
-						column.type === "path",
-			)
+			.filter((column) => columnMatchesAxis(column, axis))
 			.map((column) => ({
 				value: column.key,
 				labelKey: column.labelKey,
@@ -1182,7 +1230,10 @@ export class ComponentInspector {
 							? stored
 							: setting.fallback,
 					);
-				} else if (setting.kind === "text") {
+				} else if (
+					setting.kind === "text" ||
+					setting.kind === "textarea"
+				) {
 					input.value = typeof stored === "string" ? stored : "";
 				}
 			}

@@ -9,6 +9,7 @@ import {
 	TFolder,
 	ViewStateResult,
 	WorkspaceLeaf,
+	parseLinktext,
 	setIcon,
 	setTooltip,
 } from "obsidian";
@@ -982,9 +983,11 @@ export class CustomDashboardView extends ItemView {
 	/** Rebuild triggers: config, edit state, data refresh and query edits. */
 	private cardSignature(config: DashboardComponentConfig): string {
 		const size = clampSize(config.w, config.h, this.boundsFor(config));
+		// Queryless cards never rebuild on data/query versions (keeps editor focus).
+		const queryless = this.registry.get(config.type)?.queryless === true;
 		return [
 			config.type,
-			config.queryId,
+			queryless ? "" : config.queryId,
 			config.basis ?? "",
 			config.view ?? "",
 			config.measure ?? "",
@@ -994,9 +997,21 @@ export class CustomDashboardView extends ItemView {
 			String(size.w),
 			String(size.h),
 			this.editMode ? "edit" : "view",
-			String(this.dataVersion),
-			String(this.queriesVersion),
+			queryless ? "" : String(this.dataVersion),
+			queryless ? "" : String(this.queriesVersion),
 		].join("|");
+	}
+
+	private titleOf(
+		config: DashboardComponentConfig,
+		definition: ComponentDefinition | undefined,
+	): string {
+		return (
+			config.title ??
+			(definition
+				? t(definition.labelKey as Parameters<typeof t>[0])
+				: config.type)
+		);
 	}
 
 	private createCard(
@@ -1033,18 +1048,22 @@ export class CustomDashboardView extends ItemView {
 			});
 		}
 
+		const hideTitle =
+			!this.editMode && config.options?.hideTitle === true;
 		const header = card.createDiv({ cls: "ioto-dashboard-card-header" });
+		header.toggleClass("is-title-overlay", hideTitle);
+		card.toggleClass("is-title-hidden", hideTitle);
 		if (this.editMode) {
 			this.renderDragHandle(header, grid, card, config);
 		}
-		header.createDiv({
-			cls: "ioto-dashboard-card-title",
-			text:
-				config.title ??
-				(definition
-					? t(definition.labelKey as Parameters<typeof t>[0])
-					: config.type),
-		});
+		if (hideTitle) {
+			card.setAttr("aria-label", this.titleOf(config, definition));
+		} else {
+			header.createDiv({
+				cls: "ioto-dashboard-card-title",
+				text: this.titleOf(config, definition),
+			});
+		}
 		if (this.editMode) {
 			this.renderRenameButton(header, config);
 			this.renderRemoveButton(header, config);
@@ -1109,6 +1128,9 @@ export class CustomDashboardView extends ItemView {
 			renderMarkdown: (el, path) => this.renderMarkdown(el, path),
 			renderInlineMarkdown: (el, markdown, sourcePath) =>
 				MarkdownRenderer.render(this.app, markdown, el, sourcePath, this),
+			renderMarkdownFragment: (el, markdown) =>
+				this.renderMarkdownFragment(el, markdown),
+			patchComponent: (patch) => void this.updateComponent(config.id, patch),
 		};
 		try {
 			definition.render(body, ctx);
@@ -1139,6 +1161,7 @@ export class CustomDashboardView extends ItemView {
 		dataset: import("../dashboard/dataset/types").Dataset | undefined,
 		config: DashboardComponentConfig,
 	): { status: ComponentStatus; messageKey?: string; message?: string } {
+		if (definition.queryless) return { status: "ready" };
 		if (!query) return { status: "error", messageKey: "DASHBOARD_ERROR_CONFIG" };
 		if (definition.toDatasetRequest) {
 			if (dataset) {
@@ -2431,22 +2454,25 @@ export class CustomDashboardView extends ItemView {
 			(definition) => {
 				void (async () => {
 					const queries = this.queryRepository();
-					const preferred = queries.get(definition.defaultQueryId);
-					const targets = queryTargetsFor(definition);
-					const target = targets[0] ?? "task";
-					const objectQuery = queries.defaultFor(target);
-					const queryId =
-						preferred?.id ??
-						objectQuery?.id ??
-						queries.defaultFor("task")?.id ??
-						"builtin:tasks-all";
-					if (
-						!preferred &&
-						!objectQuery &&
-						(target === "file" || target === "folder")
-					) {
-						new Notice(t("DASHBOARD_NEED_QUERY"));
-						return;
+					let queryId = "";
+					if (!definition.queryless) {
+						const preferred = queries.get(definition.defaultQueryId);
+						const targets = queryTargetsFor(definition);
+						const target = targets[0] ?? "task";
+						const objectQuery = queries.defaultFor(target);
+						queryId =
+							preferred?.id ??
+							objectQuery?.id ??
+							queries.defaultFor("task")?.id ??
+							"builtin:tasks-all";
+						if (
+							!preferred &&
+							!objectQuery &&
+							(target === "file" || target === "folder")
+						) {
+							new Notice(t("DASHBOARD_NEED_QUERY"));
+							return;
+						}
 					}
 					const config: DashboardComponentConfig = {
 						...definition.createConfig(queryId),
@@ -2700,6 +2726,59 @@ export class CustomDashboardView extends ItemView {
 		if (!(file instanceof TFile)) return;
 		const content = await this.app.vault.cachedRead(file);
 		await MarkdownRenderer.render(this.app, content, el, file.path, this);
+	}
+
+	/**
+	 * Renders free-form Markdown at vault root; the container keeps a single
+	 * delegated listener so links rendered asynchronously are still handled.
+	 */
+	private async renderMarkdownFragment(
+		el: HTMLElement,
+		markdown: string,
+	): Promise<void> {
+		el.addClass("markdown-rendered");
+		await MarkdownRenderer.render(this.app, markdown, el, "", this);
+		this.delegateMarkdownLinks(el);
+	}
+
+	private delegateMarkdownLinks(el: HTMLElement): void {
+		if (el.dataset.linksBound === "1") return;
+		el.dataset.linksBound = "1";
+		el.addEventListener("click", (event) => {
+			const anchor = (event.target as HTMLElement | null)?.closest("a");
+			if (!anchor) return;
+			if (anchor.classList.contains("external-link")) {
+				// Let Obsidian's global handler open external URLs.
+				event.stopPropagation();
+				return;
+			}
+			if (!anchor.classList.contains("internal-link")) return;
+			event.preventDefault();
+			event.stopPropagation();
+			const href = anchor.getAttribute("data-href") ?? "";
+			if (!href) return;
+			const { path } = parseLinktext(href);
+			const file = this.app.metadataCache.getFirstLinkpathDest(path, "");
+			const newTab = event.metaKey || event.ctrlKey;
+			if (file) void this.openVaultTarget(file.path, undefined, newTab);
+			else void this.app.workspace.openLinkText(href, "", newTab);
+		});
+		el.addEventListener("mouseover", (event) => {
+			const anchor = (event.target as HTMLElement | null)?.closest(
+				"a.internal-link",
+			);
+			if (!anchor) return;
+			const href = anchor.getAttribute("data-href") ?? "";
+			if (!href) return;
+			this.app.workspace.trigger("hover-link", {
+				event,
+				source: CUSTOM_DASHBOARD_VIEW_TYPE,
+				hoverParent: el,
+				targetEl: anchor,
+				linktext: href,
+				sourcePath: "",
+			});
+		});
 	}
 }
 

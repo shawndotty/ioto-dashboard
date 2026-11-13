@@ -231,3 +231,70 @@ export function arcRatio(value: number, total: number): number {
 	if (!Number.isFinite(total) || total <= 0) return 0;
 	return Math.min(1, Math.max(0, value / total));
 }
+
+const FULL_TURN = Math.PI * 2;
+const TAU_EPSILON = 1e-6;
+
+/** Angle a starts at 12 o'clock and grows clockwise (SVG y points down). */
+export function polarPoint(
+	cx: number,
+	cy: number,
+	r: number,
+	a: number,
+): Point {
+	return { x: cx + r * Math.sin(a), y: cy - r * Math.cos(a) };
+}
+
+/**
+ * Pie/donut slice path from a0 to a1 (radians, clockwise from 12 o'clock).
+ * An empty span yields ""; a near-full turn is split into two arcs so a single
+ * 100% slice never degenerates into a line.
+ */
+export function arcPath(
+	cx: number,
+	cy: number,
+	rOuter: number,
+	rInner: number,
+	a0: number,
+	a1: number,
+): string {
+	const span = a1 - a0;
+	if (!Number.isFinite(span) || span <= TAU_EPSILON) return "";
+	const round = (value: number): number => Math.round(value * 1000) / 1000;
+	const outer = Math.max(1, rOuter);
+	const inner = Math.max(0, Math.min(rInner, outer));
+
+	if (span >= FULL_TURN - TAU_EPSILON) {
+		const top = polarPoint(cx, cy, outer, 0);
+		const bottom = polarPoint(cx, cy, outer, Math.PI);
+		const outerCircle = `M ${round(top.x)} ${round(top.y)} A ${round(outer)} ${round(outer)} 0 1 1 ${round(bottom.x)} ${round(bottom.y)} A ${round(outer)} ${round(outer)} 0 1 1 ${round(top.x)} ${round(top.y)} Z`;
+		if (inner <= 0) return outerCircle;
+		const topInner = polarPoint(cx, cy, inner, 0);
+		const bottomInner = polarPoint(cx, cy, inner, Math.PI);
+		// Reverse sweep on the inner ring punches the hole under nonzero fill.
+		const innerCircle = `M ${round(topInner.x)} ${round(topInner.y)} A ${round(inner)} ${round(inner)} 0 1 0 ${round(bottomInner.x)} ${round(bottomInner.y)} A ${round(inner)} ${round(inner)} 0 1 0 ${round(topInner.x)} ${round(topInner.y)} Z`;
+		return `${outerCircle} ${innerCircle}`;
+	}
+
+	const largeArc = span > Math.PI ? 1 : 0;
+	const end = polarPoint(cx, cy, outer, a1);
+	if (inner <= 0) {
+		const start = polarPoint(cx, cy, outer, a0);
+		return [
+			`M ${round(cx)} ${round(cy)}`,
+			`L ${round(start.x)} ${round(start.y)}`,
+			`A ${round(outer)} ${round(outer)} 0 ${largeArc} 1 ${round(end.x)} ${round(end.y)}`,
+			"Z",
+		].join(" ");
+	}
+	const start = polarPoint(cx, cy, outer, a0);
+	const innerEnd = polarPoint(cx, cy, inner, a1);
+	const innerStart = polarPoint(cx, cy, inner, a0);
+	return [
+		`M ${round(start.x)} ${round(start.y)}`,
+		`A ${round(outer)} ${round(outer)} 0 ${largeArc} 1 ${round(end.x)} ${round(end.y)}`,
+		`L ${round(innerEnd.x)} ${round(innerEnd.y)}`,
+		`A ${round(inner)} ${round(inner)} 0 ${largeArc} 0 ${round(innerStart.x)} ${round(innerStart.y)}`,
+		"Z",
+	].join(" ");
+}
