@@ -943,6 +943,14 @@
     outline: none;
 }
 
+.ioto-custom-dashboard-view.is-editing .ioto-progress-row {
+    cursor: default;
+}
+
+.ioto-custom-dashboard-view.is-editing .ioto-progress-row:hover {
+    background: transparent;
+}
+
 .ioto-custom-dashboard-view .ioto-progress-head {
     display: flex;
     align-items: baseline;

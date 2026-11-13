@@ -635,6 +635,8 @@ export default {
 	DASHBOARD_UNSUPPORTED_QUERY:
 		"This component does not support the query target.",
 	DASHBOARD_NO_SNAPSHOT: "No snapshot yet",
+	DASHBOARD_CHART_NO_VALUES: "No values to plot",
+	SETTING_PIE_ZERO_HINT: "Categories with a value of 0 are not drawn.",
 	SETTING_RANGE_7: "7 days",
 	SETTING_RANGE_30: "30 days",
 	SETTING_RANGE_90: "90 days",

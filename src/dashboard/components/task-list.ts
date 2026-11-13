@@ -99,7 +99,7 @@ export const taskListComponent: ComponentDefinition = {
 	defaultQueryId: "builtin:tasks-all",
 	createConfig: (queryId) => ({
 		queryId,
-		basis: "section",
+		basis: "file",
 		view: "list",
 		limit: 20,
 		w: 6,
@@ -108,7 +108,7 @@ export const taskListComponent: ComponentDefinition = {
 	size: { maxH: 24 },
 	settings: [
 		{ key: "queryId", kind: "query", group: "data" },
-		{ key: "basis", kind: "basis", group: "data", fallback: "section" },
+		{ key: "basis", kind: "basis", group: "data", fallback: "file" },
 		{
 			key: "limit",
 			kind: "number",
@@ -125,7 +125,7 @@ export const taskListComponent: ComponentDefinition = {
 		object: "task",
 		measure: config.measure ?? "count",
 		queryId: config.queryId,
-		basis: config.basis ?? "section",
+		basis: config.basis ?? "file",
 	}),
 	isEmptyDataset: (dataset) => dataset.total === 0,
 	isEmpty: (result) => (result.items ?? []).length === 0,

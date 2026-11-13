@@ -38,6 +38,7 @@ function pieSettings(): ComponentSetting[] {
 			kind: "field",
 			group: "axesY",
 			labelKey: "SETTING_AXIS_Y_FIELD",
+			hintKey: "SETTING_PIE_ZERO_HINT",
 			role: "y",
 			fallback: "completed",
 			target: "options",
@@ -190,6 +191,7 @@ function createPieComponent({ type, donut }: PieFactoryOptions): ComponentDefini
 						ctx.openLink?.(target, undefined, object === "file");
 					},
 				},
+				{ hasRows: dataset.rows.length > 0 },
 			);
 		},
 	};

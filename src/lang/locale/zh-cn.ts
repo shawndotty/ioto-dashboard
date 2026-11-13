@@ -622,6 +622,8 @@ export default {
 	DASHBOARD_REFRESH_ALL: "刷新全部组件",
 	DASHBOARD_UNSUPPORTED_QUERY: "该组件不支持此查询目标。",
 	DASHBOARD_NO_SNAPSHOT: "暂无快照",
+	DASHBOARD_CHART_NO_VALUES: "当前查询没有可绘制的数值",
+	SETTING_PIE_ZERO_HINT: "值为 0 的分类不会绘制。",
 	SETTING_RANGE_7: "7 天",
 	SETTING_RANGE_30: "30 天",
 	SETTING_RANGE_90: "90 天",

@@ -17,6 +17,17 @@ function extrasHeight(spec: RenderableSpecBase): number {
 	return height;
 }
 
+export interface ChartHostState {
+	/** Rows exist, so a null spec means "nothing plottable", not "no snapshot". */
+	hasRows?: boolean;
+}
+
+export function chartEmptyKey(
+	hasRows: boolean,
+): "DASHBOARD_CHART_NO_VALUES" | "DASHBOARD_NO_SNAPSHOT" {
+	return hasRows ? "DASHBOARD_CHART_NO_VALUES" : "DASHBOARD_NO_SNAPSHOT";
+}
+
 /**
  * Cards are rendered before being appended to the grid, so the first frame has
  * no measurable size. Observe the host, redraw once real pixels exist, and skip
@@ -27,6 +38,7 @@ export function renderResponsiveChart(
 	build: (size: ChartSize) => RenderableSpecBase | null,
 	minHeight = 80,
 	interactions?: ChartInteractions,
+	state?: ChartHostState,
 ): void {
 	const root = el.createDiv({ cls: "ioto-chart-host" });
 	let frame = 0;
@@ -54,7 +66,7 @@ export function renderResponsiveChart(
 			root.empty();
 			root.createDiv({
 				cls: "ioto-empty-state",
-				text: t("DASHBOARD_NO_SNAPSHOT"),
+				text: t(chartEmptyKey(state?.hasRows ?? false)),
 			});
 			return;
 		}

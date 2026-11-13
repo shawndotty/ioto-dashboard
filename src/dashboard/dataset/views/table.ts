@@ -343,13 +343,17 @@ export function renderTable(
 			indexHead.setAttr("aria-hidden", "true");
 		}
 		for (const column of columns) {
+			const sortable = options.editMode !== true;
 			const th = headRow.createEl("th", {
 				text: t(column.labelKey as Parameters<typeof t>[0]),
 				cls: column.align === "right" ? "is-right" : undefined,
-				attr: { tabindex: "0", title: t("TABLE_SORT_HINT") },
+				attr: sortable
+					? { tabindex: "0", title: t("TABLE_SORT_HINT") }
+					: undefined,
 			});
-			th.addClass("is-sortable");
+			if (sortable) th.addClass("is-sortable");
 			const activate = (): void => {
+				if (options.editMode) return;
 				sortDir = sortKey === column.key && sortDir === 1 ? -1 : 1;
 				sortKey = column.key;
 				page = 1;
@@ -381,10 +385,12 @@ export function renderTable(
 				"aria-sort",
 				sortDir === 1 ? "ascending" : "descending",
 			);
-			th.setAttr(
-				"title",
-				t(sortDir === 1 ? "TABLE_SORT_ASC" : "TABLE_SORT_DESC"),
-			);
+			if (options.editMode !== true) {
+				th.setAttr(
+					"title",
+					t(sortDir === 1 ? "TABLE_SORT_ASC" : "TABLE_SORT_DESC"),
+				);
+			}
 		}
 	};
 

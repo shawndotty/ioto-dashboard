@@ -110,6 +110,32 @@ test('setting fallbacks match the values createConfig writes', () => {
 	}
 });
 
+test('every basis setting defaults to the file-wide scope', () => {
+	const declaring = COMPONENTS.filter((component) =>
+		component.settings.some((setting) => setting.kind === 'basis'),
+	);
+	assert.ok(declaring.length > 0, 'expected at least one component to expose a basis setting');
+	for (const component of declaring) {
+		const setting = component.settings.find((item) => item.kind === 'basis');
+		assert.equal(
+			setting.fallback,
+			'file',
+			`${component.type} basis fallback should match KPI/table/project-progress`,
+		);
+		assert.equal(
+			component.createConfig(component.defaultQueryId).basis,
+			'file',
+			`${component.type} createConfig should write basis: file`,
+		);
+	}
+});
+
+test('task list requests fall back to the file-wide scope when basis is absent', () => {
+	const config = taskListComponent.createConfig(taskListComponent.defaultQueryId);
+	delete config.basis;
+	assert.equal(taskListComponent.toDatasetRequest(config).basis, 'file');
+});
+
 test('number settings declare sane min/max/step bounds', () => {
 	for (const component of COMPONENTS) {
 		for (const setting of component.settings) {

@@ -209,6 +209,7 @@ export const scatterChartComponent: ComponentDefinition = {
 					ctx.openLink?.(target, undefined, object === "file");
 				},
 			},
+			{ hasRows: dataset.rows.length > 0 },
 		);
 	},
 };

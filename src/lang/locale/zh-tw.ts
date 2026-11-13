@@ -622,6 +622,8 @@ export default {
 	DASHBOARD_REFRESH_ALL: "重新整理全部元件",
 	DASHBOARD_UNSUPPORTED_QUERY: "此元件不支援此查詢目標。",
 	DASHBOARD_NO_SNAPSHOT: "暫無快照",
+	DASHBOARD_CHART_NO_VALUES: "目前查詢沒有可繪製的數值",
+	SETTING_PIE_ZERO_HINT: "值為 0 的分類不會繪製。",
 	SETTING_RANGE_7: "7 天",
 	SETTING_RANGE_30: "30 天",
 	SETTING_RANGE_90: "90 天",

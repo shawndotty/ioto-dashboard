@@ -237,16 +237,18 @@ export const projectProgressComponent: ComponentDefinition = {
 				? t(group.nameKey as Parameters<typeof t>[0])
 				: group.name;
 			state.rows.push({ el: row, name });
-			row.setAttr("role", "button");
-			row.setAttr("tabindex", "0");
-			row.setAttr("aria-label", t("PROJECT_PROGRESS_ROW_HINT", [name]));
-			row.onClickEvent(() => ctx.openProjectTasks(group, ratioBase));
-			row.addEventListener("keydown", (event) => {
-				if (event.key === "Enter" || event.key === " ") {
-					event.preventDefault();
-					ctx.openProjectTasks(group, ratioBase);
-				}
-			});
+			if (!ctx.editMode) {
+				row.setAttr("role", "button");
+				row.setAttr("tabindex", "0");
+				row.setAttr("aria-label", t("PROJECT_PROGRESS_ROW_HINT", [name]));
+				row.onClickEvent(() => ctx.openProjectTasks(group, ratioBase));
+				row.addEventListener("keydown", (event) => {
+					if (event.key === "Enter" || event.key === " ") {
+						event.preventDefault();
+						ctx.openProjectTasks(group, ratioBase);
+					}
+				});
+			}
 
 			const head = row.createDiv({ cls: "ioto-progress-head" });
 			head.createSpan({ cls: "ioto-progress-name", text: name });
