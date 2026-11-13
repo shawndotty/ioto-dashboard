@@ -27,7 +27,7 @@ export const buttonComponent: ComponentDefinition = {
 	labelKey: "COMPONENT_BUTTON_NAME",
 	descriptionKey: "COMPONENT_BUTTON_DESC",
 	icon: "mouse-pointer-click",
-	category: "action",
+	category: "utility",
 	queryless: true,
 	defaultQueryId: "",
 	createConfig: () => ({

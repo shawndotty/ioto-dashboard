@@ -18,6 +18,8 @@ export interface CollectionItem {
 	description?: string;
 	meta?: string;
 	primaryLabel?: string;
+	/** 有值时主操作渲染成图标按钮，primaryLabel 退化为可访问名。 */
+	primaryIcon?: string;
 	onPrimary?(): void;
 	/** 指针便利：点击行/卡片主体打开；语义入口仍由首枚图标承担。 */
 	onActivate?(): void;
@@ -78,12 +80,21 @@ function renderList(el: HTMLElement, items: CollectionItem[]): void {
 		}
 
 		if (item.primaryLabel && item.onPrimary) {
-			setting.addButton((button) =>
-				button
-					.setButtonText(item.primaryLabel ?? "")
-					.setCta()
-					.onClick(() => item.onPrimary?.()),
-			);
+			const label = item.primaryLabel;
+			const icon = item.primaryIcon;
+			if (icon) {
+				setting.addExtraButton((button) => {
+					button
+						.setIcon(icon)
+						.setTooltip(label)
+						.onClick(() => item.onPrimary?.());
+					button.extraSettingsEl.addClass("ioto-collection-primary--quiet");
+				});
+			} else {
+				setting.addButton((button) =>
+					button.setButtonText(label).setCta().onClick(() => item.onPrimary?.()),
+				);
+			}
 		}
 
 		for (const action of item.actions) {
@@ -142,11 +153,25 @@ function renderCards(el: HTMLElement, items: CollectionItem[]): void {
 		const actions = card.createDiv({ cls: "ioto-modal-card__actions" });
 
 		if (item.primaryLabel && item.onPrimary) {
-			const primary = actions.createEl("button", {
-				cls: "mod-cta",
-				text: item.primaryLabel,
-			});
-			primary.addEventListener("click", () => item.onPrimary?.());
+			const label = item.primaryLabel;
+			if (item.primaryIcon) {
+				const primary = actions.createEl("button", {
+					cls: "clickable-icon ioto-collection-primary--quiet",
+					attr: {
+						type: "button",
+						"aria-label": label,
+						title: label,
+					},
+				});
+				setIcon(primary, item.primaryIcon);
+				primary.addEventListener("click", () => item.onPrimary?.());
+			} else {
+				const primary = actions.createEl("button", {
+					cls: "mod-cta",
+					text: label,
+				});
+				primary.addEventListener("click", () => item.onPrimary?.());
+			}
 		}
 
 		for (const action of item.actions) {

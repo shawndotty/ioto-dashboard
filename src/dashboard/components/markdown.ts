@@ -10,7 +10,7 @@ export const markdownComponent: ComponentDefinition = {
 	labelKey: "COMPONENT_MARKDOWN_NAME",
 	descriptionKey: "COMPONENT_MARKDOWN_DESC",
 	icon: "file-text",
-	category: "overview",
+	category: "utility",
 	queryless: true,
 	defaultQueryId: "",
 	createConfig: () => ({

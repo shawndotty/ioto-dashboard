@@ -45,7 +45,7 @@ export type ComponentCategory =
 	| "overview"
 	| "analysis"
 	| "navigation"
-	| "action";
+	| "utility";
 
 /** Inspector state a setting may depend on; absent means "no query resolved". */
 export interface SettingContext {

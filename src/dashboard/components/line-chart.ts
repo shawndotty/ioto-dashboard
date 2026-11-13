@@ -65,6 +65,7 @@ export const lineChartComponent: ComponentDefinition = {
 	type: "line-chart",
 	labelKey: "COMPONENT_LINE_NAME",
 	descriptionKey: "COMPONENT_LINE_DESC",
+	icon: "line-chart",
 	category: "analysis",
 	objects: ["task", "note", "file"],
 	queryTargets: ["task", "note", "file"],

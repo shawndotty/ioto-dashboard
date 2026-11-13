@@ -6,7 +6,7 @@ export const containerComponent: ComponentDefinition = {
 	labelKey: "COMPONENT_CONTAINER_NAME",
 	descriptionKey: "COMPONENT_CONTAINER_DESC",
 	icon: "layout-panel-top",
-	category: "overview",
+	category: "utility",
 	queryless: true,
 	acceptsChildren: true,
 	defaultQueryId: "",

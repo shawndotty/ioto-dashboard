@@ -12,6 +12,7 @@ export const scatterChartComponent: ComponentDefinition = {
 	type: "scatter-chart",
 	labelKey: "COMPONENT_SCATTER_NAME",
 	descriptionKey: "COMPONENT_SCATTER_DESC",
+	icon: "scatter-chart",
 	category: "analysis",
 	objects: ["task", "note", "folder"],
 	queryTargets: ["task", "note", "folder"],

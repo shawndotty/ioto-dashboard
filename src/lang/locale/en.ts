@@ -499,7 +499,7 @@ export default {
 	COMPONENT_CATEGORY_OVERVIEW: "Overview",
 	COMPONENT_CATEGORY_ANALYSIS: "Analysis",
 	COMPONENT_CATEGORY_NAVIGATION: "Navigation",
-	COMPONENT_CATEGORY_ACTION: "Action",
+	COMPONENT_CATEGORY_UTILITY: "Utility",
 	COMPONENT_TABLE_NAME: "Table",
 	COMPONENT_TABLE_DESC: "List rows from any query, sortable by column.",
 	COMPONENT_LINE_NAME: "Line chart",

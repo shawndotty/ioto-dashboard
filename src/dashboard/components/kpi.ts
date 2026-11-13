@@ -7,6 +7,7 @@ export const kpiComponent: ComponentDefinition = {
 	type: "kpi",
 	labelKey: "COMPONENT_KPI_NAME",
 	descriptionKey: "COMPONENT_KPI_DESC",
+	icon: "gauge",
 	category: "overview",
 	objects: ["task", "note", "file", "folder"],
 	queryTargets: ["task", "note", "file", "folder"],

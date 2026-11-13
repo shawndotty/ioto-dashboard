@@ -66,6 +66,7 @@ export const projectProgressComponent: ComponentDefinition = {
 	type: "project-progress",
 	labelKey: "COMPONENT_PROJECT_PROGRESS_NAME",
 	descriptionKey: "COMPONENT_PROJECT_PROGRESS_DESC",
+	icon: "target",
 	category: "overview",
 	objects: ["task"],
 	queryTargets: ["task"],

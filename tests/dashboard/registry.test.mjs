@@ -13,6 +13,16 @@ const {
 	MAX_COMPONENT_H,
 } = await load('../../src/dashboard/registry.ts');
 
+const { markdownComponent } = await load(
+	'../../src/dashboard/components/markdown.ts',
+);
+const { containerComponent } = await load(
+	'../../src/dashboard/components/container.ts',
+);
+const { buttonComponent } = await load(
+	'../../src/dashboard/components/button.ts',
+);
+
 function definition(type) {
 	return {
 		type,
@@ -47,6 +57,16 @@ test('boundsForSizeOverride layers partial overrides on the defaults', () => {
 		...DEFAULT_SIZE_BOUNDS,
 		maxH: 8,
 	});
+});
+
+test('queryless components share the utility category', () => {
+	for (const component of [
+		markdownComponent,
+		containerComponent,
+		buttonComponent,
+	]) {
+		assert.equal(component.category, 'utility');
+	}
 });
 
 test('register / get / list keep insertion order', () => {

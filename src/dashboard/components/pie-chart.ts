@@ -106,6 +106,7 @@ function createPieComponent({ type, donut }: PieFactoryOptions): ComponentDefini
 		type,
 		labelKey: donut ? "COMPONENT_DONUT_NAME" : "COMPONENT_PIE_NAME",
 		descriptionKey: donut ? "COMPONENT_DONUT_DESC" : "COMPONENT_PIE_DESC",
+		icon: donut ? "circle-dot" : "pie-chart",
 		category: "analysis",
 		objects: ["task", "note", "file", "folder"],
 		queryTargets: ["task", "note", "file", "folder"],

@@ -89,6 +89,7 @@ export const taskListComponent: ComponentDefinition = {
 	type: "task-list",
 	labelKey: "COMPONENT_TASK_LIST_NAME",
 	descriptionKey: "COMPONENT_TASK_LIST_DESC",
+	icon: "list-todo",
 	category: "overview",
 	objects: ["task"],
 	queryTargets: ["task"],

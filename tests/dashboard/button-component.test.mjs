@@ -28,9 +28,9 @@ test('normalizeExternalUrl keeps http/https/mailto and rejects everything else',
 	assert.equal(normalizeExternalUrl('not a url'), null);
 });
 
-test('the button is a queryless action component with no data pipeline', () => {
+test('the button is a queryless utility component with no data pipeline', () => {
 	assert.equal(buttonComponent.type, 'button');
-	assert.equal(buttonComponent.category, 'action');
+	assert.equal(buttonComponent.category, 'utility');
 	assert.equal(buttonComponent.queryless, true);
 	assert.equal(buttonComponent.defaultQueryId, '');
 	assert.equal(buttonComponent.icon, 'mouse-pointer-click');

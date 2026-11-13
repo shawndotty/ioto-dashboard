@@ -2100,6 +2100,26 @@
     background-color: color-mix(in srgb, var(--text-error) 10%, transparent);
 }
 
+/* 主操作（添加组件）：常态与普通图标同权重，hover / focus 才提级 */
+.ioto-dashboard-modal .ioto-collection-primary--quiet {
+    color: var(--text-faint);
+    opacity: 0.8;
+    transition:
+        color 120ms ease,
+        opacity 120ms ease;
+}
+
+.ioto-dashboard-modal [data-id]:hover .ioto-collection-primary--quiet,
+.ioto-dashboard-modal .ioto-collection-primary--quiet:focus-visible {
+    color: var(--text-muted);
+    opacity: 1;
+}
+
+/* 行悬停规则含 [data-id]:hover，图标自身 hover 必须再叠一层才压得住 */
+.ioto-dashboard-modal [data-id]:hover .ioto-collection-primary--quiet:hover {
+    color: var(--text-normal);
+}
+
 @media (max-width: 640px) {
     .ioto-dashboard-modal .ioto-modal-filters {
         grid-template-columns: 1fr;

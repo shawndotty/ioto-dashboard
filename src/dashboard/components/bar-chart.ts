@@ -9,6 +9,7 @@ export const barChartComponent: ComponentDefinition = {
 	type: "bar-chart",
 	labelKey: "COMPONENT_BAR_NAME",
 	descriptionKey: "COMPONENT_BAR_DESC",
+	icon: "bar-chart",
 	category: "analysis",
 	objects: ["task", "note", "file", "folder"],
 	queryTargets: ["task", "note", "file", "folder"],

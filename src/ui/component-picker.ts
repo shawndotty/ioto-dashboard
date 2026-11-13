@@ -17,14 +17,14 @@ const CATEGORY_ORDER: ComponentCategory[] = [
 	"overview",
 	"analysis",
 	"navigation",
-	"action",
+	"utility",
 ];
 
 const CATEGORY_LABELS: Record<ComponentCategory, string> = {
 	overview: "COMPONENT_CATEGORY_OVERVIEW",
 	analysis: "COMPONENT_CATEGORY_ANALYSIS",
 	navigation: "COMPONENT_CATEGORY_NAVIGATION",
-	action: "COMPONENT_CATEGORY_ACTION",
+	utility: "COMPONENT_CATEGORY_UTILITY",
 };
 
 export class ComponentPickerModal extends Modal {
@@ -126,10 +126,11 @@ export class ComponentPickerModal extends Modal {
 			const container = body.createDiv({ cls: "ioto-picker-group" });
 			const items: CollectionItem[] = definitions.map((definition) => ({
 				id: definition.type,
-				icon: definition.icon ?? "layout-dashboard",
+				icon: definition.icon ?? "component",
 				title: this.labelOf(definition),
 				description: this.descriptionOf(definition),
-				primaryLabel: t("DASHBOARD_ADD_COMPONENT"),
+				primaryLabel: `${t("DASHBOARD_ADD_COMPONENT")} · ${this.labelOf(definition)}`,
+				primaryIcon: "plus",
 				onPrimary: () => {
 					this.onChoose(definition);
 					this.close();

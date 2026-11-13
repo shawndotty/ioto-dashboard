@@ -74,6 +74,7 @@ export const tableComponent: ComponentDefinition = {
 	type: "table",
 	labelKey: "COMPONENT_TABLE_NAME",
 	descriptionKey: "COMPONENT_TABLE_DESC",
+	icon: "table",
 	category: "analysis",
 	objects: ["task", "note", "file", "folder"],
 	queryTargets: ["task", "note", "file", "folder"],

@@ -89,6 +89,7 @@ export const noteListComponent: ComponentDefinition = {
 	type: "note-list",
 	labelKey: "COMPONENT_NOTE_LIST_NAME",
 	descriptionKey: "COMPONENT_NOTE_LIST_DESC",
+	icon: "sticky-note",
 	category: "overview",
 	objects: ["note"],
 	queryTargets: ["note"],
