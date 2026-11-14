@@ -1,6 +1,14 @@
-import { moment, setTooltip } from "obsidian";
+import { moment, setIcon, setTooltip } from "obsidian";
 import { t } from "../../lang/helpers";
 import type { QueryDefinition } from "../../query/types";
+import type { DashboardComponentConfig } from "../types";
+import {
+	EMPTY_HEATMAP_FILTER,
+	clampHeatmapFilter,
+	heatmapFilterActive,
+	matchesHeatmapCount,
+	type HeatmapFilter,
+} from "../dataset/heatmap-filter";
 import {
 	chooseHeatmapLayout,
 	fitHeatmap,
@@ -9,7 +17,9 @@ import {
 import { objectForQuery } from "../dataset/object";
 import {
 	buildHeatmapModel,
+	type HeatmapBand,
 	type HeatmapCell,
+	type HeatmapModel,
 } from "../dataset/heatmap-model";
 import type {
 	TimelineDateField,
@@ -19,6 +29,13 @@ import type {
 	ComponentDefinition,
 	SettingOption,
 } from "../registry";
+import { CARD_HEADER_HEIGHT } from "../container-layout";
+import {
+	mountHeatmapPanel,
+	mountHeatmapToolsToggle,
+	type HeatmapPanelHandle,
+	type HeatmapToolsToggleHandle,
+} from "../ui/heatmap-tools";
 
 export function heatmapRangeOf(value: unknown): TimelineRange {
 	const parsed = Number(value);
@@ -87,6 +104,63 @@ const WEEKDAY_LABEL_WIDTH = 28;
 const HOST_GAP = 6;
 const GRID_ROW_GAP = 2;
 const STRETCH_RATIO = 2;
+
+interface HeatmapRuntime {
+	model: HeatmapModel;
+	locate(key: string): void;
+	applyFilter(filter: HeatmapFilter): void;
+	clearFilter(): void;
+	setPanelOpen(open: boolean): void;
+}
+
+interface HeatmapCardState {
+	queryId: string;
+	range: number;
+	filter: HeatmapFilter;
+	panelOpen: boolean;
+	runtime: HeatmapRuntime | null;
+	toggle: HeatmapToolsToggleHandle | null;
+	panelHandle: HeatmapPanelHandle | null;
+}
+
+const states = new WeakMap<DashboardComponentConfig, HeatmapCardState>();
+
+/** Switching query or range drops filters and the open panel, like card search. */
+function stateOf(
+	config: DashboardComponentConfig,
+	queryId: string,
+	range: number,
+): HeatmapCardState {
+	let state = states.get(config);
+	if (!state || state.queryId !== queryId || state.range !== range) {
+		state = {
+			queryId,
+			range,
+			filter: { ...EMPTY_HEATMAP_FILTER },
+			panelOpen: false,
+			runtime: null,
+			toggle: null,
+			panelHandle: null,
+		};
+		states.set(config, state);
+	}
+	return state;
+}
+
+function bandLabel(band: HeatmapBand): string {
+	return band.min === band.max ? String(band.min) : `${band.min}–${band.max}`;
+}
+
+function filterRangeLabel(filter: HeatmapFilter): string {
+	if (filter.min !== null && filter.max !== null) {
+		return filter.min === filter.max
+			? String(filter.min)
+			: t("HEATMAP_FILTER_RANGE", [String(filter.min), String(filter.max)]);
+	}
+	if (filter.min !== null) return t("HEATMAP_FILTER_MIN", [String(filter.min)]);
+	if (filter.max !== null) return t("HEATMAP_FILTER_MAX", [String(filter.max)]);
+	return "";
+}
 
 function px(value: string): number {
 	const parsed = Number.parseFloat(value);
@@ -231,6 +305,21 @@ export const heatmapComponent: ComponentDefinition = {
 	},
 	isEmptyDataset: (dataset) => (dataset.sourceTotal ?? dataset.total) === 0,
 	isEmpty: () => false,
+	renderHeaderActions: (header, ctx) => {
+		if (ctx.status !== "ready") return;
+		const range = heatmapRangeOf(ctx.config.options?.range);
+		const state = stateOf(ctx.config, ctx.config.queryId, range);
+		const runtime = state.runtime;
+		if (!runtime || runtime.model.activeDays === 0) return;
+		state.toggle = mountHeatmapToolsToggle(header, {
+			open: state.panelOpen,
+			filterActive: heatmapFilterActive(state.filter),
+			onToggle: (open) => runtime.setPanelOpen(open),
+		});
+		if (state.panelHandle) {
+			state.toggle.setControls(state.panelHandle.panelId);
+		}
+	},
 	render: (el, ctx) => {
 		if (ctx.status === "empty") {
 			renderEmpty(el);
@@ -255,6 +344,11 @@ export const heatmapComponent: ComponentDefinition = {
 			range,
 			firstDayOfWeek,
 		});
+		const state = stateOf(ctx.config, ctx.config.queryId, range);
+		state.toggle = null;
+		state.panelHandle = null;
+		// A refresh may lower the peak; keep the restored range inside [0, peak].
+		state.filter = clampHeatmapFilter(state.filter, model.peak);
 
 		const host = el.createDiv({ cls: "ioto-heatmap" });
 		const scroll = host.createDiv({ cls: "ioto-heatmap-scroll" });
@@ -264,9 +358,49 @@ export const heatmapComponent: ComponentDefinition = {
 		let monthsEl: HTMLElement | null = null;
 		let weekdaysEl: HTMLElement | null = null;
 		let cellModel = new Map<string, HeatmapCell>();
+		let buttonByKey = new Map<string, HTMLElement>();
 		let monthsChrome = 0;
 		let weekdayLabelWidth = WEEKDAY_LABEL_WIDTH;
 		let lastScrollbar = 0;
+		let flashTimer = 0;
+		let schedule = (): void => {};
+
+		const applyDecorations = (): void => {
+			const active = heatmapFilterActive(state.filter);
+			const peakSet = new Set(model.peakKeys);
+			for (const [key, button] of buttonByKey) {
+				const cell = cellModel.get(key);
+				if (!cell) continue;
+				button.toggleClass("is-peak", peakSet.has(key));
+				button.toggleClass(
+					"is-muted",
+					active && !matchesHeatmapCount(cell.count, state.filter),
+				);
+			}
+			grid?.toggleClass("is-hiding-miss", active && state.filter.hideMiss);
+		};
+
+		const locateCell = (key: string): void => {
+			const button = buttonByKey.get(key);
+			if (!button) return;
+			const reduced = window.matchMedia(
+				"(prefers-reduced-motion: reduce)",
+			).matches;
+			button.scrollIntoView({
+				block: "nearest",
+				inline: "center",
+				behavior: reduced ? "auto" : "smooth",
+			});
+			// Restart the pulse when the same cell is located twice.
+			button.removeClass("is-flash");
+			void button.offsetWidth;
+			button.addClass("is-flash");
+			if (flashTimer) window.clearTimeout(flashTimer);
+			flashTimer = window.setTimeout(() => {
+				button.removeClass("is-flash");
+				flashTimer = 0;
+			}, 1200);
+		};
 
 		const buildGrid = (next: HeatmapLayout): void => {
 			scroll.empty();
@@ -277,6 +411,7 @@ export const heatmapComponent: ComponentDefinition = {
 			monthsEl = null;
 			weekdaysEl = null;
 			cellModel = new Map();
+			buttonByKey = new Map();
 
 			if (next === "calendar" && showMonths) {
 				const months = nextGrid.createDiv({ cls: "ioto-heatmap-months" });
@@ -332,41 +467,186 @@ export const heatmapComponent: ComponentDefinition = {
 				if (cell.isToday) button.addClass("is-today");
 				setTooltip(button, tooltip);
 				cellModel.set(cell.key, cell);
+				buttonByKey.set(cell.key, button);
 			}
+			applyDecorations();
 		};
 
 		buildGrid(layout);
 
 		let footer: HTMLElement | null = null;
+		let chip: HTMLElement | null = null;
+		let chipText: HTMLElement | null = null;
+		const legendButtons: Array<{ el: HTMLElement; min: number; max: number }> =
+			[];
+
+		const updateFooterFilterUI = (): void => {
+			const filter = state.filter;
+			const active = heatmapFilterActive(filter);
+			for (const entry of legendButtons) {
+				entry.el.toggleClass(
+					"is-active",
+					active && filter.min === entry.min && filter.max === entry.max,
+				);
+			}
+			if (!chip || !chipText) return;
+			if (!active) {
+				chip.hide();
+				return;
+			}
+			let hits = 0;
+			let total = 0;
+			for (const cell of model.cells) {
+				if (!cell.inRange) continue;
+				total += 1;
+				if (matchesHeatmapCount(cell.count, filter)) hits += 1;
+			}
+			chip.show();
+			chip.toggleClass("is-empty", hits === 0);
+			const rangeText =
+				hits === 0 ? t("HEATMAP_FILTER_EMPTY") : filterRangeLabel(filter);
+			chipText.setText(
+				`${rangeText} · ${t("HEATMAP_FILTER_HITS", [String(hits), String(total)])}`,
+			);
+		};
+
+		const applyFilterState = (next: HeatmapFilter): void => {
+			state.filter = clampHeatmapFilter(next, model.peak);
+			applyDecorations();
+			updateFooterFilterUI();
+			state.panelHandle?.refresh(state.filter);
+			state.toggle?.setFilterActive(heatmapFilterActive(state.filter));
+			// Footer height (chip, wrapped legend) feeds the cell size budget.
+			schedule();
+		};
+
+		const clearFilter = (hideMiss = state.filter.hideMiss): void => {
+			applyFilterState({
+				...EMPTY_HEATMAP_FILTER,
+				hideMiss,
+			});
+		};
+
 		if (showSummary || showLegend) {
 			footer = host.createDiv({ cls: "ioto-heatmap-footer" });
 			if (showSummary) {
-				footer.createDiv({
-					cls: "ioto-heatmap-summary",
-					text: t("HEATMAP_SUMMARY", [
-						String(model.activeDays),
-						String(model.peak),
-					]),
+				const info = footer.createDiv({ cls: "ioto-heatmap-footer-info" });
+				const summary = t("HEATMAP_SUMMARY", [
+					String(model.activeDays),
+					String(model.peak),
+				]);
+				const firstPeak = model.peakKeys[0];
+				info.createDiv({ cls: "ioto-heatmap-summary", text: summary });
+				if (firstPeak !== undefined) {
+					const link = info.createEl("button", {
+						cls: "ioto-heatmap-summary-link",
+						text: t("HEATMAP_SUMMARY_LOCATE"),
+						attr: { type: "button" },
+					});
+					const locateLabel = t("HEATMAP_TOOLS_LOCATE", [firstPeak]);
+					link.setAttribute("aria-label", locateLabel);
+					setTooltip(link, locateLabel);
+					link.addEventListener("click", () => {
+						if (ctx.editMode) return;
+						locateCell(firstPeak);
+					});
+				}
+
+				chip = info.createDiv({
+					cls: "ioto-heatmap-chip",
+					attr: { "aria-live": "polite" },
 				});
+				chipText = chip.createSpan({ cls: "ioto-heatmap-chip-text" });
+				const clear = chip.createEl("button", {
+					cls: "clickable-icon ioto-heatmap-chip-clear",
+					attr: {
+						type: "button",
+						"aria-label": t("HEATMAP_FILTER_CLEAR"),
+					},
+				});
+				setIcon(clear, "x");
+				setTooltip(clear, t("HEATMAP_FILTER_CLEAR"));
+				clear.addEventListener("click", () => {
+					if (ctx.editMode) return;
+					clearFilter();
+				});
+				chip.hide();
 			}
 			if (showLegend) {
 				const legend = footer.createDiv({ cls: "ioto-heatmap-legend" });
-				legend.createSpan({
-					cls: "ioto-heatmap-legend-label",
-					text: t("HEATMAP_LEGEND_LESS"),
-				});
-				for (let level = 0; level < 5; level += 1) {
-					legend.createDiv({
+				for (const band of model.bands) {
+					const label = bandLabel(band);
+					const block = legend.createEl("button", {
 						cls: "ioto-heatmap-legend-block",
-						attr: { "data-level": String(level) },
+						attr: {
+							type: "button",
+							"data-level": String(band.level),
+							"aria-label": label,
+						},
+					});
+					setTooltip(block, label);
+					block.addEventListener("click", () => {
+						if (ctx.editMode) return;
+						const sameLevel =
+							state.filter.min === band.min &&
+							state.filter.max === band.max;
+						if (sameLevel) {
+							clearFilter();
+							return;
+						}
+						applyFilterState({
+							min: band.min,
+							max: band.max,
+							hideMiss: state.filter.hideMiss,
+						});
+					});
+					legendButtons.push({
+						el: block,
+						min: band.min,
+						max: band.max,
+					});
+					legend.createSpan({
+						cls: "ioto-heatmap-legend-band",
+						text: label,
 					});
 				}
-				legend.createSpan({
-					cls: "ioto-heatmap-legend-label",
-					text: t("HEATMAP_LEGEND_MORE"),
-				});
 			}
 		}
+
+		const runtime: HeatmapRuntime = {
+			model,
+			locate: locateCell,
+			applyFilter: applyFilterState,
+			clearFilter,
+			setPanelOpen: (open) => {
+				const next = ctx.editMode ? false : open;
+				state.panelOpen = next;
+				state.panelHandle?.setOpen(next);
+				state.toggle?.setOpen(next);
+			},
+		};
+
+		const card = el.closest<HTMLElement>(".ioto-dashboard-card") ?? host;
+		const cardHeader = card.querySelector<HTMLElement>(
+			":scope > .ioto-dashboard-card-header",
+		);
+		const headerHeight = cardHeader?.getBoundingClientRect().height ?? 0;
+		state.panelHandle = mountHeatmapPanel(card, {
+			model,
+			state: state.filter,
+			open: state.panelOpen && !ctx.editMode,
+			topOffset:
+				(headerHeight > 0 ? headerHeight : CARD_HEADER_HEIGHT) + 4,
+			callbacks: {
+				locate: locateCell,
+				applyFilter: applyFilterState,
+				clearFilter,
+				setOpen: (open) => runtime.setPanelOpen(open),
+			},
+		});
+
+		state.runtime = runtime;
+		updateFooterFilterUI();
 
 		scroll.addEventListener("click", (event) => {
 			if (ctx.editMode) return;
@@ -411,7 +691,7 @@ export const heatmapComponent: ComponentDefinition = {
 		let frame = 0;
 		let wasConnected = false;
 
-		const schedule = (): void => {
+		schedule = (): void => {
 			if (frame) return;
 			frame = requestAnimationFrame(paint);
 		};
@@ -470,6 +750,7 @@ export const heatmapComponent: ComponentDefinition = {
 			grid.style.setProperty("--ioto-heatmap-cell-h", `${fit.cellH}px`);
 			grid.style.setProperty("--ioto-heatmap-columns", String(columns));
 			grid.classList.toggle("is-compact", fit.cellH < COMPACT_CELL);
+			host.classList.toggle("is-compact", fit.cellH < COMPACT_CELL);
 
 			// Only a growing scrollbar warrants a re-layout: shrinking back would
 			// otherwise oscillate between "cells grow → scrollbar appears → cells shrink".

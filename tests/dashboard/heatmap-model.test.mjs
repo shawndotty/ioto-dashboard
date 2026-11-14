@@ -122,15 +122,18 @@ test('level thresholds use the 25/50/75 percentiles of positive days', () => {
 	assert.equal(dayOf(model, '2026-11-12').level, 4);
 });
 
-test('a single positive day collapses thresholds to its value', () => {
+test('a single positive day is placed in the top level', () => {
 	const model = buildHeatmapModel([row('2026-11-10', 7)], {
 		range: 7,
 		now: NOW,
 	});
 	assert.deepEqual(model.thresholds, [7, 7, 7]);
-	assert.equal(dayOf(model, '2026-11-10').level, 1);
+	assert.equal(dayOf(model, '2026-11-10').level, 4);
 	assert.equal(model.activeDays, 1);
 	assert.equal(model.peak, 7);
+	assert.deepEqual(model.peakKeys, ['2026-11-10']);
+	assert.equal(model.minActive, 7);
+	assert.deepEqual(model.minActiveKeys, ['2026-11-10']);
 });
 
 test('an all-zero window keeps every cell at level 0', () => {
@@ -140,6 +143,88 @@ test('an all-zero window keeps every cell at level 0', () => {
 	);
 	assert.deepEqual(model.thresholds, [0, 0, 0]);
 	assert.ok(model.cells.every((cell) => cell.level === 0));
+	assert.deepEqual(model.bands, [{ level: 0, min: 0, max: 0 }]);
+	assert.deepEqual(model.peakKeys, []);
+	assert.equal(model.minActive, 0);
+	assert.deepEqual(model.minActiveKeys, []);
+	assert.equal(model.averageActive, 0);
+});
+
+test('p75 steps down so the top level stays reachable', () => {
+	const model = buildHeatmapModel(
+		[row('2026-11-08', 1), row('2026-11-09', 2), row('2026-11-10', 10)],
+		{ range: 7, now: NOW },
+	);
+	assert.equal(model.thresholds[2], 2);
+	assert.equal(dayOf(model, '2026-11-08').level, 1);
+	assert.equal(dayOf(model, '2026-11-09').level, 2);
+	assert.equal(dayOf(model, '2026-11-10').level, 4);
+	assert.deepEqual(
+		model.bands.map((band) => band.level),
+		[0, 1, 2, 4],
+	);
+});
+
+test('bands report the actual count range of every present level', () => {
+	const model = buildHeatmapModel(
+		[
+			row('2026-11-08', 1),
+			row('2026-11-09', 2),
+			row('2026-11-10', 3),
+			row('2026-11-11', 4),
+			row('2026-11-12', 5),
+		],
+		{ range: 7, now: NOW, firstDayOfWeek: 0 },
+	);
+	assert.deepEqual(model.thresholds, [2, 3, 4]);
+	assert.deepEqual(model.bands, [
+		{ level: 0, min: 0, max: 0 },
+		{ level: 1, min: 1, max: 2 },
+		{ level: 2, min: 3, max: 3 },
+		{ level: 3, min: 4, max: 4 },
+		{ level: 4, min: 5, max: 5 },
+	]);
+});
+
+test('tied peaks are all reported and the lowest active day ignores zeros', () => {
+	const model = buildHeatmapModel(
+		[
+			row('2026-11-08', 10),
+			row('2026-11-10', 4),
+			row('2026-11-12', 10),
+		],
+		{ range: 7, now: NOW },
+	);
+	assert.equal(model.peak, 10);
+	assert.deepEqual(model.peakKeys, ['2026-11-08', '2026-11-12']);
+	assert.equal(model.minActive, 4);
+	assert.deepEqual(model.minActiveKeys, ['2026-11-10']);
+});
+
+test('identical counts make level 4 unreachable but keep every peak key', () => {
+	const model = buildHeatmapModel(
+		[
+			row('2026-11-08', 5),
+			row('2026-11-09', 5),
+			row('2026-11-10', 5),
+		],
+		{ range: 7, now: NOW },
+	);
+	assert.deepEqual(model.thresholds, [5, 5, 5]);
+	assert.deepEqual(model.peakKeys, ['2026-11-08', '2026-11-09', '2026-11-10']);
+	assert.ok(
+		model.cells
+			.filter((cell) => cell.inRange && cell.count === 5)
+			.every((cell) => cell.level !== 4),
+	);
+});
+
+test('averageActive is the mean of positive days only', () => {
+	const model = buildHeatmapModel(
+		[row('2026-11-08', 1), row('2026-11-09', 2), row('2026-11-10', 10)],
+		{ range: 7, now: NOW },
+	);
+	assert.ok(Math.abs(model.averageActive - 13 / 3) < 1e-9);
 });
 
 test('exactly one cell is today', () => {

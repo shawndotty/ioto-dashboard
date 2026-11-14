@@ -3352,6 +3352,7 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
 .ioto-heatmap {
     --ioto-heatmap-cell-w: 12px;
     --ioto-heatmap-cell-h: 12px;
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -3491,6 +3492,7 @@ button.ioto-heatmap-cell:hover {
 
 .ioto-heatmap-footer {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
@@ -3498,18 +3500,430 @@ button.ioto-heatmap-cell:hover {
     color: var(--text-muted);
 }
 
+.ioto-heatmap-footer-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.ioto-heatmap-summary-link,
+.ioto-heatmap-tools-link,
+.ioto-heatmap-tools-clear {
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-accent);
+    font: inherit;
+    line-height: inherit;
+    text-align: start;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+.ioto-heatmap-summary-link:hover,
+.ioto-heatmap-tools-link:hover,
+.ioto-heatmap-tools-clear:hover {
+    color: var(--text-accent-hover);
+}
+
+.ioto-heatmap-summary-link {
+    display: inline;
+    padding: 0 2px;
+    margin-inline: -2px;
+    white-space: normal;
+}
+
+.ioto-heatmap-summary-link:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+.ioto-custom-dashboard-view.is-mobile .ioto-heatmap-summary-link {
+    padding-block: 4px;
+    margin-block: -4px;
+}
+
 .ioto-heatmap-legend {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: 4px;
     margin-left: auto;
 }
 
 .ioto-heatmap-legend-block {
+    flex: 0 0 auto;
     width: 10px;
     height: 10px;
+    padding: 0;
+    border: none;
     border-radius: 2px;
     background: var(--background-modifier-border-hover);
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.ioto-heatmap-legend-band {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+
+.ioto-heatmap.is-compact .ioto-heatmap-legend-band {
+    display: none;
+}
+
+.ioto-heatmap-legend-block.is-active {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 1px;
+}
+
+.ioto-heatmap-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-inline: 6px 2px;
+    border-radius: 999px;
+    background: var(--background-modifier-hover);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+.ioto-heatmap-chip.is-empty {
+    color: var(--text-warning);
+}
+
+.ioto-heatmap-chip-clear {
+    --icon-size: 12px;
+    padding: 0;
+}
+
+/* Peak / filter decorations sit inside the cell so today's outline survives. */
+.ioto-heatmap-cell.is-peak {
+    box-shadow: inset 0 0 0 2px var(--color-orange, var(--interactive-accent));
+}
+
+.ioto-heatmap.is-compact .ioto-heatmap-cell.is-peak {
+    box-shadow: inset 0 0 0 1.5px var(--color-orange, var(--interactive-accent));
+}
+
+.ioto-heatmap-cell.is-muted {
+    opacity: 0.15;
+    filter: saturate(0.4);
+}
+
+/* Visibility keeps the placeholder in flow, so week alignment never shifts. */
+.ioto-heatmap-grid.is-hiding-miss .ioto-heatmap-cell.is-muted {
+    visibility: hidden;
+}
+
+.ioto-heatmap-cell.is-flash {
+    animation: ioto-heatmap-flash 1.2s ease-out;
+}
+
+@keyframes ioto-heatmap-flash {
+    0%,
+    100% {
+        box-shadow: inset 0 0 0 2px transparent;
+    }
+    50% {
+        box-shadow: inset 0 0 0 2px var(--color-orange, var(--interactive-accent));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ioto-heatmap-cell.is-flash {
+        animation: none;
+        outline: 2px solid var(--color-orange, var(--interactive-accent));
+        outline-offset: 1px;
+    }
+}
+
+/* Analysis tools panel is anchored to the card so overflow never clips it. */
+.ioto-heatmap-tools-toggle {
+    position: relative;
+}
+
+.ioto-heatmap-tools-toggle.has-filter::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--interactive-accent);
+}
+
+.ioto-heatmap-tools-panel {
+    --ioto-heatmap-space-inline: 4px;
+    --ioto-heatmap-space-field: 8px;
+    --ioto-heatmap-space-section: 12px;
+    --ioto-heatmap-control-h: 28px;
+    position: absolute;
+    top: var(--ioto-heatmap-panel-top, 4px);
+    right: 8px;
+    z-index: 5;
+    display: none;
+    width: min(272px, calc(100% - 16px));
+    max-height: calc(100% - var(--ioto-heatmap-panel-top, 4px) - 8px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m, 8px);
+    background: var(--background-primary);
+    box-shadow: var(--shadow-l);
+    color: var(--text-normal);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+}
+
+.ioto-heatmap-tools-panel.is-open {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ioto-heatmap-space-section);
+}
+
+.ioto-heatmap-tools-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ioto-heatmap-space-inline);
+}
+
+.ioto-heatmap-tools-title {
+    font-weight: var(--font-semibold, 600);
+}
+
+.ioto-heatmap-tools-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+}
+
+.ioto-heatmap-tools-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ioto-heatmap-space-field);
+    padding-top: var(--ioto-heatmap-space-section);
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.ioto-heatmap-tools-titlebar + .ioto-heatmap-tools-section {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.ioto-heatmap-tools-section-title {
+    color: var(--text-muted);
+    font-weight: var(--font-semibold, 600);
+}
+
+.ioto-heatmap-tools-extreme-row {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+    min-height: 24px;
+}
+
+.ioto-heatmap-tools-extreme-label {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.ioto-heatmap-tools-link {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    flex: 1 1 auto;
+    align-items: center;
+    column-gap: var(--ioto-heatmap-space-inline);
+    min-width: 0;
+    padding: 4px 6px;
+    margin: -4px -6px;
+    border-radius: var(--radius-s, 6px);
+    text-decoration: none;
+}
+
+.ioto-heatmap-tools-link:hover {
+    background: var(--background-modifier-hover);
+}
+
+.ioto-heatmap-tools-link-text {
+    min-width: 0;
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-heatmap-tools-chevron {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    color: var(--text-faint);
+    --icon-size: 12px;
+}
+
+.ioto-heatmap-tools-menu {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ioto-heatmap-space-inline);
+    width: 100%;
+    height: var(--ioto-heatmap-control-h);
+    padding: 0 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s, 6px);
+    background: var(--background-modifier-form-field);
+    box-shadow: none;
+    color: var(--text-normal);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+
+.ioto-heatmap-tools-menu:hover {
+    background: var(--background-modifier-hover);
+}
+
+.ioto-heatmap-tools-menu-label {
+    min-width: 0;
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-heatmap-tools-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ioto-heatmap-space-field);
+}
+
+.ioto-heatmap-tools-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ioto-heatmap-space-inline);
+    min-width: 0;
+}
+
+.ioto-heatmap-tools-field-label {
+    color: var(--text-muted);
+}
+
+.ioto-heatmap-tools-input {
+    width: 100%;
+    height: var(--ioto-heatmap-control-h);
+    font-size: inherit;
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-heatmap-tools-segmented {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s, 6px);
+    background: var(--background-modifier-form-field);
+}
+
+.ioto-heatmap-tools-segment {
+    height: var(--ioto-heatmap-control-h);
+    min-width: 0;
+    padding: 0 8px;
+    border: 0;
+    border-inline-start: 1px solid var(--background-modifier-border);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-normal);
+    font: inherit;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.ioto-heatmap-tools-segment:first-child {
+    border-inline-start: 0;
+}
+
+.ioto-heatmap-tools-segment[aria-pressed="false"]:hover {
+    background: var(--background-modifier-hover);
+}
+
+.ioto-heatmap-tools-segment[aria-pressed="true"] {
+    border-color: transparent;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.ioto-heatmap-tools-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 24px;
+    color: var(--text-normal);
+}
+
+.ioto-heatmap-tools-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.ioto-heatmap-tools-clear {
+    align-self: start;
+}
+
+.ioto-heatmap-tools-link:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+.ioto-heatmap-tools-menu:focus-visible,
+.ioto-heatmap-tools-segment:focus-visible,
+.ioto-heatmap-tools-input:focus-visible,
+.ioto-heatmap-tools-clear:focus-visible,
+.ioto-heatmap-tools-close:focus-visible,
+.ioto-heatmap-tools-check input:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+.ioto-custom-dashboard-view.is-mobile .ioto-heatmap-tools-menu,
+.ioto-custom-dashboard-view.is-mobile .ioto-heatmap-tools-input,
+.ioto-custom-dashboard-view.is-mobile .ioto-heatmap-tools-segment {
+    height: 36px;
+    min-height: 36px;
+}
+
+.ioto-custom-dashboard-view.is-mobile .ioto-heatmap-tools-close {
+    width: 32px;
+    height: 32px;
+}
+
+.ioto-custom-dashboard-view.is-mobile .ioto-heatmap-tools-link,
+.ioto-custom-dashboard-view.is-mobile .ioto-heatmap-tools-clear {
+    padding-block: 6px;
+    margin-block: -6px;
 }
 
 /* Pie / donut slices */

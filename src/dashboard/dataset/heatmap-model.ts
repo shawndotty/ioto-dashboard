@@ -31,6 +31,14 @@ export interface HeatmapMonthMark {
 	key: string;
 }
 
+export interface HeatmapBand {
+	level: 0 | 1 | 2 | 3 | 4;
+	/** Smallest count actually present in this band. */
+	min: number;
+	/** Largest count actually present in this band; level 4's max is the peak. */
+	max: number;
+}
+
 export interface HeatmapModel {
 	columns: number;
 	cells: HeatmapCell[];
@@ -38,6 +46,16 @@ export interface HeatmapModel {
 	activeDays: number;
 	peak: number;
 	thresholds: [number, number, number];
+	/** Every in-range day whose count equals `peak`, in date order; empty when peak is 0. */
+	peakKeys: string[];
+	/** Smallest positive count; 0 when no day is active. */
+	minActive: number;
+	/** Every in-range day whose count equals `minActive`, in date order. */
+	minActiveKeys: string[];
+	/** Mean count across active days; 0 when no day is active. */
+	averageActive: number;
+	/** Bands actually present on the grid, ascending by level. */
+	bands: HeatmapBand[];
 }
 
 function pad(value: number): string {
@@ -148,15 +166,55 @@ export function buildHeatmapModel(
 		percentile(positive, 0.5),
 		percentile(positive, 0.75),
 	];
+	const soleActive = positive.length === 1;
+	const peakValue = positive[positive.length - 1] ?? 0;
+
+	// p75 can land on the peak, which makes level 4 unreachable. Step it down
+	// to the second-largest value so the top band still exists.
+	if (!soleActive && positive.length >= 2 && thresholds[2] >= peakValue) {
+		thresholds[2] = positive[positive.length - 2] ?? thresholds[2];
+	}
 
 	let activeDays = 0;
 	let peak = 0;
+	let sum = 0;
 	for (const cell of cells) {
 		if (!cell.inRange) continue;
-		cell.level = levelOf(cell.count, thresholds);
-		if (cell.count > 0) activeDays += 1;
+		cell.level = soleActive && cell.count > 0 ? 4 : levelOf(cell.count, thresholds);
+		if (cell.count > 0) {
+			activeDays += 1;
+			sum += cell.count;
+		}
 		if (cell.count > peak) peak = cell.count;
 	}
+
+	const bandBounds = new Map<0 | 1 | 2 | 3 | 4, HeatmapBand>();
+	const peakKeys: string[] = [];
+	const minActiveKeys: string[] = [];
+	for (const cell of cells) {
+		if (!cell.inRange) continue;
+		const band = bandBounds.get(cell.level);
+		if (!band) {
+			bandBounds.set(cell.level, {
+				level: cell.level,
+				min: cell.count,
+				max: cell.count,
+			});
+		} else {
+			band.min = Math.min(band.min, cell.count);
+			band.max = Math.max(band.max, cell.count);
+		}
+		if (peak > 0 && cell.count === peak) peakKeys.push(cell.key);
+	}
+
+	const minActive = positive[0] ?? 0;
+	if (minActive > 0) {
+		for (const cell of cells) {
+			if (cell.inRange && cell.count === minActive) minActiveKeys.push(cell.key);
+		}
+	}
+
+	const bands = [...bandBounds.values()].sort((a, b) => a.level - b.level);
 
 	return {
 		columns: column,
@@ -165,5 +223,10 @@ export function buildHeatmapModel(
 		activeDays,
 		peak,
 		thresholds,
+		peakKeys,
+		minActive,
+		minActiveKeys,
+		averageActive: positive.length > 0 ? sum / positive.length : 0,
+		bands,
 	};
 }
