@@ -1,18 +1,10 @@
-- IOTO仪表盘插件
-    - **全新自定义Dashboard功能上线**
-    - 无限Dashboard
-    - 无限Page
-    - 目前提供以下组件
-        - KPI（KPI）
-        - 项目进度（Project progress）
-        - 任务列表（Task list）
-        - 笔记列表（Note list）
-        - 表格（Table）
-        - 折线图（Line chart）
-        - 柱状图（Bar chart）
-        - 饼图（Pie chart）
-        - 圆环图（Donut chart）
-        - 散点图（Scatter chart）
-        - Markdown 卡片（Markdown card）
-        - 按钮（Button）
-        - 容器（Container）
+- **本次更新**
+    - 组件优化
+        - 任务查询新增「任务状态」选项：全部 / 已完成 / 未完成
+        - 查询管理器卡片与组件设置中显示当前查询的过滤条件摘要
+    - 查询优化
+        - 笔记 / 文件 / 文件夹查询支持指定 IOTO 四大根目录之外的任意文件夹
+        - 文件夹路径不存在时在查询编辑器中给出提示
+        - 每日指标快照仍按四大根目录统计，不受额外查询目录影响
+    - 修复
+        - 按「5-人物」等非 IOTO 文件夹查询笔记返回 0 的问题
