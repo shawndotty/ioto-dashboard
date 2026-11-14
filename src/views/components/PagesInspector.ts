@@ -9,6 +9,7 @@ type PageRow = PagesInspectorState["target"]["pages"][number];
 export interface PagesInspectorDeps {
 	switchTo(pageId: string): void;
 	create(): void;
+	importPage(): void;
 	createSubpage(pageId: string): void;
 	duplicate(pageId: string): void;
 	exportPage(pageId: string): void;
@@ -113,6 +114,19 @@ export class PagesInspector {
 		heading.createSpan({
 			cls: "ioto-inspector-crumb-plain",
 			text: state.target.dashboardName,
+		});
+		const importPage = header.createEl("button", {
+			cls: "ioto-pages-import clickable-icon",
+			attr: {
+				type: "button",
+				"aria-label": t("TRANSFER_IMPORT_PAGE"),
+			},
+		});
+		setIcon(importPage, "download");
+		setTooltip(importPage, t("TRANSFER_IMPORT_PAGE"));
+		importPage.disabled = !state.editable;
+		importPage.onClickEvent(() => {
+			if (this.state?.editable) this.deps.importPage();
 		});
 		const add = header.createEl("button", {
 			cls: "clickable-icon",

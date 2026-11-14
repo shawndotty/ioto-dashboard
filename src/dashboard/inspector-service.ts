@@ -123,6 +123,7 @@ export interface PagesInspectorController extends InspectorControllerBase {
 	getTarget(): DashboardPagesInspectorTarget | null;
 	switchPage(pageId: string): void;
 	createPage(): void;
+	importPage(): void;
 	/** Creates an empty page under `pageId` and switches to it. */
 	createSubpage(pageId: string): void;
 	duplicatePage(pageId: string): void;

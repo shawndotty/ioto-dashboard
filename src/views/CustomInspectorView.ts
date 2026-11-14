@@ -91,6 +91,7 @@ export class CustomInspectorView extends ItemView {
 			pages: {
 				switchTo: (id) => pages()?.switchPage(id),
 				create: () => pages()?.createPage(),
+				importPage: () => pages()?.importPage(),
 				createSubpage: (id) => pages()?.createSubpage(id),
 				pickParent: (id) => pages()?.pickParent(id),
 				setParent: (id, parentId) =>

@@ -680,7 +680,8 @@
     pointer-events: auto;
 }
 
-.ioto-custom-dashboard-view .ioto-dashboard-page-add {
+.ioto-custom-dashboard-view .ioto-dashboard-page-add,
+.ioto-custom-dashboard-view .ioto-dashboard-page-import {
     display: none;
     align-self: center;
     flex: 0 0 auto;
@@ -692,7 +693,8 @@
     color: var(--text-muted);
 }
 
-.ioto-custom-dashboard-view.is-editing .ioto-dashboard-page-add {
+.ioto-custom-dashboard-view.is-editing .ioto-dashboard-page-add,
+.ioto-custom-dashboard-view.is-editing .ioto-dashboard-page-import {
     display: inline-flex;
 }
 

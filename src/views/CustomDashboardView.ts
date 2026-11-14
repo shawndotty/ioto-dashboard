@@ -468,6 +468,15 @@ export class CustomDashboardView extends ItemView {
 			this.pagesScrollEl.addEventListener("keydown", (event) =>
 				this.handlePagesKeydown(event),
 			);
+			const importPage = this.pagesEl.createEl("button", {
+				cls: "ioto-dashboard-page-import clickable-icon",
+				attr: { type: "button", "aria-label": t("TRANSFER_IMPORT_PAGE") },
+			});
+			setIcon(importPage, "download");
+			setTooltip(importPage, t("TRANSFER_IMPORT_PAGE"));
+			importPage.onClickEvent(() =>
+				this.plugin.transfer.importPage(this.activeDashboard?.id),
+			);
 			const add = this.pagesEl.createEl("button", {
 				cls: "ioto-dashboard-page-add clickable-icon",
 				attr: { type: "button", "aria-label": t("PAGE_TABS_ADD") },
@@ -2694,6 +2703,12 @@ export class CustomDashboardView extends ItemView {
 							controller.createPage();
 						}
 					},
+					importPage: () => {
+						const controller = service.current()?.controller;
+						if (controller?.kind === "pages") {
+							controller.importPage();
+						}
+					},
 					createSubpage: (id) => {
 						const controller = service.current()?.controller;
 						if (controller?.kind === "pages") {
@@ -3017,6 +3032,7 @@ export class CustomDashboardView extends ItemView {
 					: null,
 			switchPage: (pageId) => this.switchPage(pageId),
 			createPage: () => void this.createPage(),
+			importPage: () => this.plugin.transfer.importPage(dashboardId),
 			createSubpage: (pageId) =>
 				void this.createPageWithParent(pageId),
 			setPageParent: (pageId, parentId) =>
