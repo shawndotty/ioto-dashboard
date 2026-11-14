@@ -168,6 +168,26 @@ test('builtins cover every target with stable ids', () => {
 	}
 });
 
+test('builtin unfinished query resolves only unchecked tasks', () => {
+	const tree = {
+		...snapshot,
+		tasks: [
+			task({ text: 'open' }),
+			task({ text: 'done', marker: 'done', isCompleted: true }),
+			task({ text: 'doing', marker: 'in-progress' }),
+			task({ text: 'forwarded', marker: 'forwarded' }),
+			task({ text: 'cancelled', marker: 'cancelled' }),
+		],
+	};
+	const unfinished = builtinQueries().find(
+		(item) => item.id === 'builtin:tasks-unfinished',
+	);
+	assert.deepEqual(
+		resolveQuery(tree, unfinished).tasks.map((item) => item.text),
+		['open'],
+	);
+});
+
 test('file target filters by folder scope, file name and extension', () => {
 	const tree = {
 		...snapshot,

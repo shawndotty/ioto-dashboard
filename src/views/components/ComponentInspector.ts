@@ -32,6 +32,7 @@ import {
 import type { QueryDefinition, QueryTarget } from "../../query/types";
 import {
 	queryDisplayName,
+	queryFilterSummary,
 	queryTargetLabel,
 } from "../../ui/query-labels";
 
@@ -976,6 +977,15 @@ export class ComponentInspector {
 					: t("INSPECTOR_QUERY_MISSING"),
 			);
 			this.queryHintEl = hint;
+		} else {
+			const current = state.queries.find((query) => query.id === select.value);
+			const summary = current ? queryFilterSummary(current) : "";
+			if (summary) {
+				field.createDiv({
+					cls: "ioto-inspector-hint ioto-inspector-query-summary",
+					text: summary,
+				});
+			}
 		}
 	}
 

@@ -8,6 +8,7 @@ import {
 } from "obsidian";
 import { t } from "../lang/helpers";
 import { createDefaultFilterState } from "../data/saved-query-adapter";
+import type { FilterState } from "../data/types";
 import {
 	DATE_PRESETS,
 	DATE_PRESET_LABEL_KEYS,
@@ -25,7 +26,11 @@ import {
 	querySourceOf,
 	type QuerySource,
 } from "../query/manager";
-import { queryDisplayName, queryTargetLabel } from "./query-labels";
+import {
+	queryDisplayName,
+	queryFilterSummary,
+	queryTargetLabel,
+} from "./query-labels";
 import { QUERY_TARGETS, type QueryDefinition, type QueryTarget } from "../query/types";
 import {
 	type CollectionAction,
@@ -81,10 +86,12 @@ const targetLabel = queryTargetLabel;
 
 function metaLabel(query: QueryDefinition, references: number): string {
 	const source = querySourceOf(query.id);
-	const citation = `${t("QUERY_MANAGER_REFERENCES")} ${references}`;
-	return source
-		? `${t(SOURCE_LABEL_KEYS[source])} · ${citation}`
-		: citation;
+	const parts = [
+		source ? t(SOURCE_LABEL_KEYS[source]) : "",
+		`${t("QUERY_MANAGER_REFERENCES")} ${references}`,
+		queryFilterSummary(query),
+	];
+	return parts.filter(Boolean).join(" · ");
 }
 
 export class QueryManagerModal extends Modal {
@@ -705,6 +712,26 @@ export class QueryEditModal extends Modal {
 			"subject",
 			this.draft.filters.subject,
 		);
+
+		if (this.draft.target === "task") {
+			new Setting(body)
+				.setName(t("FILTER_STATUS_LABEL"))
+				.addDropdown((dropdown) =>
+					dropdown
+						.addOption("all", t("FILTER_STATUS_ALL"))
+						.addOption("completed", t("FILTER_STATUS_COMPLETED"))
+						.addOption("incomplete", t("FILTER_STATUS_INCOMPLETE"))
+						.setValue(this.draft.filters.status)
+						.onChange((value) => {
+							this.draft.filters.status =
+								value as FilterState["status"];
+						}),
+				);
+			body.createDiv({
+				cls: "ioto-modal-note",
+				text: t("QUERY_FILTER_STATUS_HINT"),
+			});
+		}
 
 		new Setting(body)
 			.setName(t("QUERY_FILTER_DATE_PRESET"))

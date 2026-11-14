@@ -434,6 +434,12 @@ export default {
 	QUERY_FILTER_NAME: "Name contains",
 	QUERY_FILTER_PROJECT: "Project contains",
 	QUERY_FILTER_SUBJECT: "Subject contains",
+	QUERY_FILTER_STATUS_HINT:
+		"Incomplete includes only unchecked [ ] tasks; in-progress, forwarded and cancelled tasks appear under All.",
+	QUERY_SUMMARY_STATUS: "Status: {0}",
+	QUERY_SUMMARY_NAME: "Name: {0}",
+	QUERY_SUMMARY_PROJECT: "Project: {0}",
+	QUERY_SUMMARY_SUBJECT: "Subject: {0}",
 	QUERY_FILTER_DATE_PRESET: "Date preset",
 	QUERY_DATE_RANGE_HINT: "Leave blank for no limit.",
 	QUERY_DATE_RANGE_INVALID: "Start date must not be after the end date.",

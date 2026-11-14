@@ -428,6 +428,12 @@ export default {
 	QUERY_FILTER_NAME: "名称包含",
 	QUERY_FILTER_PROJECT: "项目包含",
 	QUERY_FILTER_SUBJECT: "主题包含",
+	QUERY_FILTER_STATUS_HINT:
+		"「未完成」仅包含未勾选的 [ ] 任务；进行中、转发、已取消任务请在「全部」中查看。",
+	QUERY_SUMMARY_STATUS: "状态：{0}",
+	QUERY_SUMMARY_NAME: "名称：{0}",
+	QUERY_SUMMARY_PROJECT: "项目：{0}",
+	QUERY_SUMMARY_SUBJECT: "主题：{0}",
 	QUERY_FILTER_DATE_PRESET: "日期范围",
 	QUERY_DATE_RANGE_HINT: "留空表示不限。",
 	QUERY_DATE_RANGE_INVALID: "开始日期不能晚于结束日期。",

@@ -95,6 +95,12 @@ test('status: completed means done only, incomplete means open only', () => {
 		),
 		['open'],
 	);
+	assert.deepEqual(
+		queryTasks(tasks, createDefaultFilterState({ status: 'all' }), ALL).map(
+			(item) => item.text,
+		),
+		['open', 'done', 'cancelled', 'doing', 'forwarded'],
+	);
 });
 
 test('taskType maps section roles and keeps untagged tasks', () => {
