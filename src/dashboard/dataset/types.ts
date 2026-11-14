@@ -34,6 +34,7 @@ export type ViewId =
 	| "pie"
 	| "donut"
 	| "scatter"
+	| "treemap"
 	| "markdown";
 
 export const DATA_OBJECTS: DataObject[] = [
@@ -65,6 +66,7 @@ export const VIEW_IDS: ViewId[] = [
 	"pie",
 	"donut",
 	"scatter",
+	"treemap",
 	"markdown",
 ];
 

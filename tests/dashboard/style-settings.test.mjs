@@ -37,6 +37,9 @@ const { pieChartComponent, donutChartComponent } = await load(
 const { scatterChartComponent } = await load(
 	'../../src/dashboard/components/scatter-chart.ts',
 );
+const { treemapChartComponent } = await load(
+	'../../src/dashboard/components/treemap-chart.ts',
+);
 const { markdownComponent } = await load(
 	'../../src/dashboard/components/markdown.ts',
 );
@@ -55,6 +58,7 @@ const COMPONENTS = [
 	pieChartComponent,
 	donutChartComponent,
 	scatterChartComponent,
+	treemapChartComponent,
 	markdownComponent,
 	buttonComponent,
 ];
@@ -204,6 +208,7 @@ test('settingsOf appends style settings and hides alignment where unsupported', 
 		'pie-chart',
 		'donut-chart',
 		'scatter-chart',
+		'treemap-chart',
 		'task-list',
 		'note-list',
 		'table',

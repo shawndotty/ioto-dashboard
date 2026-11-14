@@ -829,6 +829,7 @@ export class ComponentInspector {
 			query,
 			state.target.definition?.type,
 			setting,
+			state.target.config.options,
 		);
 	}
 
@@ -836,13 +837,14 @@ export class ComponentInspector {
 		query: QueryDefinition | undefined,
 		type: string | undefined,
 		setting: Extract<ComponentSetting, { kind: "field" }>,
+		options?: Record<string, unknown>,
 	): Array<{ value: string; labelKey: string }> {
-		// Bars, pies and donuts aggregate task/note queries per project; scatter
-		// charts read per-record rows. Line charts read time-series columns.
+		// Bars, pies, donuts and treemaps aggregate some queries per project;
+		// scatter charts read per-record rows. Line charts read time-series columns.
 		const object =
 			type === "line-chart"
 				? objectForQuery(query)
-				: objectForComponentType(type, query);
+				: objectForComponentType(type, query, options);
 		const columns =
 			type === "line-chart"
 				? timelineColumnsForObject(object)
@@ -1018,7 +1020,12 @@ export class ComponentInspector {
 			const options =
 				setting.kind === "select"
 					? resolveSettingOptions(setting, context)
-					: this.fieldOptionsFor(query, definition.type, setting);
+					: this.fieldOptionsFor(
+							query,
+							definition.type,
+							setting,
+							merged.options,
+						);
 			if (options.some((option) => option.value === stored)) continue;
 			const preferred =
 				setting.kind === "select" && setting.key === "measure"

@@ -90,7 +90,8 @@ export type ChartAriaKey =
 	| "CHART_ARIA_BAR"
 	| "CHART_ARIA_PIE"
 	| "CHART_ARIA_DONUT"
-	| "CHART_ARIA_SCATTER";
+	| "CHART_ARIA_SCATTER"
+	| "CHART_ARIA_TREEMAP";
 
 /** Everything a renderer needs regardless of the chart family. */
 export interface RenderableSpecBase {

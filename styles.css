@@ -3412,6 +3412,57 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     stroke-width: 1.5;
 }
 
+/* Treemap tiles */
+.ioto-chart-treemap-tile {
+    fill: var(--ioto-series-color, var(--interactive-accent));
+    fill-opacity: 0.78;
+    stroke: var(--background-primary);
+    stroke-width: 1;
+    cursor: pointer;
+    transition: fill-opacity 120ms ease;
+}
+
+.ioto-chart-treemap-tile:hover,
+.ioto-chart-treemap-tile.is-active {
+    fill-opacity: 0.95;
+}
+
+.ioto-chart-treemap-tile.ioto-chart-cat-other {
+    cursor: default;
+}
+
+.ioto-chart-treemap-parent {
+    fill: color-mix(in srgb, var(--ioto-series-color, var(--interactive-accent)) 16%, var(--background-primary));
+    stroke: var(--background-primary);
+    stroke-width: 1;
+    cursor: pointer;
+    transition: fill 120ms ease;
+}
+
+.ioto-chart-treemap-parent:hover,
+.ioto-chart-treemap-parent.is-active {
+    fill: color-mix(in srgb, var(--ioto-series-color, var(--interactive-accent)) 28%, var(--background-primary));
+}
+
+.ioto-chart-treemap-header {
+    fill: color-mix(in srgb, var(--ioto-series-color, var(--interactive-accent)) 40%, var(--background-primary));
+    pointer-events: none;
+}
+
+.ioto-chart-treemap-label {
+    fill: var(--text-normal);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-medium, 500);
+    pointer-events: none;
+}
+
+.ioto-chart-treemap-value {
+    fill: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
 .ioto-chart-path {
     fill: none;
     stroke: var(--ioto-series-color, var(--interactive-accent));

@@ -13,6 +13,8 @@ import type { PieChartSpec } from "./pie-spec";
 import { renderPieChart } from "./svg-pie";
 import type { ScatterChartSpec } from "./scatter-spec";
 import { renderScatterChart } from "./svg-scatter";
+import type { TreemapChartSpec } from "./treemap-spec";
+import { renderTreemapChart } from "./svg-treemap";
 
 export interface ChartInteractions {
 	onActivate?(target: {
@@ -506,6 +508,10 @@ export function renderChart(
 	}
 	if (spec.kind === "scatter") {
 		renderScatterChart(el, spec as ScatterChartSpec, interactions);
+		return;
+	}
+	if (spec.kind === "treemap") {
+		renderTreemapChart(el, spec as TreemapChartSpec, interactions);
 		return;
 	}
 	renderCartesianChart(el, spec as ChartSpec, interactions);

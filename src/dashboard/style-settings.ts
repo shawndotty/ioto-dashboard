@@ -96,6 +96,7 @@ export const STYLE_SETTINGS: ComponentSetting[] = [
 			config.type !== "pie-chart" &&
 			config.type !== "donut-chart" &&
 			config.type !== "scatter-chart" &&
+			config.type !== "treemap-chart" &&
 			config.type !== "task-list" &&
 			config.type !== "note-list" &&
 			config.type !== "table",

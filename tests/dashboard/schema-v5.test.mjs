@@ -75,8 +75,8 @@ test('unknown view/measure values and non-scalar options are dropped', () => {	c
 	assert.equal(component.unknownField, undefined);
 });
 
-test('pie, donut and scatter views survive normalization', () => {
-	for (const view of ['pie', 'donut', 'scatter']) {
+test('pie, donut, scatter and treemap views survive normalization', () => {
+	for (const view of ['pie', 'donut', 'scatter', 'treemap']) {
 		const imported = repository().importJson(store({ view }));
 		assert.equal(imported.dashboards[0].pages[0].components[0].view, view);
 	}
