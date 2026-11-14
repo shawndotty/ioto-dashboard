@@ -1981,6 +1981,16 @@
     color: var(--text-on-accent);
 }
 
+.ioto-query-scope-hint {
+    margin: 4px 0 8px;
+    font-size: var(--font-ui-small);
+    color: var(--text-warning);
+}
+
+.ioto-query-scope-hint:empty {
+    display: none;
+}
+
 .ioto-modal-date-range-wrap[hidden] {
     display: none;
 }

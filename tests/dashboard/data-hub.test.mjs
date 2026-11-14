@@ -9,12 +9,12 @@ const { createDefaultFilterState } = await load(
 	'../../src/data/saved-query-adapter.ts',
 );
 
-function query(target = 'note') {
+function query(target = 'note', folders = []) {
 	return {
 		id: 'q1',
 		name: 'Q',
 		target,
-		scope: { folders: [], includeSubfolders: true },
+		scope: { folders, includeSubfolders: true },
 		filters: createDefaultFilterState(),
 	};
 }
@@ -23,21 +23,24 @@ function emptySnapshot(marker = 'snapshot') {
 	return { notes: [], tasks: [], projects: [], marker };
 }
 
-function makeHub({ fail = null } = {}) {
+function makeHub({ fail = null, folders = [] } = {}) {
 	const state = {
 		fail,
 		snapshot: emptySnapshot(),
-		query: query('note'),
+		query: query('note', folders),
+		calls: [],
 	};
 	const hub = new DataHub({
 		index: {
-			getSnapshot: async () => {
+			getSnapshot: async (options = {}) => {
+				state.calls.push(options);
 				if (state.fail) throw new Error(state.fail);
 				return state.snapshot;
 			},
 		},
 		getQueries: () => ({
 			get: (id) => (id === state.query.id ? state.query : undefined),
+			list: () => [state.query],
 		}),
 		getIndexConfig: () => ({
 			inputFolder: '1-输入',
@@ -125,7 +128,7 @@ test('a stale refresh does not overwrite a newer result', async () => {
 				return Promise.resolve(emptySnapshot('fast'));
 			},
 		},
-		getQueries: () => ({ get: () => undefined }),
+		getQueries: () => ({ get: () => undefined, list: () => [] }),
 		getIndexConfig: () => ({
 			inputFolder: '',
 			outputFolder: '',
@@ -159,4 +162,24 @@ test('one failing adapter only fails its own key', async () => {
 	assert.equal(hub.getDataset(datasetKey(bad)), undefined);
 	assert.ok(hub.getDatasetError(datasetKey(bad)));
 	assert.equal(hub.getLastError(), null);
+});
+
+test('refresh passes the queries extra roots to the snapshot', async () => {
+	const { hub, state } = makeHub({ folders: ['5-人物'] });
+	await hub.refresh();
+
+	assert.deepEqual(state.calls[0], {
+		withTree: false,
+		extraRoots: ['5-人物'],
+	});
+	// The daily metrics read the base snapshot: no extra roots, same cache.
+	assert.deepEqual(state.calls[1], { withTree: false });
+	assert.equal(state.calls.length, 2);
+});
+
+test('refresh without extra roots takes a single base snapshot', async () => {
+	const { hub, state } = makeHub();
+	await hub.refresh();
+
+	assert.deepEqual(state.calls, [{ withTree: false, extraRoots: [] }]);
 });

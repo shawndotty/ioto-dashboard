@@ -421,7 +421,9 @@ export default {
 	QUERY_TARGET_FILE: "檔案",
 	QUERY_TARGET_FOLDER: "資料夾",
 	QUERY_FOLDERS: "資料夾",
-	QUERY_FOLDERS_DESC: "以逗號分隔的庫內路徑；留空表示目標的預設根目錄。",
+	QUERY_FOLDERS_DESC:
+		"以逗號分隔的庫內路徑；留空表示目標的預設根目錄；4 大根目錄之外的路徑會在查詢時按需索引。",
+	QUERY_SCOPE_MISSING_PATHS: "以下路徑不存在或不是資料夾：{0}",
 	QUERY_FOLDERS_PLACEHOLDER: "3-任務, 1-輸入",
 	QUERY_INCLUDE_SUBFOLDERS: "包含子資料夾",
 	QUERY_BROWSE_FOLDER: "新增資料夾",

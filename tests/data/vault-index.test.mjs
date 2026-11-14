@@ -290,3 +290,153 @@ test('a persistent read failure skips the file and retries next snapshot', async
 		['3-任务/bad.md', '3-任务/good.md'],
 	);
 });
+
+function makeExtraTree() {
+	const person = makeFile('5-人物/Johnny.md', '# 任务\n- [ ] 联系 Johnny\n');
+	const tree = {
+		input: makeFolder('1-输入'),
+		output: makeFolder('2-输出'),
+		task: makeFolder('3-任务'),
+		outcome: makeFolder('4-成果'),
+		people: makeFolder('5-人物', [person]),
+	};
+	return { person, tree, app: makeApp(tree) };
+}
+
+test('extraRoots indexes folders outside the four roots', async () => {
+	const { app } = makeExtraTree();
+	const index = new VaultIndex(app, () => makeConfig());
+
+	const base = await index.getSnapshot();
+	assert.deepEqual(base.notes, []);
+	assert.equal(base.extraPaths, undefined);
+
+	const scoped = await index.getSnapshot({ extraRoots: ['5-人物'] });
+	assert.deepEqual(
+		scoped.notes.map((note) => note.path),
+		['5-人物/Johnny.md'],
+	);
+	assert.deepEqual(
+		scoped.tasks.map((task) => task.text),
+		['联系 Johnny'],
+	);
+	assert.deepEqual(scoped.extraPaths, ['5-人物']);
+});
+
+test('extra records never leak into later snapshots without extraRoots', async () => {
+	const { app } = makeExtraTree();
+	const index = new VaultIndex(app, () => makeConfig());
+
+	await index.getSnapshot({ extraRoots: ['5-人物'] });
+	const plain = await index.getSnapshot();
+	assert.deepEqual(plain.notes, []);
+	assert.equal(plain.extraPaths, undefined);
+	assert.deepEqual(
+		(await index.getSnapshot({ extraRoots: [] })).notes,
+		[],
+	);
+});
+
+test('a base snapshot keeps the extra cache warm', async () => {
+	const { app } = makeExtraTree();
+	const index = new VaultIndex(app, () => makeConfig());
+
+	const scoped = await index.getSnapshot({ extraRoots: ['5-人物'] });
+	assert.equal(scoped.notes.length, 1);
+	assert.equal(app.reads, 1);
+
+	await index.getSnapshot({ withTree: false });
+	const again = await index.getSnapshot({ extraRoots: ['5-人物'] });
+	assert.equal(again.notes.length, 1);
+	assert.equal(app.reads, 1); // cached, not re-read
+});
+
+test('modify invalidation refreshes extra records', async () => {
+	const { person, app } = makeExtraTree();
+	const index = new VaultIndex(app, () => makeConfig());
+	await index.getSnapshot({ extraRoots: ['5-人物'] });
+
+	person.content = '# 任务\n- [ ] 更新后\n';
+	person.stat = { ...person.stat, mtime: 5, size: person.content.length };
+	index.invalidate(person.path);
+
+	const snapshot = await index.getSnapshot({ extraRoots: ['5-人物'] });
+	assert.deepEqual(
+		snapshot.tasks.map((task) => task.text),
+		['更新后'],
+	);
+});
+
+test('remove drops extra records', async () => {
+	const { person, tree, app } = makeExtraTree();
+	const index = new VaultIndex(app, () => makeConfig());
+	await index.getSnapshot({ extraRoots: ['5-人物'] });
+
+	tree.people.children = [];
+	app.nodes.delete(person.path);
+	index.remove(person.path);
+
+	const snapshot = await index.getSnapshot({ extraRoots: ['5-人物'] });
+	assert.deepEqual(snapshot.notes, []);
+});
+
+test('withTree merges extra files and folders', async () => {
+	const { app } = makeExtraTree();
+	const index = new VaultIndex(app, () => makeConfig());
+
+	const snapshot = await index.getSnapshot({
+		withTree: true,
+		extraRoots: ['5-人物'],
+	});
+	assert.deepEqual(
+		snapshot.files.map((file) => file.path),
+		['5-人物/Johnny.md'],
+	);
+	const people = snapshot.folders.find((folder) => folder.path === '5-人物');
+	assert.ok(people);
+	assert.equal(people.fileCount, 1);
+});
+
+test('multi-level extra roots do not add ancestor folder records', async () => {
+	const deep = makeFile('5-人物/sub/deep.md', '# 任务\n- [ ] deep\n');
+	const tree = {
+		input: makeFolder('1-输入'),
+		output: makeFolder('2-输出'),
+		task: makeFolder('3-任务'),
+		outcome: makeFolder('4-成果'),
+		people: makeFolder('5-人物', [makeFolder('5-人物/sub', [deep])]),
+	};
+	const index = new VaultIndex(makeApp(tree), () => makeConfig());
+
+	const snapshot = await index.getSnapshot({
+		withTree: true,
+		extraRoots: ['5-人物/sub'],
+	});
+	assert.deepEqual(
+		snapshot.folders
+			.map((folder) => folder.path)
+			.filter((path) => path.startsWith('5-人物')),
+		['5-人物/sub'],
+	);
+	assert.deepEqual(snapshot.extraPaths, ['5-人物/sub']);
+});
+
+test('extra roots inside the four roots are ignored', async () => {
+	const note = makeFile('3-任务/proj/n.md', '# 任务\n- [ ] n\n');
+	const tree = {
+		input: makeFolder('1-输入'),
+		output: makeFolder('2-输出'),
+		task: makeFolder('3-任务', [makeFolder('3-任务/proj', [note])]),
+		outcome: makeFolder('4-成果'),
+	};
+	const index = new VaultIndex(makeApp(tree), () => makeConfig());
+
+	const snapshot = await index.getSnapshot({
+		extraRoots: ['3-任务/proj'],
+	});
+	assert.deepEqual(
+		snapshot.notes.map((item) => item.path),
+		['3-任务/proj/n.md'],
+	);
+	assert.equal(snapshot.extraPaths, undefined);
+});

@@ -3,6 +3,7 @@ import {
 	matchesFileExtension,
 	normalizeExtensions,
 } from "../data/file-extensions";
+import { isInsideFolder } from "../data/note-source";
 import { queryNotes } from "../data/note-query";
 import { queryTasks } from "../data/task-query";
 import type { QueryDefinition, QueryResolution } from "./types";
@@ -30,7 +31,7 @@ export function resolveQuery(
 	}
 	if (query.target === "note") {
 		const notes = queryNotes(
-			snapshot.notes,
+			withoutExtraPaths(snapshot.notes, snapshot, paths),
 			query.filters,
 			options.customFilters ?? [],
 			{
@@ -80,6 +81,24 @@ function matchesName(name: string, filter: string): boolean {
 	return needle.length === 0 || name.toLowerCase().includes(needle);
 }
 
+/**
+ * Extra roots are merged into the snapshot only for queries that asked for
+ * them; a query without explicit folders must keep the four-root semantics.
+ */
+function withoutExtraPaths<T extends { path: string }>(
+	records: T[],
+	snapshot: IndexSnapshot,
+	explicitPaths: string[],
+): T[] {
+	if (explicitPaths.length > 0) return records;
+	const extras = snapshot.extraPaths ?? [];
+	if (extras.length === 0) return records;
+	return records.filter(
+		(record) =>
+			!extras.some((root) => isInsideFolder(record.path, root)),
+	);
+}
+
 /** `file` / `folder` targets read the optional tree records from the snapshot. */
 function resolveTreeQuery(
 	snapshot: IndexSnapshot,
@@ -89,7 +108,11 @@ function resolveTreeQuery(
 	const includeSubfolders = query.scope.includeSubfolders ?? true;
 	if (query.target === "file") {
 		const extensions = normalizeExtensions(query.scope.extensions);
-		const files = (snapshot.files ?? []).filter(
+		const files = withoutExtraPaths(
+			snapshot.files ?? [],
+			snapshot,
+			paths,
+		).filter(
 			(file) =>
 				inFolderScope(file.folder, paths, includeSubfolders) &&
 				matchesName(file.basename, query.filters.name) &&
@@ -97,7 +120,11 @@ function resolveTreeQuery(
 		);
 		return { notes: [], tasks: [], files };
 	}
-	const folders = (snapshot.folders ?? []).filter(
+	const folders = withoutExtraPaths(
+		snapshot.folders ?? [],
+		snapshot,
+		paths,
+	).filter(
 		(folder) =>
 			inFolderScope(folder.path, paths, includeSubfolders) &&
 			matchesName(folder.name, query.filters.name),

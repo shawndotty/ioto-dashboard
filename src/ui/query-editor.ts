@@ -5,9 +5,11 @@ import {
 	Notice,
 	Setting,
 	TextComponent,
+	TFolder,
 } from "obsidian";
 import { t } from "../lang/helpers";
 import { createDefaultFilterState } from "../data/saved-query-adapter";
+import { normalizeFolder } from "../data/note-source";
 import type { FilterState } from "../data/types";
 import {
 	DATE_PRESETS,
@@ -387,6 +389,7 @@ export class QueryEditModal extends Modal {
 	private dateEndInputEl: HTMLInputElement | null = null;
 	private rangeErrorEl: HTMLElement | null = null;
 	private foldersInput: TextComponent | null = null;
+	private foldersHintEl: HTMLElement | null = null;
 	private saving = false;
 
 	constructor(
@@ -515,6 +518,7 @@ export class QueryEditModal extends Modal {
 		const body = this.dynamicEl;
 		body.empty();
 		this.foldersInput = null;
+		this.foldersHintEl = null;
 		this.rangeEl = null;
 		this.dateStartInputEl = null;
 		this.dateEndInputEl = null;
@@ -537,6 +541,7 @@ export class QueryEditModal extends Modal {
 						.split(",")
 						.map((item) => item.trim())
 						.filter((item) => item.length > 0);
+					this.updateScopeHint();
 				});
 		});
 		foldersSetting.addButton((button) =>
@@ -551,10 +556,15 @@ export class QueryEditModal extends Modal {
 						this.foldersInput?.setValue(
 							this.draft.scope.folders.join(", "),
 						);
+						this.updateScopeHint();
 						this.foldersInput?.inputEl.focus();
 					}).open();
 				}),
 		);
+		this.foldersHintEl = body.createDiv({
+			cls: "ioto-query-scope-hint",
+		});
+		this.updateScopeHint();
 
 		new Setting(body)
 			.setName(t("QUERY_INCLUDE_SUBFOLDERS"))
@@ -576,6 +586,24 @@ export class QueryEditModal extends Modal {
 		}
 
 		this.renderFilters(body);
+	}
+
+	/** Warn about paths that cannot resolve to a folder, instead of saving a silently empty scope. */
+	private updateScopeHint(): void {
+		const el = this.foldersHintEl;
+		if (!el) return;
+		const missing: string[] = [];
+		for (const raw of this.draft.scope.folders) {
+			const path = normalizeFolder(raw);
+			if (path.length === 0) continue;
+			const node = this.app.vault.getAbstractFileByPath(path);
+			if (!(node instanceof TFolder)) missing.push(path);
+		}
+		el.setText(
+			missing.length > 0
+				? t("QUERY_SCOPE_MISSING_PATHS", [missing.join(", ")])
+				: "",
+		);
 	}
 
 	private renderFileFilters(body: HTMLElement): void {

@@ -18,6 +18,7 @@ import {
 	type MetricResult,
 } from "../metrics/types";
 import type { QueryRepository } from "../query/repository";
+import { collectExtraRoots } from "../query/extra-roots";
 import { adapterFor } from "./dataset/adapter-registry";
 import {
 	datasetKey,
@@ -229,15 +230,17 @@ export class DataHub {
 
 		try {
 			const config = this.options.getIndexConfig();
+			const queries = this.options.getQueries();
+			const extraRoots = collectExtraRoots(queries.list(), config);
 			const snapshot = await this.options.index.getSnapshot({
 				withTree: this.needsTree(),
+				extraRoots,
 			});
 			if (runId !== this.runId) return;
 			if (this.needsSeries()) {
 				this.points = await this.loadPoints();
 				if (runId !== this.runId) return;
 			}
-			const queries = this.options.getQueries();
 			const ctx = {
 				snapshot,
 				taskFolder: config.taskFolder,
@@ -253,7 +256,14 @@ export class DataHub {
 			this.datasets = this.evaluateDatasets(snapshot, queries);
 			this.snapshot = snapshot;
 			this.retryAttempt = 0;
-			void this.collect(snapshot, config).catch((error) => {
+			// Daily metrics keep the four-root scope: extra query roots must not
+			// shift the persisted totals.
+			const baseSnapshot =
+				extraRoots.length > 0
+					? await this.options.index.getSnapshot({ withTree: false })
+					: snapshot;
+			if (runId !== this.runId) return;
+			void this.collect(baseSnapshot, config).catch((error) => {
 				console.warn("IOTO Dashboard: snapshot collect failed", error);
 			});
 		} catch (error) {

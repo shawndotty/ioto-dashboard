@@ -169,6 +169,11 @@ export interface IndexSnapshot {
 	files?: FileRecord[];
 	/** Built on demand: recursive aggregates for every folder under the roots. */
 	folders?: FolderRecord[];
+	/**
+	 * Extra roots merged into this snapshot on demand. In memory only: it is
+	 * never persisted, so downstream consumers must treat it as optional.
+	 */
+	extraPaths?: string[];
 }
 
 export interface FileRecord {

@@ -421,7 +421,9 @@ export default {
 	QUERY_TARGET_FILE: "文件",
 	QUERY_TARGET_FOLDER: "文件夹",
 	QUERY_FOLDERS: "文件夹",
-	QUERY_FOLDERS_DESC: "用逗号分隔的库内路径；留空表示目标的默认根目录。",
+	QUERY_FOLDERS_DESC:
+		"用逗号分隔的库内路径；留空表示目标的默认根目录；4 大根目录之外的路径会在查询时按需索引。",
+	QUERY_SCOPE_MISSING_PATHS: "以下路径不存在或不是文件夹：{0}",
 	QUERY_FOLDERS_PLACEHOLDER: "3-任务, 1-输入",
 	QUERY_INCLUDE_SUBFOLDERS: "包含子文件夹",
 	QUERY_BROWSE_FOLDER: "添加文件夹",

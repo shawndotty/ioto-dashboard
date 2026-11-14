@@ -9,13 +9,13 @@ import {
 	buildNoteRecord,
 	folderProjectName,
 	isInsideFolder,
-	normalizeFolder,
 	resolveIoType,
 	toText,
 } from "./note-source";
 import { buildProjectRecord } from "./project-source";
 import { extractTasks } from "./task-source";
 import { fileRecords, folderRecords } from "./file-source";
+import { baseRoots, normalizeExtraRoots } from "../query/extra-roots";
 import type {
 	IndexConfig,
 	IndexSnapshot,
@@ -23,6 +23,16 @@ import type {
 	ProjectRecord,
 	TaskRecord,
 } from "./types";
+
+export interface SnapshotOptions {
+	withTree?: boolean;
+	/**
+	 * Folders to index on demand for this request. Passing the field (even as
+	 * an empty list) scopes the snapshot and drops unrequested extra records;
+	 * omitting it takes the base snapshot without touching the extra cache.
+	 */
+	extraRoots?: string[];
+}
 
 interface CachedFile {
 	signature: string;
@@ -60,6 +70,10 @@ function isFolder(node: TAbstractFile): node is TFolder {
 	return "children" in node;
 }
 
+function isWithinScope(path: string, roots: string[]): boolean {
+	return roots.some((root) => isInsideFolder(path, root));
+}
+
 /**
  * Single source of truth for notes / tasks / projects.
  *
@@ -68,6 +82,10 @@ function isFolder(node: TAbstractFile): node is TFolder {
  */
 export class VaultIndex {
 	private records = new Map<string, CachedFile>();
+	/** Notes under query-referenced folders outside the four framework roots. */
+	private extraRecords = new Map<string, CachedFile>();
+	/** Extra roots whose current contents are already in `extraRecords`. */
+	private extraRootsLoaded = new Set<string>();
 	private dirty = new Set<string>();
 	private building: Promise<void> | null = null;
 	private built = false;
@@ -124,15 +142,21 @@ export class VaultIndex {
 
 	invalidate(path: string): void {
 		const config = this.getConfig();
-		if (!this.isIndexedPath(path, config) && !this.records.has(path)) return;
+		const tracked =
+			this.isIndexedPath(path, config) ||
+			this.isInExtraRoot(path) ||
+			this.records.has(path) ||
+			this.extraRecords.has(path);
+		if (!tracked) return;
 		this.dirty.add(path);
 		this.notify();
 	}
 
 	remove(path: string): void {
-		const existed = this.records.delete(path);
+		const base = this.records.delete(path);
+		const extra = this.extraRecords.delete(path);
 		this.dirty.delete(path);
-		if (existed) this.notify();
+		if (base || extra) this.notify();
 	}
 
 	rebuild(): void {
@@ -140,14 +164,18 @@ export class VaultIndex {
 		// and drops files that are no longer under any configured root.
 		this.built = false;
 		this.dirty.clear();
+		this.extraRecords.clear();
+		this.extraRootsLoaded.clear();
 		this.notify();
 	}
 
 	async getSnapshot(
-		options: { withTree?: boolean } = {},
+		options: SnapshotOptions = {},
 	): Promise<IndexSnapshot> {
 		await this.ensureBuilt();
 		await this.flushDirty();
+		const config = this.getConfig();
+		const extras = normalizeExtraRoots(options.extraRoots ?? [], config);
 		const notes: NoteRecord[] = [];
 		const tasks: TaskRecord[] = [];
 		const projects: ProjectRecord[] = [];
@@ -156,10 +184,25 @@ export class VaultIndex {
 			tasks.push(...entry.tasks);
 			if (entry.project) projects.push(entry.project);
 		}
+		// Only an explicit `extraRoots` request reads or merges the extra cache;
+		// the base snapshot (daily metrics) must stay on the four roots.
+		if (options.extraRoots !== undefined) {
+			await this.loadExtraRoots(extras);
+			this.pruneExtraRecords(extras);
+			for (const entry of this.extraRecords.values()) {
+				// A configured root nested inside an extra root must not duplicate.
+				if (this.records.has(entry.note.path)) continue;
+				notes.push(entry.note);
+				tasks.push(...entry.tasks);
+				if (entry.project) projects.push(entry.project);
+			}
+		}
 		notes.sort((a, b) => a.path.localeCompare(b.path));
 		const snapshot: IndexSnapshot = { notes, tasks, projects };
+		if (extras.length > 0) snapshot.extraPaths = extras;
 		if (options.withTree) {
-			const tree = this.collectTree(this.getConfig());
+			const tree = this.collectTree(config, extras);
+			const scope = [...baseRoots(config), ...extras];
 			const files = fileRecords(
 				tree.files.map((file) => ({
 					path: file.path,
@@ -169,9 +212,11 @@ export class VaultIndex {
 					ctime: file.stat.ctime,
 					mtime: file.stat.mtime,
 				})),
-			);
+			).filter((file) => isWithinScope(file.path, scope));
 			snapshot.files = files;
-			snapshot.folders = folderRecords(files, tree.folders);
+			snapshot.folders = folderRecords(files, tree.folders).filter(
+				(folder) => isWithinScope(folder.path, scope),
+			);
 		}
 		return snapshot;
 	}
@@ -218,30 +263,90 @@ export class VaultIndex {
 		await this.building;
 	}
 
-	private collectTree(config: IndexConfig): {
+	private collectTree(
+		config: IndexConfig,
+		extraRoots: string[] = [],
+	): {
 		files: TFile[];
 		folders: string[];
 	} {
-		const roots = [
-			config.inputFolder,
-			config.outputFolder,
-			config.taskFolder,
-			config.outcomeFolder,
-		];
+		const roots = [...baseRoots(config), ...extraRoots];
 		const seenFiles = new Set<string>();
 		const seenFolders = new Set<string>();
 		const files: TFile[] = [];
 		const folders: string[] = [];
-		for (const rawRoot of roots) {
-			const root = normalizeFolder(rawRoot);
-			if (!root) continue;
+		for (const root of roots) {
 			const node = this.app.vault.getAbstractFileByPath(root);
 			if (!node || !isFolder(node)) continue;
-			seenFolders.add(root);
-			folders.push(root);
+			if (!seenFolders.has(root)) {
+				seenFolders.add(root);
+				folders.push(root);
+			}
 			this.walk(node, seenFiles, files, seenFolders, folders);
 		}
 		return { files, folders };
+	}
+
+	private collectExtraFiles(root: TFolder): TFile[] {
+		const files: TFile[] = [];
+		const walk = (folder: TFolder): void => {
+			for (const child of folder.children) {
+				if (isFolder(child)) walk(child);
+				else if (child instanceof TFile) files.push(child);
+			}
+		};
+		walk(root);
+		return files;
+	}
+
+	private isInExtraRoot(path: string): boolean {
+		for (const root of this.extraRootsLoaded) {
+			if (isInsideFolder(path, root)) return true;
+		}
+		return false;
+	}
+
+	private async loadExtraRoots(roots: string[]): Promise<void> {
+		if (roots.length === 0) return;
+		const config = this.getConfig();
+		for (const root of roots) {
+			if (this.extraRootsLoaded.has(root)) continue;
+			const node = this.app.vault.getAbstractFileByPath(root);
+			if (!node || !isFolder(node)) {
+				this.warnOnce(
+					`extra-root:${root}`,
+					new Error(`Extra query root is not a folder: ${root}`),
+				);
+				continue;
+			}
+			const files = this.collectExtraFiles(node).filter(
+				(file) => file.extension === "md",
+			);
+			await mapWithLimit(files, 32, async (file) => {
+				const signature = this.signatureOf(file);
+				const cached = this.extraRecords.get(file.path);
+				if (cached && cached.signature === signature) return;
+				try {
+					const entry = await this.loadFile(file, config, signature);
+					if (entry) this.extraRecords.set(file.path, entry);
+					else this.extraRecords.delete(file.path);
+				} catch (error) {
+					if (!cached) this.extraRecords.delete(file.path);
+					this.dirty.add(file.path);
+					this.warnOnce(`extra:${file.path}`, error);
+				}
+			});
+			this.extraRootsLoaded.add(root);
+		}
+	}
+
+	private pruneExtraRecords(roots: string[]): void {
+		for (const path of [...this.extraRecords.keys()]) {
+			if (!isWithinScope(path, roots)) this.extraRecords.delete(path);
+		}
+		for (const root of [...this.extraRootsLoaded]) {
+			if (!roots.includes(root)) this.extraRootsLoaded.delete(root);
+		}
 	}
 
 	private walk(
@@ -302,18 +407,22 @@ export class VaultIndex {
 		const config = this.getConfig();
 		await mapWithLimit(paths, 16, async (path) => {
 			const node = this.app.vault.getAbstractFileByPath(path);
-			if (!(node instanceof TFile) || !this.isIndexedPath(path, config)) {
+			const inBase = this.isIndexedPath(path, config);
+			const inExtra = this.isInExtraRoot(path);
+			if (!(node instanceof TFile) || (!inBase && !inExtra)) {
 				this.records.delete(path);
+				this.extraRecords.delete(path);
 				return;
 			}
 			const file = node;
+			const target = inBase ? this.records : this.extraRecords;
 			try {
 				const signature = this.signatureOf(file);
-				const cached = this.records.get(path);
+				const cached = target.get(path);
 				if (cached && cached.signature === signature) return;
 				const entry = await this.loadFile(file, config, signature);
-				if (entry) this.records.set(path, entry);
-				else this.records.delete(path);
+				if (entry) target.set(path, entry);
+				else target.delete(path);
 			} catch (error) {
 				// Keep the last good record and retry on the next snapshot.
 				this.dirty.add(path);

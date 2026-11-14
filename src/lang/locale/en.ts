@@ -427,7 +427,9 @@ export default {
 	QUERY_TARGET_FOLDER: "Folders",
 	QUERY_FOLDERS: "Folders",
 	QUERY_FOLDERS_DESC:
-		"Comma-separated vault paths. Empty = the target's default root.",
+		"Comma-separated vault paths; empty means the target's default root. Paths outside the four framework roots are indexed on demand.",
+	QUERY_SCOPE_MISSING_PATHS:
+		"These paths do not exist or are not folders: {0}",
 	QUERY_FOLDERS_PLACEHOLDER: "3-Tasks, 1-Inputs",
 	QUERY_INCLUDE_SUBFOLDERS: "Include subfolders",
 	QUERY_BROWSE_FOLDER: "Add folder",

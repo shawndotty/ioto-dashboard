@@ -279,3 +279,91 @@ test('folder target filters the folder records and ignores a missing tree', () =
 	const missing = resolveQuery(snapshot, definition({ target: 'folder' }));
 	assert.deepEqual(missing.folders, []);
 });
+
+const extraSnapshot = {
+	...snapshot,
+	extraPaths: ['5-人物'],
+	notes: [
+		...snapshot.notes,
+		note({ path: '5-人物/Johnny.md', basename: 'Johnny', folder: '5-人物', ioType: 'Unknown' }),
+	],
+	tasks: [
+		...snapshot.tasks,
+		task({ path: '5-人物/Johnny.md', text: 'person', ioType: 'Unknown' }),
+	],
+	files: [
+		{ path: '3-任务/Alpha/pic.png', basename: 'pic', extension: 'png', folder: '3-任务/Alpha', size: 1, ctime: 1, mtime: 1 },
+		{ path: '5-人物/avatar.png', basename: 'avatar', extension: 'png', folder: '5-人物', size: 2, ctime: 1, mtime: 1 },
+		{ path: '5-人物/Johnny.md', basename: 'Johnny', extension: 'md', folder: '5-人物', size: 2, ctime: 1, mtime: 1 },
+	],
+	folders: [
+		{ path: '3-任务/Alpha', name: 'Alpha', depth: 2, directFiles: 1, directFolders: 0, fileCount: 1, noteCount: 1, totalSize: 1, latestMtime: 1 },
+		{ path: '5-人物', name: '人物', depth: 1, directFiles: 1, directFolders: 0, fileCount: 1, noteCount: 1, totalSize: 2, latestMtime: 1 },
+	],
+};
+
+test('note queries return extra-root records only when folders are explicit', () => {
+	const scoped = resolveQuery(
+		extraSnapshot,
+		definition({ target: 'note', scope: { folders: ['5-人物'], includeSubfolders: true } }),
+	);
+	assert.deepEqual(scoped.notes.map((item) => item.basename), ['Johnny']);
+
+	const open = resolveQuery(
+		extraSnapshot,
+		definition({ target: 'note', scope: { folders: [], includeSubfolders: true } }),
+	);
+	assert.ok(!open.notes.some((item) => item.path.startsWith('5-人物/')));
+	assert.deepEqual(
+		open.notes.map((item) => item.path).sort(),
+		snapshot.notes.map((item) => item.path).sort(),
+	);
+});
+
+test('file queries return extra-root files only when folders are explicit', () => {
+	const scoped = resolveQuery(
+		extraSnapshot,
+		definition({
+			target: 'file',
+			scope: { folders: ['5-人物'], includeSubfolders: true },
+		}),
+	);
+	assert.deepEqual(scoped.files.map((file) => file.basename), ['avatar']);
+
+	const open = resolveQuery(
+		extraSnapshot,
+		definition({
+			target: 'file',
+			scope: { folders: [], includeSubfolders: true },
+		}),
+	);
+	assert.deepEqual(open.files.map((file) => file.basename), ['pic']);
+});
+
+test('folder queries return extra-root folders only when folders are explicit', () => {
+	const scoped = resolveQuery(
+		extraSnapshot,
+		definition({ target: 'folder', scope: { folders: ['5-人物'], includeSubfolders: true } }),
+	);
+	assert.deepEqual(scoped.folders.map((folder) => folder.name), ['人物']);
+
+	const open = resolveQuery(
+		extraSnapshot,
+		definition({ target: 'folder', scope: { folders: [], includeSubfolders: true } }),
+	);
+	assert.deepEqual(open.folders.map((folder) => folder.name), ['Alpha']);
+});
+
+test('task queries reach extra-root tasks only through explicit folders', () => {
+	const scoped = resolveQuery(
+		extraSnapshot,
+		definition({ target: 'task', scope: { folders: ['5-人物'], includeSubfolders: true } }),
+	);
+	assert.deepEqual(scoped.tasks.map((item) => item.text), ['person']);
+
+	const open = resolveQuery(
+		extraSnapshot,
+		definition({ target: 'task', scope: { folders: [], includeSubfolders: true } }),
+	);
+	assert.ok(!open.tasks.some((item) => item.path.startsWith('5-人物/')));
+});
