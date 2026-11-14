@@ -1,7 +1,7 @@
 {
 	"id": "ioto-dashboard",
 	"name": "IOTO Dashboard",
-	"version": "2.7.5",
+	"version": "2.7.6",
 	"minAppVersion": "1.7.2",
 	"description": "Dashboard for IOTO Framework",
 	"author": "Obsidian",
