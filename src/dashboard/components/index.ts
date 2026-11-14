@@ -5,6 +5,7 @@ import { taskListComponent } from "./task-list";
 import { noteListComponent } from "./note-list";
 import { tableComponent } from "./table";
 import { lineChartComponent } from "./line-chart";
+import { heatmapComponent } from "./heatmap";
 import { barChartComponent } from "./bar-chart";
 import { donutChartComponent, pieChartComponent } from "./pie-chart";
 import { scatterChartComponent } from "./scatter-chart";
@@ -22,6 +23,7 @@ export function createComponentRegistry(): ComponentRegistry {
 	registry.register(noteListComponent);
 	registry.register(tableComponent);
 	registry.register(lineChartComponent);
+	registry.register(heatmapComponent);
 	registry.register(barChartComponent);
 	registry.register(pieChartComponent);
 	registry.register(donutChartComponent);

@@ -5,6 +5,7 @@ import {
 	type DatasetRow,
 	type TimelineBucket,
 	type TimelineDateField,
+	type TimelineRange,
 } from "./types";
 import { cell } from "./adapters/shared";
 
@@ -44,7 +45,7 @@ export const MAX_BUCKET_ITEMS = 500;
 export interface TimelineSeriesOptions {
 	bucket: TimelineBucket;
 	dateField: TimelineDateField;
-	range: 7 | 30 | 90 | 180;
+	range: TimelineRange;
 	now?: () => number;
 }
 

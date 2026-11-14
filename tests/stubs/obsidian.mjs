@@ -57,6 +57,8 @@ export const Platform = {
 
 export const setIcon = () => {};
 
+export const setTooltip = () => {};
+
 export const debounce = (fn) => fn;
 
 export const normalizePath = (path) => path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');

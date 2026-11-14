@@ -17,6 +17,9 @@ const { lineChartComponent } = await load(
 const { barChartComponent } = await load(
 	'../../src/dashboard/components/bar-chart.ts',
 );
+const { heatmapComponent } = await load(
+	'../../src/dashboard/components/heatmap.ts',
+);
 const { pieChartComponent, donutChartComponent } = await load(
 	'../../src/dashboard/components/pie-chart.ts',
 );
@@ -45,6 +48,11 @@ test('registration components declare explicit query targets', () => {
 	assert.deepEqual(queryTargetsFor(taskListComponent), ['task']);
 	assert.deepEqual(queryTargetsFor(noteListComponent), ['note']);
 	assert.deepEqual(queryTargetsFor(lineChartComponent), [
+		'task',
+		'note',
+		'file',
+	]);
+	assert.deepEqual(queryTargetsFor(heatmapComponent), [
 		'task',
 		'note',
 		'file',

@@ -17,6 +17,8 @@ export type MeasureId =
 
 export type TimelineBucket = "day" | "week" | "month";
 
+export type TimelineRange = 7 | 14 | 30 | 90 | 180 | 365;
+
 export type TimelineDateField = "auto" | "filename" | "created" | "modified";
 
 export interface TimelineRequest {
@@ -136,8 +138,8 @@ export interface DatasetRequest {
 	basis?: "file" | "section";
 	groupBy?: "project" | "ioType" | "sectionRole";
 	limit?: number;
-	/** Line/bar ranges in days. */
-	range?: 7 | 30 | 90 | 180;
+	/** Timeline ranges in days. */
+	range?: TimelineRange;
 	/** Only read when `measure === "timeline"`. */
 	timeline?: TimelineRequest;
 }

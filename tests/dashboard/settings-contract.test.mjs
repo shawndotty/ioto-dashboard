@@ -17,6 +17,9 @@ const { tableComponent } = await load('../../src/dashboard/components/table.ts')
 const { lineChartComponent } = await load(
 	'../../src/dashboard/components/line-chart.ts',
 );
+const { heatmapComponent } = await load(
+	'../../src/dashboard/components/heatmap.ts',
+);
 const { barChartComponent } = await load(
 	'../../src/dashboard/components/bar-chart.ts',
 );
@@ -34,6 +37,7 @@ const COMPONENTS = [
 	noteListComponent,
 	tableComponent,
 	lineChartComponent,
+	heatmapComponent,
 	barChartComponent,
 	markdownComponent,
 	buttonComponent,

@@ -3348,6 +3348,170 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     --ioto-series-color: color-mix(in srgb, var(--text-faint) 55%, var(--background-primary));
 }
 
+/* Heatmap: calendar grid of daily activity */
+.ioto-heatmap {
+    --ioto-heatmap-cell-w: 12px;
+    --ioto-heatmap-cell-h: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+}
+
+.ioto-heatmap-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.ioto-heatmap-grid {
+    display: grid;
+    width: max-content;
+    margin-inline: auto;
+}
+
+.ioto-heatmap-grid[data-layout="calendar"] {
+    grid-template-columns: auto auto;
+    grid-template-rows: auto auto;
+    align-items: start;
+    column-gap: 6px;
+    row-gap: 2px;
+}
+
+.ioto-heatmap-months {
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: repeat(var(--ioto-heatmap-columns, 1), var(--ioto-heatmap-cell-w));
+    gap: 3px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.2;
+}
+
+.ioto-heatmap-month {
+    white-space: nowrap;
+}
+
+.ioto-heatmap-weekdays {
+    grid-column: 1;
+    grid-row: 2;
+    display: grid;
+    grid-template-rows: repeat(7, var(--ioto-heatmap-cell-h));
+    gap: 3px;
+    width: 22px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-heatmap-weekday {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 4px;
+    line-height: 1;
+}
+
+.ioto-heatmap-cells {
+    grid-column: 2;
+    grid-row: 2;
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, var(--ioto-heatmap-cell-h));
+    grid-auto-columns: var(--ioto-heatmap-cell-w);
+    gap: 3px;
+}
+
+.ioto-heatmap-grid[data-layout="strip"] .ioto-heatmap-cells {
+    grid-template-rows: var(--ioto-heatmap-cell-h);
+}
+
+.ioto-heatmap-grid.is-compact .ioto-heatmap-weekday {
+    visibility: hidden;
+}
+
+.ioto-heatmap-grid.is-compact .ioto-heatmap-weekday[data-row="0"],
+.ioto-heatmap-grid.is-compact .ioto-heatmap-weekday[data-row="2"],
+.ioto-heatmap-grid.is-compact .ioto-heatmap-weekday[data-row="4"] {
+    visibility: visible;
+}
+
+.ioto-heatmap-cell {
+    width: var(--ioto-heatmap-cell-w);
+    height: var(--ioto-heatmap-cell-h);
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: var(--background-modifier-border-hover);
+    box-shadow: none;
+    line-height: 0;
+    cursor: pointer;
+}
+
+button.ioto-heatmap-cell:hover {
+    border-color: var(--interactive-accent);
+}
+
+.ioto-heatmap-cell.is-outside {
+    background: transparent;
+    border-color: color-mix(in srgb, var(--background-modifier-border) 65%, transparent);
+    cursor: default;
+}
+
+/* A year view renders ~371 placeholders; a faint fill is quieter than outlines. */
+.ioto-heatmap-grid.is-compact .ioto-heatmap-cell.is-outside {
+    background: color-mix(in srgb, var(--text-faint) 7%, transparent);
+    border-color: transparent;
+}
+
+.ioto-heatmap-cell.is-today {
+    outline: 1.5px solid var(--interactive-accent);
+    outline-offset: 1px;
+}
+
+.ioto-heatmap-cell[data-level="1"],
+.ioto-heatmap-legend-block[data-level="1"] {
+    background: color-mix(in srgb, var(--interactive-accent) 20%, var(--background-secondary));
+}
+
+.ioto-heatmap-cell[data-level="2"],
+.ioto-heatmap-legend-block[data-level="2"] {
+    background: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-secondary));
+}
+
+.ioto-heatmap-cell[data-level="3"],
+.ioto-heatmap-legend-block[data-level="3"] {
+    background: color-mix(in srgb, var(--interactive-accent) 65%, var(--background-secondary));
+}
+
+.ioto-heatmap-cell[data-level="4"],
+.ioto-heatmap-legend-block[data-level="4"] {
+    background: color-mix(in srgb, var(--interactive-accent) 90%, var(--background-secondary));
+}
+
+.ioto-heatmap-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.ioto-heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.ioto-heatmap-legend-block {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--background-modifier-border-hover);
+}
+
 /* Pie / donut slices */
 .ioto-chart-slice {
     fill: var(--ioto-series-color, var(--interactive-accent));
