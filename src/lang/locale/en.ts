@@ -786,4 +786,90 @@ export default {
 	DASHBOARD_CONTAINER_REMOVE_CONFIRM: "Delete this container and its {0} component(s)?",
 	DASHBOARD_MOVED_INTO_CONTAINER: "Moved “{0}” into “{1}”",
 	DASHBOARD_MOVED_OUT_OF_CONTAINER: "Moved “{0}” out of the container",
+
+	// Import / export
+	TRANSFER_EXPORT: "Export…",
+	TRANSFER_IMPORT: "Import…",
+	TRANSFER_EXPORT_PAGE: "Export page…",
+	TRANSFER_IMPORT_PAGE: "Import page…",
+	TRANSFER_EXPORT_DASHBOARD: "Export this dashboard…",
+	TRANSFER_IMPORT_DASHBOARD: "Import dashboard…",
+	TRANSFER_EXPORT_BACKUP: "Export all dashboards…",
+	TRANSFER_RESTORE_BACKUP: "Restore from backup…",
+	TRANSFER_EXPORT_TITLE: "Export dashboard data",
+	TRANSFER_IMPORT_TITLE: "Import dashboard data",
+	TRANSFER_IMPORT_HINT:
+		"Paste a package below, or load the newest .json file from the folder.",
+	TRANSFER_IMPORT_PLACEHOLDER: "Paste the package JSON here",
+	TRANSFER_WARNINGS_TITLE: "Warnings",
+	TRANSFER_FOLDER_NAME: "Folder",
+	TRANSFER_FOLDER_DESC: "Used for saving or reading the .json file.",
+	TRANSFER_COPY: "Copy to clipboard",
+	TRANSFER_SAVE_FILE: "Save .json",
+	TRANSFER_COPIED: "Copied to clipboard",
+	TRANSFER_COPY_FAILED: "Could not copy; select the text manually",
+	TRANSFER_SAVED: "Saved to {0}",
+	TRANSFER_SAVE_FAILED: "Could not save the file",
+	TRANSFER_LOAD_FILE: "Load file",
+	TRANSFER_PREVIEW: "Preview",
+	TRANSFER_APPLY: "Import",
+	TRANSFER_NO_FILES: "No .json file found in that folder",
+	TRANSFER_READ_FAILED: "Could not read the file",
+	TRANSFER_PAGES: "Pages",
+	TRANSFER_DASHBOARDS: "Dashboards",
+	TRANSFER_QUERIES: "Queries",
+	TRANSFER_FILTERS: "New filters",
+	TRANSFER_NEW_PAGES: "{0} new page(s) will be added",
+	TRANSFER_RESTORE_TITLE: "Restore backup",
+	TRANSFER_RESTORE_CONFIRM:
+		"Restoring replaces every existing dashboard and query. Continue?",
+	TRANSFER_IMPORT_FAILED: "Import failed",
+	TRANSFER_IMPORTED: "Import complete",
+	TRANSFER_EXPORT_EMPTY: "Nothing to export.",
+	TRANSFER_ERROR_INVALID_JSON: "This is not valid JSON.",
+	TRANSFER_ERROR_UNKNOWN_KIND: "Unknown package type.",
+	TRANSFER_ERROR_UNSUPPORTED_VERSION:
+		"Package format {0} is not supported. Please update the plugin.",
+	TRANSFER_ERROR_INVALID_PAYLOAD: "The package content is invalid.",
+	TRANSFER_ERROR_NO_TARGET_DASHBOARD: "No target dashboard is available.",
+	TRANSFER_ERROR_NOT_BACKUP: "This is not a backup package.",
+	TRANSFER_ERROR_USE_RESTORE:
+		"This is a full backup; use “Restore from backup” instead.",
+	TRANSFER_ERROR_NO_STORE: "Dashboard data is not loaded yet.",
+	TRANSFER_IMPORT_SUFFIX: " (import)",
+	TRANSFER_SAVED_QUERY_SUFFIX: " (from saved query)",
+	TRANSFER_SUMMARY_PAGE:
+		"Exporting page “{0}”: {1} page(s), {2} query(ies).",
+	TRANSFER_SUMMARY_DASHBOARD:
+		"Exporting dashboard “{0}”: {1} page(s), {2} query(ies).",
+	TRANSFER_SUMMARY_QUERY: "Exporting query “{0}”.",
+	TRANSFER_SUMMARY_BACKUP: "Backup of {0} dashboard(s) and {1} query(ies).",
+	TRANSFER_WARN_BUILTIN_MISSING:
+		"Built-in query {0} is not available; its component will fall back to the default query.",
+	TRANSFER_WARN_MISSING_SAVED: "Saved query {0} could not be found.",
+	TRANSFER_WARN_MISSING_QUERY:
+		"Query {0} is missing; the component will fall back to the default query.",
+	TRANSFER_WARN_MISSING_FILTER:
+		"Custom filter “{0}” has no definition and was skipped.",
+	TRANSFER_WARN_PARENT_OUTSIDE:
+		"Parent page of “{0}” is not in the bundle; it will be imported as a top-level page.",
+	TRANSFER_WARN_DROPPED_PAGE: "Page #{0} is invalid and was skipped.",
+	TRANSFER_WARN_SAVED_SKIPPED:
+		"Saved query “{0}” cannot be imported directly and was skipped.",
+	TRANSFER_WARN_UNKNOWN_COMPONENT:
+		"Unknown component type “{0}”; it will render a placeholder.",
+	TRANSFER_WARN_TARGET:
+		"Component “{0}” cannot use a {1} query; it now uses its default query.",
+	TRANSFER_WARN_BUTTON_PAGE:
+		"Button “{0}” links to a page outside the bundle.",
+	TRANSFER_WARN_PATH_REWRITTEN: "Folder {0} → {1}",
+	TRANSFER_WARN_PATH_UNMATCHED:
+		"Folder {0} is outside the source roots and was kept as is.",
+	COMMAND_EXPORT_CANVAS_PAGE: "Export current page…",
+	COMMAND_IMPORT_CANVAS_PAGE: "Import page…",
+	COMMAND_EXPORT_CANVAS_BACKUP: "Export dashboard backup…",
+	COMMAND_RESTORE_CANVAS_BACKUP: "Restore dashboard backup…",
+	SETTINGS_BACKUP_NAME: "Dashboard backup",
+	SETTINGS_BACKUP_DESC:
+		"Export every dashboard and query, or restore a previous backup.",
 };

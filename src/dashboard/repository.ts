@@ -1,17 +1,22 @@
-import { MEASURE_IDS, VIEW_IDS } from "./dataset/types";
 import { moveItem } from "./layout";
 import {
 	descendantsOf,
 	normalizePageTree,
 } from "./page-tree";
 import {
-	MAX_CONTAINER_DEPTH,
 	cloneWithFreshIds,
 	collectComponentIds,
 	containsComponent,
 	findComponentLocation,
 	walkComponents,
 } from "./hierarchy";
+import {
+	isQuery,
+	isRecord,
+	slugOf,
+	toPage,
+	uniqueId,
+} from "./schema";
 import { MAX_COMPONENT_H, MIN_COMPONENT_W } from "./registry";
 import { containerColumnsOf } from "./style-settings";
 import type {
@@ -28,6 +33,8 @@ import {
 	activePageOf,
 	createDefaultStore,
 } from "./types";
+import type { ImportPlan } from "./bundle";
+import type { CustomFilter } from "../settings";
 
 export interface DashboardDataHost {
 	readData(): Promise<unknown>;
@@ -39,6 +46,16 @@ export interface DashboardLoadResult {
 	store: DashboardStoreData;
 	/** JSON existed but was malformed: the raw data is kept, never overwritten. */
 	damaged: boolean;
+}
+
+export class ImportApplyError extends Error {
+	constructor(
+		readonly code: string,
+		message: string,
+	) {
+		super(message);
+		this.name = "ImportApplyError";
+	}
 }
 
 export interface DashboardRepositoryOptions {
@@ -56,153 +73,6 @@ function insertAt<T>(list: T[], item: T, index?: number): void {
 			? list.length
 			: Math.min(list.length, Math.max(0, Math.trunc(index)));
 	list.splice(at, 0, item);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isComponent(value: unknown): value is DashboardComponentConfig {
-	return (
-		isRecord(value) &&
-		typeof value.id === "string" &&
-		typeof value.type === "string" &&
-		typeof value.queryId === "string"
-	);
-}
-
-function isPage(value: unknown): value is DashboardPage {
-	return (
-		isRecord(value) &&
-		typeof value.id === "string" &&
-		Array.isArray(value.components)
-	);
-}
-
-function isQuery(value: unknown): boolean {
-	return (
-		isRecord(value) &&
-		typeof value.id === "string" &&
-		typeof value.name === "string" &&
-		(value.target === "note" ||
-			value.target === "task" ||
-			value.target === "file" ||
-			value.target === "folder") &&
-		isRecord(value.scope) &&
-		isRecord(value.filters)
-	);
-}
-
-const VIEW_SET = new Set<string>(VIEW_IDS);
-const MEASURE_SET = new Set<string>(MEASURE_IDS);
-
-function toOptions(
-	value: unknown,
-): Record<string, string | number | boolean> | undefined {
-	if (!isRecord(value)) return undefined;
-	const options: Record<string, string | number | boolean> = {};
-	for (const [key, raw] of Object.entries(value)) {
-		if (
-			typeof raw === "string" ||
-			typeof raw === "boolean" ||
-			(typeof raw === "number" && Number.isFinite(raw))
-		) {
-			options[key] = raw;
-		}
-	}
-	return Object.keys(options).length > 0 ? options : undefined;
-}
-
-const LEGACY_COMPONENT_TYPES: Record<string, string> = {
-	"unfinished-tasks": "task-list",
-};
-
-/** Whitelists stored fields so unknown/dirty keys never survive a load. */
-function toComponent(
-	value: unknown,
-	depth = 0,
-): DashboardComponentConfig | null {
-	if (!isComponent(value)) return null;
-	const legacyType = LEGACY_COMPONENT_TYPES[value.type];
-	const component: DashboardComponentConfig = {
-		id: value.id,
-		type: legacyType ?? value.type,
-		queryId: value.queryId,
-	};
-	if (value.basis === "file" || value.basis === "section") {
-		component.basis = value.basis;
-	}
-	if (typeof value.limit === "number" && Number.isFinite(value.limit)) {
-		component.limit = value.limit;
-	}
-	if (typeof value.title === "string") component.title = value.title;
-	if (typeof value.view === "string" && VIEW_SET.has(value.view)) {
-		component.view = value.view as DashboardComponentConfig["view"];
-	}
-	if (
-		!legacyType &&
-		typeof value.measure === "string" &&
-		MEASURE_SET.has(value.measure)
-	) {
-		component.measure = value.measure as DashboardComponentConfig["measure"];
-	}
-	const options = toOptions(value.options);
-	if (options) component.options = options;
-	for (const axis of ["x", "y", "w", "h"] as const) {
-		const raw = value[axis];
-		if (typeof raw === "number" && Number.isFinite(raw)) {
-			component[axis] = raw;
-		}
-	}
-	// Only the page level keeps children; deeper nesting is dropped on load.
-	if (Array.isArray(value.children) && depth < MAX_CONTAINER_DEPTH) {
-		const children = value.children
-			.map((child) => toComponent(child, depth + 1))
-			.filter((item): item is DashboardComponentConfig => item !== null);
-		if (children.length > 0) component.children = children;
-	}
-	return component;
-}
-
-function uniqueId(base: string, taken: Set<string>): string {
-	if (!taken.has(base)) return base;
-	let index = 2;
-	let candidate = `${base}-${index}`;
-	while (taken.has(candidate)) {
-		index += 1;
-		candidate = `${base}-${index}`;
-	}
-	return candidate;
-}
-
-function slugOf(value: string): string {
-	const slug = value.replace(/[^A-Za-z0-9_-]/g, "-");
-	return slug.length > 0 ? slug : "dashboard";
-}
-
-function toPage(value: unknown): DashboardPage | null {
-	if (!isPage(value)) return null;
-	const name =
-		typeof value.name === "string" && value.name.trim().length > 0
-			? value.name.trim()
-			: DEFAULT_PAGE_NAME;
-	const page: DashboardPage = {
-		id: value.id,
-		name,
-		components: value.components
-			.map(toComponent)
-			.filter((item): item is DashboardComponentConfig => item !== null),
-	};
-	if (typeof value.parentId === "string" && value.parentId.length > 0) {
-		page.parentId = value.parentId;
-	}
-	if (value.columns === 12 || value.columns === 24) {
-		page.columns = value.columns;
-	}
-	if (typeof value.rowHeight === "number" && Number.isFinite(value.rowHeight)) {
-		page.rowHeight = Math.min(200, Math.max(40, Math.round(value.rowHeight)));
-	}
-	return page;
 }
 
 export class DashboardRepository {
@@ -1099,6 +969,77 @@ export class DashboardRepository {
 		return this.mutate((draft) => {
 			draft.queries = draft.queries.filter((item) => item.id !== queryId);
 		});
+	}
+
+	/**
+	 * Applies a planned import in one `data.json` write: store and (optional)
+	 * custom filters land together, followed by a single change notification.
+	 * A damaged store is never overwritten.
+	 */
+	async applyImport(plan: ImportPlan): Promise<{
+		store: DashboardStoreData;
+		customFilters?: CustomFilter[];
+	}> {
+		const { store, damaged } = await this.load();
+		if (damaged) {
+			throw new ImportApplyError(
+				"damaged",
+				"Dashboard data is damaged; import was not applied.",
+			);
+		}
+		const next = structuredClone(store);
+
+		if (plan.mode === "replace") {
+			if (plan.dashboards.length === 0) {
+				throw new ImportApplyError(
+					"empty-backup",
+					"Backup contains no dashboards.",
+				);
+			}
+			next.dashboards = plan.dashboards;
+			next.activeDashboardId = plan.dashboards[0]?.id;
+		} else {
+			next.queries.push(...plan.queries);
+			next.dashboards.push(...plan.dashboards);
+			if (plan.pages.length > 0) {
+				const dashboardId =
+					plan.targetDashboardId ?? next.activeDashboardId;
+				const dashboard = next.dashboards.find(
+					(item) => item.id === dashboardId,
+				);
+				if (!dashboard) {
+					throw new ImportApplyError(
+						"missing-target",
+						"Target dashboard no longer exists.",
+					);
+				}
+				dashboard.pages = normalizePageTree([
+					...dashboard.pages,
+					...plan.pages,
+				]);
+			}
+		}
+		next.schemaVersion = DASHBOARD_SCHEMA_VERSION;
+
+		let mergedFilters: CustomFilter[] | undefined;
+		await this.host.updateData((data) => {
+			data[DASHBOARD_STORE_KEY] = next;
+			if (plan.customFilters.length > 0) {
+				const existing = Array.isArray(data.customFilters)
+					? (data.customFilters as CustomFilter[])
+					: [];
+				const names = new Set(existing.map((item) => item.name));
+				const additions = plan.customFilters.filter(
+					(item) => !names.has(item.name),
+				);
+				if (additions.length > 0) {
+					mergedFilters = [...existing, ...additions];
+					data.customFilters = mergedFilters;
+				}
+			}
+		});
+		this.notify(next);
+		return { store: next, customFilters: mergedFilters };
 	}
 
 	exportJson(store: DashboardStoreData): string {

@@ -660,6 +660,9 @@ export class CustomDashboardView extends ItemView {
 				this.refreshHeader();
 				return copy?.id ?? null;
 			},
+			onExport: (id) => this.plugin.transfer.exportDashboard(id),
+			onImport: (onImported) =>
+				this.plugin.transfer.importDashboard(onImported),
 			onDelete: async (id) => {
 				const staleLeaves = this.plugin.getDashboardLeaves(id, {
 					except: this.leaf,
@@ -1002,6 +1005,14 @@ export class CustomDashboardView extends ItemView {
 					.onClick(() => void this.applyPageParent(page.id, null));
 			});
 		}
+		menu.addSeparator();
+		menu.addItem((item) => {
+			item.setTitle(t("TRANSFER_EXPORT_PAGE"))
+				.setIcon("upload")
+				.onClick(() =>
+					this.plugin.transfer.exportPage(dashboard.id, page.id),
+				);
+		});
 		if (event.detail > 0) {
 			menu.showAtMouseEvent(event);
 			return;
@@ -1454,6 +1465,14 @@ export class CustomDashboardView extends ItemView {
 		this.switchPage(pageId);
 	}
 
+	/** Current binding for export commands and the manage menu. */
+	getTransferTarget(): { dashboardId?: string; pageId?: string } {
+		return {
+			dashboardId: this.activeDashboard?.id,
+			pageId: this.activePage?.id,
+		};
+	}
+
 	toggleZenMode(): void {
 		if (!this.isZenMode && this.editMode) {
 			this.editMode = false;
@@ -1643,6 +1662,8 @@ export class CustomDashboardView extends ItemView {
 		event: MouseEvent,
 		button: HTMLButtonElement,
 	): void {
+		const dashboard = this.activeDashboard;
+		const page = this.activePage;
 		const menu = new Menu();
 		menu.addItem((item) =>
 			item
@@ -1661,6 +1682,52 @@ export class CustomDashboardView extends ItemView {
 				.setTitle(t("DASHBOARD_MANAGER_TOOLTIP"))
 				.setIcon("layout-dashboard")
 				.onClick(() => this.openDashboardManager()),
+		);
+		menu.addSeparator();
+		if (page && dashboard) {
+			menu.addItem((item) =>
+				item
+					.setTitle(t("TRANSFER_EXPORT_PAGE"))
+					.setIcon("upload")
+					.onClick(() =>
+						this.plugin.transfer.exportPage(dashboard.id, page.id),
+					),
+			);
+		}
+		menu.addItem((item) =>
+			item
+				.setTitle(t("TRANSFER_IMPORT_PAGE"))
+				.setIcon("download")
+				.onClick(() => this.plugin.transfer.importPage(dashboard?.id)),
+		);
+		if (dashboard) {
+			menu.addItem((item) =>
+				item
+					.setTitle(t("TRANSFER_EXPORT_DASHBOARD"))
+					.setIcon("layout-dashboard")
+					.onClick(() =>
+						this.plugin.transfer.exportDashboard(dashboard.id),
+					),
+			);
+		}
+		menu.addItem((item) =>
+			item
+				.setTitle(t("TRANSFER_IMPORT_DASHBOARD"))
+				.setIcon("folder-input")
+				.onClick(() => this.plugin.transfer.importDashboard()),
+		);
+		menu.addSeparator();
+		menu.addItem((item) =>
+			item
+				.setTitle(t("TRANSFER_EXPORT_BACKUP"))
+				.setIcon("archive")
+				.onClick(() => this.plugin.transfer.exportBackup()),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(t("TRANSFER_RESTORE_BACKUP"))
+				.setIcon("history")
+				.onClick(() => this.plugin.transfer.restoreBackup()),
 		);
 		if (event.detail > 0) {
 			menu.showAtMouseEvent(event);
@@ -2589,6 +2656,12 @@ export class CustomDashboardView extends ItemView {
 							controller.duplicatePage();
 						}
 					},
+					exportPage: () => {
+						const controller = service.current()?.controller;
+						if (controller?.kind === "page") {
+							controller.exportPage();
+						}
+					},
 					setLayout: (columns, rowHeight) => {
 						const controller = service.current()?.controller;
 						if (controller?.kind === "page") {
@@ -2643,6 +2716,12 @@ export class CustomDashboardView extends ItemView {
 						const controller = service.current()?.controller;
 						if (controller?.kind === "pages") {
 							controller.duplicatePage(id);
+						}
+					},
+					exportPage: (id) => {
+						const controller = service.current()?.controller;
+						if (controller?.kind === "pages") {
+							controller.exportPage(id);
 						}
 					},
 					rename: (id) => {
@@ -2761,6 +2840,12 @@ export class CustomDashboardView extends ItemView {
 					(item) => item.id === pageId,
 				);
 				if (page) void this.duplicatePage(page);
+			},
+			exportPage: () => {
+				this.plugin.transfer.exportPage(
+					this.activeDashboard?.id,
+					pageId,
+				);
 			},
 			renamePage: (name) => {
 				void (async () => {
@@ -2944,6 +3029,8 @@ export class CustomDashboardView extends ItemView {
 				const page = pageById(pageId);
 				if (page) void this.duplicatePage(page);
 			},
+			exportPage: (pageId) =>
+				this.plugin.transfer.exportPage(dashboardId, pageId),
 			renamePage: (pageId) => {
 				const page = pageById(pageId);
 				if (page) this.openPageSettings(page, "name");
@@ -4061,6 +4148,16 @@ export class CustomDashboardView extends ItemView {
 						? { queries: this.queryRepository().list(), created }
 						: null;
 				},
+				onExport: (query) =>
+					this.plugin.transfer.exportQuery(query.id),
+				onImport: (onImported) =>
+					this.plugin.transfer.importQuery(() => {
+						this.store = this.plugin.getDashboardStore();
+						this.queriesVersion += 1;
+						this.hub?.scheduleRefresh(0);
+						this.render();
+						onImported(this.queryRepository().list());
+					}),
 				onDelete: (query, onDeleted) => {
 					const references = this.store
 						? this.plugin.dashboardRepository.referenceCount(

@@ -112,6 +112,7 @@ export interface PageInspectorController extends InspectorControllerBase {
 	getTarget(): PageInspectorTarget | null;
 	renamePage(name: string): void;
 	duplicatePage(): void;
+	exportPage(): void;
 	setPageLayout(columns: 12 | 24, rowHeight: number): void;
 	setPageParent(parentId: string | null): void;
 	removePage(): void;
@@ -125,6 +126,7 @@ export interface PagesInspectorController extends InspectorControllerBase {
 	/** Creates an empty page under `pageId` and switches to it. */
 	createSubpage(pageId: string): void;
 	duplicatePage(pageId: string): void;
+	exportPage(pageId: string): void;
 	renamePage(pageId: string): void;
 	removePage(pageId: string): void;
 	setPageParent(pageId: string, parentId: string | null): void;

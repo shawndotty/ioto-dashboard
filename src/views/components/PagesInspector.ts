@@ -11,6 +11,7 @@ export interface PagesInspectorDeps {
 	create(): void;
 	createSubpage(pageId: string): void;
 	duplicate(pageId: string): void;
+	exportPage(pageId: string): void;
 	rename(pageId: string): void;
 	remove(pageId: string): void;
 	setParent(pageId: string, parentId: string | null): void;
@@ -358,6 +359,11 @@ export class PagesInspector {
 			item.setTitle(t("PAGE_DUPLICATE"))
 				.setIcon("copy")
 				.onClick(() => this.deps.duplicate(page.id));
+		});
+		menu.addItem((item) => {
+			item.setTitle(t("TRANSFER_EXPORT_PAGE"))
+				.setIcon("upload")
+				.onClick(() => this.deps.exportPage(page.id));
 		});
 		menu.addSeparator();
 		menu.addItem((item) => {

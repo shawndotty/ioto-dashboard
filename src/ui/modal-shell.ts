@@ -14,7 +14,8 @@ export type ModalKind =
 	| "dashboard-manager"
 	| "project-tasks"
 	| "folder-contents"
-	| "chart-bucket";
+	| "chart-bucket"
+	| "transfer";
 
 export interface ModalShellOptions {
 	kind: ModalKind;
@@ -22,6 +23,8 @@ export interface ModalShellOptions {
 	restore?: boolean;
 	/** Sets the title before the toolbar is created. */
 	title?: string;
+	/** 默认 true；短表单弹窗可关闭全屏，避免全屏态把表单压扁。 */
+	allowFullscreen?: boolean;
 }
 
 const sessionState = new Map<ModalKind, boolean>();
@@ -78,10 +81,12 @@ export function applyModalShell(
 
 	if (modal.modalEl.dataset[SHELL_FLAG] === options.kind) return;
 
+	const allowFullscreen = options.allowFullscreen !== false;
+
 	// setTitle replaces the whole title element, so it must run before the toolbar.
 	if (options.title) modal.setTitle(options.title);
 
-	if (options.restore) {
+	if (options.restore && allowFullscreen) {
 		// 只认本 kind 记住的形态，避免不同类型弹窗互相串味。
 		setFullscreen(modal, sessionState.get(options.kind) ?? false);
 	}
@@ -90,7 +95,7 @@ export function applyModalShell(
 
 	const tools = modal.titleEl.createDiv({ cls: TOOLS_CLASS });
 
-	if (!Platform.isMobile) {
+	if (!Platform.isMobile && allowFullscreen) {
 		const button = tools.createEl("button", {
 			cls: "clickable-icon ioto-dashboard-modal__fullscreen",
 			attr: { type: "button" },
@@ -114,8 +119,9 @@ export function applyModalShell(
 
 	const previousOnClose = modal.onClose.bind(modal);
 	modal.onClose = () => {
-		const state = isFullscreen(modal);
-		sessionState.set(options.kind, state);
+		if (allowFullscreen) {
+			sessionState.set(options.kind, isFullscreen(modal));
+		}
 		restoreFrameButtons(modal);
 		previousOnClose();
 	};

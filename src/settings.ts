@@ -240,6 +240,22 @@ export class DashboardSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName(t("SETTINGS_BACKUP_NAME"))
+			.setDesc(t("SETTINGS_BACKUP_DESC"))
+			.addButton((btn) =>
+				btn
+					.setButtonText(t("TRANSFER_EXPORT_BACKUP"))
+					.setIcon("archive")
+					.onClick(() => this.plugin.transfer.exportBackup()),
+			)
+			.addButton((btn) =>
+				btn
+					.setButtonText(t("TRANSFER_RESTORE_BACKUP"))
+					.setWarning()
+					.onClick(() => this.plugin.transfer.restoreBackup()),
+			);
 	}
 
 	private renderCustomFiltersSettings(containerEl: HTMLElement) {

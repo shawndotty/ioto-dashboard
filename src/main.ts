@@ -24,6 +24,7 @@ import { VaultIndex } from "./data/vault-index";
 import type { IndexConfig, SectionHeadings } from "./data/types";
 import { DashboardRepository } from "./dashboard/repository";
 import { dashboardCommandId } from "./dashboard/command-ids";
+import { DashboardTransfer } from "./dashboard/transfer";
 import type {
 	DashboardStoreData,
 } from "./dashboard/types";
@@ -49,6 +50,7 @@ export default class IotoDashboardPlugin extends Plugin {
 	index: VaultIndex;
 	dashboardRepository: DashboardRepository;
 	snapshotStore: SnapshotStore;
+	transfer!: DashboardTransfer;
 	readonly inspectorService = new DashboardInspectorService();
 	private indexRebuildTimer: number | null = null;
 	private snapshotTimer: number | null = null;
@@ -81,6 +83,7 @@ export default class IotoDashboardPlugin extends Plugin {
 			},
 		);
 		this.dashboardStore = (await this.dashboardRepository.load()).store;
+		this.transfer = new DashboardTransfer(this);
 		this.syncDashboardCommands();
 		this.register(
 			this.dashboardRepository.onChange((store) => {
@@ -289,6 +292,49 @@ export default class IotoDashboardPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "export-ioto-canvas-page",
+			name: t("COMMAND_EXPORT_CANVAS_PAGE"),
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(
+					CustomDashboardView,
+				);
+				const target = view?.getTransferTarget();
+				if (!target?.pageId) return false;
+				if (!checking) {
+					this.transfer.exportPage(target.dashboardId, target.pageId);
+				}
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "import-ioto-canvas-page",
+			name: t("COMMAND_IMPORT_CANVAS_PAGE"),
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(
+					CustomDashboardView,
+				);
+				if (!view) return false;
+				if (!checking) {
+					this.transfer.importPage(view.getTransferTarget()?.dashboardId);
+				}
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "export-ioto-canvas-backup",
+			name: t("COMMAND_EXPORT_CANVAS_BACKUP"),
+			callback: () => this.transfer.exportBackup(),
+		});
+
+		this.addCommand({
+			id: "restore-ioto-canvas-backup",
+			name: t("COMMAND_RESTORE_CANVAS_BACKUP"),
+			callback: () => this.transfer.restoreBackup(),
+		});
+
 		// Settings Tab
 		this.addSettingTab(new DashboardSettingTab(this.app, this));
 	}
@@ -302,6 +348,10 @@ export default class IotoDashboardPlugin extends Plugin {
 		window.activeDocument
 			.querySelectorAll(".ioto-dashboard-modal.is-frame-buttons-hidden")
 			.forEach((el) => el.classList.remove("is-frame-buttons-hidden"));
+	}
+
+	getDashboardStore(): DashboardStoreData | null {
+		return this.dashboardStore;
 	}
 
 	async activateView(

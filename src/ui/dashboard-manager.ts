@@ -23,6 +23,8 @@ export interface DashboardManagerDeps {
 	onRename: (dashboardId: string, name: string) => Promise<void>;
 	onDuplicate: (dashboardId: string, name: string) => Promise<string | null>;
 	onDelete: (dashboardId: string) => Promise<void>;
+	onExport: (dashboardId: string) => void;
+	onImport: (onImported: () => void) => void;
 }
 
 export interface DashboardManagerPreferences {
@@ -71,6 +73,9 @@ export class DashboardManagerModal extends Modal {
 			.setButtonText(t("DASHBOARD_NEW"))
 			.setCta()
 			.onClick(() => this.promptCreate());
+		new ButtonComponent(toolbar)
+			.setButtonText(t("TRANSFER_IMPORT"))
+			.onClick(() => this.deps.onImport(() => this.renderItems()));
 
 		const body = this.contentEl.createDiv({ cls: "ioto-modal-body" });
 		this.collectionEl = body.createDiv({ cls: "ioto-modal-collection" });
@@ -122,6 +127,11 @@ export class DashboardManagerModal extends Modal {
 						icon: "copy",
 						label: t("DASHBOARD_DUPLICATE"),
 						onClick: () => this.promptDuplicate(dashboard),
+					},
+					{
+						icon: "upload",
+						label: t("TRANSFER_EXPORT"),
+						onClick: () => this.deps.onExport(dashboard.id),
 					},
 					{
 						icon: "pencil",

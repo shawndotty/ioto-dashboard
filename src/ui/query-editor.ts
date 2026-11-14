@@ -60,6 +60,8 @@ export interface QueryManagerActions {
 	): void;
 	/** Persists a copy and returns the fresh list; null means the write failed. */
 	onDuplicate(query: QueryDefinition): Promise<QueryMutationResult | null>;
+	onExport(query: QueryDefinition): void;
+	onImport(onImported: (queries: QueryDefinition[]) => void): void;
 	onDelete(
 		query: QueryDefinition,
 		onDeleted: (queries: QueryDefinition[]) => void,
@@ -144,6 +146,11 @@ export class QueryManagerModal extends Modal {
 				this.actions.onNew(this.activeTarget, (result) =>
 					this.adopt(result),
 				),
+			);
+		new ButtonComponent(toolbar)
+			.setButtonText(t("TRANSFER_IMPORT"))
+			.onClick(() =>
+				this.actions.onImport((queries) => this.adoptList(queries)),
 			);
 
 		const body = contentEl.createDiv({ cls: "ioto-modal-body" });
@@ -268,6 +275,11 @@ export class QueryManagerModal extends Modal {
 
 			if (isUser) {
 				actions.push(
+					{
+						icon: "upload",
+						label: t("TRANSFER_EXPORT"),
+						onClick: () => this.actions.onExport(query),
+					},
 					{
 						icon: "pencil",
 						label: t("QUERY_MANAGER_EDIT"),

@@ -3,7 +3,7 @@
 对应执行计划：`4-成果/IOTO Dashboard/Plan/Plan-20261108-061254.md` §3。
 本文件只记录已确认、不再讨论的决策，供后续迭代（M5 拖拽、趋势组件）直接引用。
 
-## 1. 25 条决策
+## 1. 26 条决策
 
 1. **项目归属**：`3-任务/<Project>/` 文件夹优先 → frontmatter `Project` → 未分类；其他根目录仍以 frontmatter 为准。
 2. **进度口径**：首版默认 `basis: "file"`（任务笔记全文 checkbox）；`section` 为可选项；UI 必须显示当前口径。
@@ -31,6 +31,7 @@
 24. **卡片头部统一高度 + 项目进度搜索**：(1) 所有显示标题行的卡片头部（含嵌套卡片）统一 `min-height: 42px`，内容行固定 24px（头部直属图标按钮、拖拽手柄行高、搜索输入框统一 24px），用 `min-height` 而非 `height`，放大字体 / 主题加宽头部时不被裁切。42 = 24（内容行）+ 16（上下 padding）+ 约 1（发丝边框）+ 余量；40 低于自然高度 40.56 故对带控制件的头部是空操作、纯标题头部却会被压到 39.99（仍差 0.57px），41 为最小可行整数，42 取偶数并留余量。隐藏标题的浮层头部（`.is-title-overlay`，绝对定位）不参与统一。(2) 项目进度组件复用 `card-search.ts`，只对「已渲染行」做 DOM 过滤，匹配行上显示的项目名（含本地化的「未分类」），不新增搜索 UI 或数据层参数；空数据集不渲染搜索按钮，编辑态不渲染搜索，关键字通过 `card-search` 的按 config 状态在数据刷新重建后保留。(3) 已知取舍：`limit > 0` 时只搜索前 N 个项目（默认 0 = 全部，无影响）；如后续反馈强烈，再升级为「先过滤后截断」。
 
 25. **按钮交互与颜色**：(1) 预览态光标用 `cursor: var(--cursor-link)` 跟随主题，不写死 `pointer`。(2) 按钮底色、悬停、按下统一走 `--ioto-btn-bg` / `--ioto-btn-bg-hover` / `--ioto-btn-bg-active` 三个变量，悬停与按下用 `color-mix()` 混 `--text-normal` 派生，方向随主题自适应；悬停包在 `@media (hover: hover)` 内，触屏不粘住，按下态用 `:active` 兜底。(3) 预设新增 `success` / `danger`，由插件类 `ioto-btn-success` / `ioto-btn-danger` 提供底色（Obsidian 按钮没有 `mod-success`），只用主题变量 `--background-modifier-success` / `--background-modifier-error`。(4) `variant: custom` 才显示 `buttonColor` 取色器；自定义色与预设互斥，切回预设即忽略 `buttonColor`；`buttonColor` 只放在组件自身 `settings`，不进 `STYLE_SETTINGS`。自定义色按 WCAG 亮度自动选择黑/白文字，显式卡片级 `textColor` 始终优先。`createConfig` 不写 `buttonColor`（未设置 = 跟随预设，重置天然成立）。(5) 旧 `has-custom-bg` 入口不再直接写 `background-color`，改为提供 `--ioto-btn-color`，与自定义色共用同一派生路径并因此获得悬停/按下反馈。(6) `schemaVersion` 不变（7），无数据迁移。
+26. **导入 / 导出**：(1) 四类包共用 `formatVersion: 1` 信封（`kind` / `pluginVersion` / `storeSchemaVersion` / `exportedAt` / `source` / `payload` / `warnings`），包内只含定义与配置，不含快照、不发起任何网络请求，复制与落盘都是本地操作。(2) 语义固定为「追加 + 全新副本」：导入永远新建 page / dashboard / user query，id 统一重写为 `*:import-<时间戳>-*`，名称冲突追加本地化后缀「（导入）」；唯一例外是整库备份恢复，走 `replace` 并保留原 id，且必须二次确认。(3) 导出时 `saved:` 查询就地物化为 `user:` 快照（名称带「（来自收藏查询）」），因为收藏查询存在 settings 而非 `dashboardStore`；`builtin:` 只随包引用、导入时不落库。(4) 组件 `queryId` 按 `queryIdMap` 重写，包内缺失的查询置空并告警；目标类型不兼容时同样置空回退默认查询；按钮 `options.pageId` 按 `pageIdMap` 重写，指向包外页面时保留原值并告警。(5) 父页面不在包内的 page 降级为顶层页面；查询的 `folders` 以包内 `source.roots` 与当前根目录做前缀改写，未命中保留原路径并告警。(6) 导入落盘走 `DashboardRepository.applyImport`：内存合并完成后经一次 `plugin.updateData` 同时写入 `dashboardStore` 与新增的 `customFilters`，只广播一次；数据损坏（`damaged`）时直接拒绝，绝不覆盖。`schemaVersion` 仍为 7。
 ## 2. 存储落位
 
 | 数据 | 位置 | 写入方式 | 理由 |

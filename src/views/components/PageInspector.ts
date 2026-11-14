@@ -5,6 +5,7 @@ import type { PageInspectorState } from "../../dashboard/inspector-service";
 export interface PageInspectorDeps {
 	rename(name: string): void;
 	duplicate(): void;
+	exportPage(): void;
 	setLayout(columns: 12 | 24, rowHeight: number): void;
 	setParent(parentId: string | null): void;
 	remove(): void;
@@ -171,6 +172,14 @@ export class PageInspector {
 				.onClick(() => {
 					if (this.state?.target.pageId !== pageId) return;
 					this.deps.duplicate();
+				});
+		});
+		menu.addItem((item) => {
+			item.setTitle(t("TRANSFER_EXPORT_PAGE"))
+				.setIcon("upload")
+				.onClick(() => {
+					if (this.state?.target.pageId !== pageId) return;
+					this.deps.exportPage();
 				});
 		});
 		menu.addSeparator();

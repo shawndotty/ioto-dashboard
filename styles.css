@@ -1911,6 +1911,107 @@
     gap: 8px;
 }
 
+/* ---- Transfer (import / export) ---- */
+.modal.ioto-dashboard-modal.ioto-dashboard-modal--transfer:not(.is-fullscreen) {
+    width: min(640px, 92vw);
+}
+
+/* 与 query-editor 同范式：内容限高，滚动只发生在 body，底栏固定 */
+.ioto-dashboard-modal--transfer .modal-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.ioto-dashboard-modal--transfer:not(.is-fullscreen) .modal-content {
+    max-height: calc(100vh - 8em);
+    overflow: hidden;
+}
+
+.ioto-dashboard-modal--transfer .ioto-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ioto-dashboard-modal--transfer .ioto-modal-body > * {
+    margin-block: 0;
+    flex: 0 0 auto; /* 内容超长时交给 body 滚动，不压缩输入区 */
+}
+
+/* JSON 文本框：核心不给 width，必须显式撑满 */
+.ioto-transfer-json {
+    width: 100%;
+    min-height: 150px;
+    max-height: 42vh;
+    resize: vertical;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.5;
+    tab-size: 2;
+    white-space: pre; /* 导出只读预览不折行，避免缩进错乱 */
+    overflow: auto;
+}
+
+/* 导入框允许折行，方便粘贴长 JSON */
+.ioto-dashboard-modal--transfer .ioto-modal-body > textarea.ioto-transfer-json:not([readonly]) {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.ioto-transfer-warnings {
+    padding: 10px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-secondary);
+    font-size: var(--font-ui-small);
+}
+
+.ioto-transfer-warnings ul,
+.ioto-transfer-preview ul {
+    margin: 6px 0 0;
+    padding-inline-start: 1.2em;
+}
+
+.ioto-transfer-warnings li {
+    margin-block: 2px;
+}
+
+.ioto-transfer-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ioto-transfer-preview__counts {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-transfer-preview__hint {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.ioto-transfer-preview__error {
+    color: var(--text-error);
+    font-size: var(--font-ui-small);
+}
+
+/* 告警分级：与 bundle.ts 的 warning.level 对齐 */
+.ioto-transfer-warnings li.is-info {
+    color: var(--text-muted);
+}
+
+.ioto-transfer-warnings li.is-warn {
+    color: var(--text-warning);
+}
+
+.ioto-transfer-warnings li.is-error {
+    color: var(--text-error);
+}
+
 /* ---- Query editor: fixed footer + one quiet row rhythm ---- */
 .ioto-dashboard-modal--query-editor .modal-content {
     display: flex;
