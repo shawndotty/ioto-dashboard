@@ -362,6 +362,17 @@ test('rescalePageLayout reacts to gap changes and clamps to the minimum rows', (
 	);
 });
 
+test('rescalePageLayout clips rows to the widened page ceiling', () => {
+	const maxRows = pageMaxRows(10, 12);
+	const rescaled = rescalePageLayout(
+		[component('tall', { y: 0, h: 30 })],
+		{ rowHeight: 72, gap: 12 },
+		{ rowHeight: 10, gap: 12 },
+	);
+	assert.equal(maxRows, 92);
+	assert.equal(rescaled[0].h, maxRows);
+});
+
 test('rescalePageLayout leaves children untouched and skips unsized cards', () => {
 	const child = component('child', { y: 1, h: 2 });
 	const parent = component('container', {
