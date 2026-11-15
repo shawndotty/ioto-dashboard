@@ -59,7 +59,10 @@ export interface SettingOption {
 }
 
 /** How a `target` setting resolves its value in the inspector. */
-export type TargetPickerKind = "note" | "command" | "page";
+export type TargetPickerKind = "note" | "command" | "page" | "base" | "baseView";
+
+/** Outcome of mounting a `.base` embed; drives the component's localized empty state. */
+export type BaseMountResult = "ok" | "missing" | "disabled" | "view";
 
 interface SettingBase {
 	/** Hides the row when the predicate returns false. */
@@ -208,6 +211,13 @@ export interface ComponentRenderContext {
 	): Promise<void>;
 	/** Renders a free-form Markdown fragment and wires its links/hover previews. */
 	renderMarkdownFragment?(el: HTMLElement, markdown: string): Promise<void>;
+	/** 把库内 .base 挂到卡片；生命周期、兜底与视图校验由宿主负责。 */
+	mountBaseEmbed?(
+		el: HTMLElement,
+		path: string,
+		view: string,
+		hideToolbar: boolean,
+	): Promise<BaseMountResult>;
 	/** Lets a component patch its own config from inside the canvas. */
 	patchComponent?(patch: Partial<DashboardComponentConfig>): void;
 }

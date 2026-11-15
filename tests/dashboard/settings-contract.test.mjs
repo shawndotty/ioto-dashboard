@@ -29,6 +29,9 @@ const { markdownComponent } = await load(
 const { buttonComponent } = await load(
 	'../../src/dashboard/components/button.ts',
 );
+const { baseComponent } = await load(
+	'../../src/dashboard/components/base.ts',
+);
 
 const COMPONENTS = [
 	kpiComponent,
@@ -41,6 +44,7 @@ const COMPONENTS = [
 	barChartComponent,
 	markdownComponent,
 	buttonComponent,
+	baseComponent,
 ];
 const CONFIG_KEYS = new Set(['id', 'type', 'queryId', 'basis', 'limit', 'title', 'view', 'measure', 'options', 'x', 'y', 'w', 'h']);
 const QUERY_IDS = new Set(['builtin:tasks-all', 'builtin:tasks-unfinished', 'user:1']);

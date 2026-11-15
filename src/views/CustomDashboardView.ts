@@ -1,4 +1,6 @@
 import {
+	App,
+	Component,
 	ItemView,
 	MarkdownRenderer,
 	Menu,
@@ -10,6 +12,7 @@ import {
 	ViewStateResult,
 	WorkspaceLeaf,
 	parseLinktext,
+	parseYaml,
 	setIcon,
 	setTooltip,
 } from "obsidian";
@@ -18,6 +21,12 @@ import type IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
 import { createComponentRegistry } from "../dashboard/components";
 import { DataHub } from "../dashboard/data-hub";
+import {
+	baseViewChoices,
+	extractBaseViews,
+	hasBaseView,
+	type BaseViewInfo,
+} from "../dashboard/base-views";
 import {
 	MAX_CONTAINER_DEPTH,
 	containsComponent,
@@ -65,6 +74,7 @@ import {
 	clampSize,
 	queryTargetsFor,
 	type ChartBucketPayload,
+	type BaseMountResult,
 	type ComponentDefinition,
 	type ComponentRenderContext,
 	type ComponentStatus,
@@ -106,6 +116,7 @@ import { PageLayoutModal } from "../ui/page-layout-modal";
 import { PageNameModal } from "../ui/page-name-modal";
 import { PagePickerModal, type PageTarget } from "../ui/page-picker";
 import { armPointerDrag, bindPointerSession } from "../ui/pointer-session";
+import { BaseFilePickerModal, BaseViewPickerModal } from "../ui/pickers/base-picker";
 import { CommandPickerModal } from "../ui/pickers/command-picker";
 import { NotePickerModal } from "../ui/pickers/note-picker";
 import { ProjectTasksModal } from "../ui/project-tasks-modal";
@@ -126,6 +137,27 @@ interface DropTarget {
 	grid: HTMLElement;
 	index: number;
 }
+
+/** 核心嵌入组件的最小形状（`embedRegistry` 无公共 d.ts，只声明用到的部分）。 */
+interface CoreBaseEmbed extends Component {
+	loadFile(): void;
+}
+
+interface CoreBaseEmbedContext {
+	app: App;
+	containerEl: HTMLElement;
+	linktext: string;
+	sourcePath: string;
+	displayMode: boolean;
+	showInline: boolean;
+	depth: number;
+}
+
+type CoreBaseEmbedCreator = (
+	ctx: CoreBaseEmbedContext,
+	file: TFile,
+	subpath: string,
+) => CoreBaseEmbed | null;
 
 export class CustomDashboardView extends ItemView {
 	private store: DashboardStoreData | null = null;
@@ -178,6 +210,8 @@ export class CustomDashboardView extends ItemView {
 	>();
 	private autoRepairKeys = new Set<string>();
 	private renderFailures = new Set<string>();
+	private baseEmbeds = new Map<string, { host: HTMLElement; embed?: Component }>();
+	private baseMountSeq = new Map<string, number>();
 	private visibilityTimer: number | null = null;
 	private resizeOverlays: {
 		ghost: HTMLElement;
@@ -274,6 +308,7 @@ export class CustomDashboardView extends ItemView {
 		this.removeDragGhost();
 		this.removePageTabGhost();
 		this.removeResizeOverlays();
+		this.teardownAllBaseEmbeds();
 		this.hub?.destroy();
 		this.hub = null;
 	}
@@ -438,6 +473,7 @@ export class CustomDashboardView extends ItemView {
 
 		const page = this.activePage;
 		if (!page || page.components.length === 0) {
+			this.teardownAllBaseEmbeds();
 			this.setEmptyVisible(true);
 			this.publishRequests();
 		} else {
@@ -445,6 +481,8 @@ export class CustomDashboardView extends ItemView {
 			const grid = this.ensureGrid();
 			this.applyPageLayout(grid);
 			this.syncCards(grid, page.components);
+			// 只在顶层扫：容器里的卡片构建时其嵌套网格还没入 DOM。
+			this.sweepBaseEmbeds();
 			this.publishRequests();
 		}
 
@@ -2114,6 +2152,8 @@ export class CustomDashboardView extends ItemView {
 			renderMarkdownFragment: (el, markdown) =>
 				this.renderMarkdownFragment(el, markdown),
 			patchComponent: (patch) => void this.updateComponent(config.id, patch),
+			mountBaseEmbed: (body, path, view, hideToolbar) =>
+				this.mountBaseEmbed(config.id, body, path, view, hideToolbar),
 		};
 		try {
 			definition.render(body, ctx);
@@ -3191,6 +3231,19 @@ export class CustomDashboardView extends ItemView {
 			).open();
 			return;
 		}
+		if (picker === "base") {
+			new BaseFilePickerModal(this.app, (file) => {
+				// 新文件上的旧视图名不可信，一次 patch 里清掉。
+				void this.updateComponent(componentId, {
+					options: { basePath: file.path, view: undefined },
+				} as unknown as Partial<DashboardComponentConfig>);
+			}).open();
+			return;
+		}
+		if (picker === "baseView") {
+			void this.pickBaseViewForComponent(componentId);
+			return;
+		}
 		const targets = this.pageTargets(this.activePage?.id);
 		if (targets.length === 0) {
 			new Notice(t("PICKER_NO_PAGES_FOUND"));
@@ -3201,6 +3254,58 @@ export class CustomDashboardView extends ItemView {
 			targets,
 			(target) => apply(target.page.id),
 			{ describe: (target) => this.describePagePath(target) },
+		).open();
+	}
+
+	private async pickBaseViewForComponent(componentId: string): Promise<void> {
+		const page = this.activePage;
+		const config = page
+			? findComponentLocation(page.components, componentId)?.config
+			: undefined;
+		const basePath =
+			typeof config?.options?.basePath === "string"
+				? config.options.basePath.trim()
+				: "";
+		if (!basePath) {
+			new Notice(t("PICKER_BASE_VIEW_EMPTY"));
+			return;
+		}
+		const file = this.app.vault.getAbstractFileByPath(basePath);
+		if (!(file instanceof TFile)) {
+			new Notice(t("PICKER_BASE_VIEW_EMPTY"));
+			return;
+		}
+		let views: BaseViewInfo[];
+		try {
+			const parsed = parseYaml(
+				await this.app.vault.cachedRead(file),
+			) as unknown;
+			views = extractBaseViews(parsed);
+		} catch (error) {
+			console.error(
+				"IOTO Dashboard: failed to read base views",
+				basePath,
+				error,
+			);
+			new Notice(t("PICKER_BASE_VIEW_EMPTY"));
+			return;
+		}
+		const choices = baseViewChoices(views);
+		if (choices.length === 0) {
+			new Notice(t("PICKER_BASE_VIEW_EMPTY"));
+			return;
+		}
+		new BaseViewPickerModal(
+			this.app,
+			[
+				{ name: "", label: t("PICKER_BASE_VIEW_DEFAULT") },
+				...choices.map((name) => ({ name, label: name })),
+			],
+			(name) => {
+				void this.updateComponent(componentId, {
+					options: { view: name || undefined },
+				} as unknown as Partial<DashboardComponentConfig>);
+			},
 		).open();
 	}
 
@@ -4402,6 +4507,12 @@ export class CustomDashboardView extends ItemView {
 					.find((command) => command.id === stored)?.name ?? stored
 			);
 		}
+		if (picker === "base") {
+			return stored.split("/").pop()?.replace(/\.base$/i, "") || stored;
+		}
+		if (picker === "baseView") {
+			return stored;
+		}
 		const dashboard = this.store
 			? findDashboardForPage(this.store, stored)
 			: undefined;
@@ -4516,6 +4627,156 @@ export class CustomDashboardView extends ItemView {
 		el.addClass("markdown-rendered");
 		await MarkdownRenderer.render(this.app, markdown, el, "", this);
 		this.delegateMarkdownLinks(el);
+	}
+
+	/**
+	 * Mounts an existing `.base` into a card through the core embed registry.
+	 * `embedRegistry` is an internal API (same precedent as the tasks-center PDF
+	 * preview), so every step is feature-detected and falls back to a Markdown
+	 * embed before reporting "disabled".
+	 */
+	private async mountBaseEmbed(
+		id: string,
+		el: HTMLElement,
+		path: string,
+		view: string,
+		hideToolbar: boolean,
+	): Promise<BaseMountResult> {
+		this.teardownBaseEmbed(id);
+		const seq = (this.baseMountSeq.get(id) ?? 0) + 1;
+		this.baseMountSeq.set(id, seq);
+
+		const file = this.app.vault.getAbstractFileByPath(path);
+		if (!(file instanceof TFile) || file.extension.toLowerCase() !== "base") {
+			return "missing";
+		}
+
+		if (view) {
+			try {
+				const parsed = parseYaml(
+					await this.app.vault.cachedRead(file),
+				) as unknown;
+				if (!hasBaseView(extractBaseViews(parsed), view)) return "view";
+			} catch (error) {
+				// 解析失败交给核心定夺，避免把可用文件误判成视图缺失。
+				console.error(
+					"IOTO Dashboard: failed to read base views",
+					path,
+					error,
+				);
+			}
+		}
+		if (!el.isConnected || this.baseMountSeq.get(id) !== seq) return "ok";
+
+		const registry = (
+			this.app as unknown as {
+				embedRegistry?: {
+					getEmbedCreator?: (
+						target: TFile,
+					) => CoreBaseEmbedCreator | undefined;
+				};
+			}
+		).embedRegistry;
+		const creator = registry?.getEmbedCreator?.(file);
+		if (typeof creator !== "function") {
+			return this.mountBaseEmbedFallback(
+				id,
+				el,
+				file,
+				view,
+				hideToolbar,
+				seq,
+			);
+		}
+
+		const host = el.createDiv({ cls: "ioto-base-embed-host" });
+		if (hideToolbar) host.addClass("is-toolbar-hidden");
+		let embed: CoreBaseEmbed | null = null;
+		try {
+			embed = creator(
+				{
+					app: this.app,
+					containerEl: host,
+					linktext: file.path,
+					sourcePath: file.path,
+					displayMode: false,
+					showInline: false,
+					depth: 1,
+				},
+				file,
+				view ? `#${view}` : "",
+			);
+		} catch (error) {
+			console.error("IOTO Dashboard: base embed failed", path, error);
+		}
+		if (!embed) {
+			host.remove();
+			return "disabled";
+		}
+		// 必须进 Component 生命周期，核心才会把库变化推给这个嵌入。
+		this.addChild(embed);
+		void embed.loadFile();
+		this.baseEmbeds.set(id, { host, embed });
+		return "ok";
+	}
+
+	/** 兜底降级路径：creator 缺失时走 Markdown 嵌入；不随库变化刷新。 */
+	private async mountBaseEmbedFallback(
+		id: string,
+		el: HTMLElement,
+		file: TFile,
+		view: string,
+		hideToolbar: boolean,
+		seq: number,
+	): Promise<BaseMountResult> {
+		const host = el.createDiv({ cls: "ioto-base-embed-host" });
+		if (hideToolbar) host.addClass("is-toolbar-hidden");
+		try {
+			await MarkdownRenderer.render(
+				this.app,
+				`![[${file.path}${view ? `#${view}` : ""}]]`,
+				host,
+				file.path,
+				this,
+			);
+		} catch (error) {
+			console.error(
+				"IOTO Dashboard: base fallback render failed",
+				file.path,
+				error,
+			);
+			host.remove();
+			return "disabled";
+		}
+		if (!el.isConnected || this.baseMountSeq.get(id) !== seq) {
+			host.remove();
+			return "ok";
+		}
+		if (!host.querySelector(".bases-embed")) {
+			host.remove();
+			return "disabled";
+		}
+		this.baseEmbeds.set(id, { host });
+		return "ok";
+	}
+
+	private teardownBaseEmbed(id: string): void {
+		this.baseMountSeq.set(id, (this.baseMountSeq.get(id) ?? 0) + 1);
+		const entry = this.baseEmbeds.get(id);
+		if (!entry) return;
+		if (entry.embed) this.removeChild(entry.embed);
+		entry.host.remove();
+		this.baseEmbeds.delete(id);
+	}
+
+	private teardownAllBaseEmbeds(): void {
+		for (const id of [...this.baseEmbeds.keys()]) this.teardownBaseEmbed(id);
+	}
+
+	private sweepBaseEmbeds(): void {
+		for (const [id, entry] of [...this.baseEmbeds]) {
+			if (!entry.host.isConnected) this.teardownBaseEmbed(id);
+		}
 	}
 
 	private delegateMarkdownLinks(el: HTMLElement): void {

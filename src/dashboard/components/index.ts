@@ -12,6 +12,7 @@ import { scatterChartComponent } from "./scatter-chart";
 import { treemapChartComponent } from "./treemap-chart";
 import { markdownComponent } from "./markdown";
 import { buttonComponent } from "./button";
+import { baseComponent } from "./base";
 import { ComponentRegistry } from "../registry";
 
 export function createComponentRegistry(): ComponentRegistry {
@@ -31,5 +32,6 @@ export function createComponentRegistry(): ComponentRegistry {
 	registry.register(treemapChartComponent);
 	registry.register(markdownComponent);
 	registry.register(buttonComponent);
+	registry.register(baseComponent);
 	return registry;
 }

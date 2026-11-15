@@ -848,6 +848,47 @@
     overflow: auto;
 }
 
+/* Base card: the embed owns its own scrolling surface. */
+.ioto-custom-dashboard-view .ioto-dashboard-card[data-component-type="base"] > .ioto-dashboard-card-body {
+    padding: 0;
+    overflow: hidden;
+}
+
+.ioto-base-embed-host {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.ioto-base-embed-host > .bases-embed {
+    height: 100%;
+    min-height: 0;
+}
+
+.ioto-base-embed-host .bases-view {
+    overflow: auto;
+}
+
+.ioto-base-embed-host.is-toolbar-hidden .bases-header {
+    display: none;
+}
+
+.ioto-custom-dashboard-view.is-editing .ioto-base-embed-host {
+    pointer-events: none;
+}
+
+.ioto-base-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
 .ioto-custom-dashboard-view .ioto-dashboard-empty {
     display: flex;
     flex-direction: column;

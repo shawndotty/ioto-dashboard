@@ -327,6 +327,8 @@ export default {
 	COMPONENT_MARKDOWN_NAME: "Markdown card",
 	COMPONENT_MARKDOWN_DESC:
 		"Free-form Markdown with images, embeds and links.",
+	COMPONENT_BASE_NAME: "Base",
+	COMPONENT_BASE_DESC: "Show an existing Base file inside the dashboard.",
 	COMPONENT_PROJECT_PROGRESS_NAME: "Project progress",
 	COMPONENT_PROJECT_PROGRESS_DESC:
 		"Completion per project with open and cancelled counts.",
@@ -835,6 +837,24 @@ export default {
 	BUTTON_COMMAND_MISSING: "No command selected",
 	BUTTON_COMMAND_FAILED: "Command could not run on this page",
 	BUTTON_PAGE_MISSING: "Target page is missing",
+	// Base component
+	SETTING_BASE_FILE: "Base file",
+	SETTING_BASE_VIEW: "Fixed view",
+	SETTING_BASE_VIEW_HINT: "Leave empty to follow the file's default view",
+	SETTING_BASE_HIDE_TOOLBAR: "Hide toolbar",
+	SETTING_BASE_HIDE_TOOLBAR_HINT:
+		"Sorting and filtering can no longer be changed in the card, but the file's own configuration still applies",
+	BASE_EMPTY_HINT: "Choose a Base file in edit mode",
+	BASE_MISSING: "Base file not found: {0}",
+	BASE_DISABLED: "Enable the core Bases plugin to display this card",
+	BASE_VIEW_MISSING:
+		"The selected view no longer exists in {0}; it may have been renamed",
+	PICKER_BASE_PLACEHOLDER: "Search Base files",
+	PICKER_NO_BASE_FILES: "No Base files found",
+	PICKER_BASE_VIEW_PLACEHOLDER: "Search views",
+	PICKER_BASE_VIEW_EMPTY:
+		"No Base file is selected, or this file has no named views",
+	PICKER_BASE_VIEW_DEFAULT: "Default view (first in file)",
 	// Container component
 	COMPONENT_CONTAINER_NAME: "Container",
 	COMPONENT_CONTAINER_DESC: "Groups other components; move, style and delete them as one.",
