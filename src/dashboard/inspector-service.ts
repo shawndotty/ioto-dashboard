@@ -42,6 +42,7 @@ export interface PageInspectorTarget {
 	componentCount: number;
 	columns: 12 | 24;
 	rowHeight: number;
+	gap: number;
 	canDelete: boolean;
 	/** Parent page id; `null` for a top-level page. */
 	parentId: string | null;
@@ -113,7 +114,7 @@ export interface PageInspectorController extends InspectorControllerBase {
 	renamePage(name: string): void;
 	duplicatePage(): void;
 	exportPage(): void;
-	setPageLayout(columns: 12 | 24, rowHeight: number): void;
+	setPageLayout(columns: 12 | 24, rowHeight: number, gap: number): void;
 	setPageParent(parentId: string | null): void;
 	removePage(): void;
 }

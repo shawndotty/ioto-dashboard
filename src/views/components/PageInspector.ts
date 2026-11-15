@@ -6,7 +6,7 @@ export interface PageInspectorDeps {
 	rename(name: string): void;
 	duplicate(): void;
 	exportPage(): void;
-	setLayout(columns: 12 | 24, rowHeight: number): void;
+	setLayout(columns: 12 | 24, rowHeight: number, gap: number): void;
 	setParent(parentId: string | null): void;
 	remove(): void;
 }
@@ -32,6 +32,8 @@ export class PageInspector {
 	private columnsSelect: HTMLSelectElement | null = null;
 	private rowHeightInput: HTMLInputElement | null = null;
 	private rowHeightValueEl: HTMLElement | null = null;
+	private gapInput: HTMLInputElement | null = null;
+	private gapValueEl: HTMLElement | null = null;
 	private menuButtonEl: HTMLButtonElement | null = null;
 	private nameDebouncer: Debouncer<[string], void> | null = null;
 	/** Session-only collapse state keyed by section title key, never persisted. */
@@ -73,8 +75,7 @@ export class PageInspector {
 		return [
 			target.pageId,
 			state.editable ? "edit" : "view",
-			String(target.columns),
-			String(target.rowHeight),
+			// Layout values are synced in place; rebuilding would kill slider drags.
 			String(target.total),
 			String(target.componentCount),
 			target.canDelete ? "delete" : "locked",
@@ -364,6 +365,7 @@ export class PageInspector {
 			this.deps.setLayout(
 				columns.value === "24" ? 24 : 12,
 				target.rowHeight,
+				target.gap,
 			);
 		});
 		columnsField.createDiv({
@@ -381,7 +383,7 @@ export class PageInspector {
 		});
 		const range = rangeRow.createEl("input", {
 			type: "range",
-			attr: { min: "40", max: "200", step: "8" },
+			attr: { min: "10", max: "200", step: "1" },
 		});
 		range.value = String(state.target.rowHeight);
 		range.disabled = !state.editable;
@@ -395,7 +397,11 @@ export class PageInspector {
 		range.addEventListener("change", () => {
 			const target = this.state?.target;
 			if (!target) return;
-			this.deps.setLayout(target.columns, Number(range.value));
+			this.deps.setLayout(
+				target.columns,
+				Number(range.value),
+				target.gap,
+			);
 		});
 		rowField.createDiv({
 			cls: "ioto-inspector-hint",
@@ -403,6 +409,42 @@ export class PageInspector {
 		});
 		this.rowHeightInput = range;
 		this.rowHeightValueEl = value;
+
+		const gapField = section.createDiv({ cls: "ioto-inspector-field" });
+		gapField.createEl("label", {
+			text: t("PAGE_LAYOUT_GAP"),
+		});
+		const gapRow = gapField.createDiv({
+			cls: "ioto-inspector-range-row",
+		});
+		const gapRange = gapRow.createEl("input", {
+			type: "range",
+			attr: { min: "0", max: "32", step: "1" },
+		});
+		gapRange.value = String(state.target.gap);
+		gapRange.disabled = !state.editable;
+		const gapValue = gapRow.createSpan({
+			cls: "ioto-inspector-range-value",
+			text: `${state.target.gap}px`,
+		});
+		gapRange.addEventListener("input", () => {
+			gapValue.setText(`${gapRange.value}px`);
+		});
+		gapRange.addEventListener("change", () => {
+			const target = this.state?.target;
+			if (!target) return;
+			this.deps.setLayout(
+				target.columns,
+				target.rowHeight,
+				Number(gapRange.value),
+			);
+		});
+		gapField.createDiv({
+			cls: "ioto-inspector-hint",
+			text: t("PAGE_LAYOUT_GAP_DESC"),
+		});
+		this.gapInput = gapRange;
+		this.gapValueEl = gapValue;
 	}
 
 	private syncValues(state: PageInspectorState): void {
@@ -434,6 +476,11 @@ export class PageInspector {
 			this.rowHeightInput.disabled = !state.editable;
 		}
 		this.rowHeightValueEl?.setText(`${target.rowHeight}px`);
+		if (this.gapInput) {
+			this.gapInput.value = String(target.gap);
+			this.gapInput.disabled = !state.editable;
+		}
+		this.gapValueEl?.setText(`${target.gap}px`);
 		this.syncParentField(state);
 		if (this.menuButtonEl) {
 			this.menuButtonEl.disabled = !state.editable;
@@ -475,6 +522,8 @@ export class PageInspector {
 		this.columnsSelect = null;
 		this.rowHeightInput = null;
 		this.rowHeightValueEl = null;
+		this.gapInput = null;
+		this.gapValueEl = null;
 		this.menuButtonEl = null;
 	}
 }

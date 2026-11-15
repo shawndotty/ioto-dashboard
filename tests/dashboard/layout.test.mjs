@@ -12,6 +12,9 @@ const {
 	resizeByDelta,
 	snapSize,
 	gridMetrics,
+	pageMinRows,
+	pageMaxRows,
+	rescalePageLayout,
 } = await load('../../src/dashboard/layout.ts');
 
 const {
@@ -296,4 +299,84 @@ test('insertionLine clamps out-of-range indexes and keeps gap 0 finite', () => {
 	assert.ok(line);
 	assert.equal(Number.isFinite(line.top), true);
 	assert.equal(line.top, 70);
+});
+
+test('pageMinRows keeps the title bar visible at every pitch', () => {
+	assert.equal(pageMinRows(72, 12), 1);
+	assert.equal(pageMinRows(40, 12), 2);
+	assert.equal(pageMinRows(10, 12), 3);
+	assert.equal(pageMinRows(10, 0), 5);
+	assert.equal(pageMinRows(Number.NaN, Number.NaN), 1);
+	assert.equal(pageMinRows(10, 12, 0), 1);
+});
+
+test('pageMaxRows widens the 24-row cap as rows get shorter', () => {
+	assert.equal(pageMaxRows(72, 12), 24);
+	assert.equal(pageMaxRows(56, 12), 30);
+	assert.equal(pageMaxRows(10, 0), 202);
+	assert.equal(pageMaxRows(10, 12), 92);
+	assert.equal(pageMaxRows(Number.NaN, Number.NaN), 24);
+});
+
+test('rescalePageLayout is idempotent for unchanged metrics', () => {
+	const components = [component('a', { y: 2, h: 3 })];
+	const same = rescalePageLayout(
+		components,
+		{ rowHeight: 72, gap: 12 },
+		{ rowHeight: 72, gap: 12 },
+	);
+	assert.equal(same, components);
+});
+
+test('rescalePageLayout keeps pixel edges when rows shrink', () => {
+	const oldStep = 72 + 12;
+	const newStep = 10 + 12;
+	const components = [
+		component('top', { y: 0, h: 2 }),
+		component('mid', { y: 10, h: 3 }),
+	];
+	const rescaled = rescalePageLayout(
+		components,
+		{ rowHeight: 72, gap: 12 },
+		{ rowHeight: 10, gap: 12 },
+	);
+	for (const [index, item] of rescaled.entries()) {
+		const before = components[index];
+		assert.ok(before.h != null && item.h != null);
+		assert.ok(Math.abs(item.y * newStep - before.y * oldStep) <= newStep / 2);
+		const beforeBottom = (before.y + before.h) * oldStep - 12;
+		const afterBottom = (item.y + item.h) * newStep - 12;
+		assert.ok(Math.abs(afterBottom - beforeBottom) <= newStep);
+	}
+});
+
+test('rescalePageLayout reacts to gap changes and clamps to the minimum rows', () => {
+	const rescaled = rescalePageLayout(
+		[component('a', { y: 0, h: 1 })],
+		{ rowHeight: 72, gap: 12 },
+		{ rowHeight: 10, gap: 32 },
+	);
+	assert.deepEqual(
+		rescaled.map((item) => [item.y, item.h]),
+		[[0, 2]],
+	);
+});
+
+test('rescalePageLayout leaves children untouched and skips unsized cards', () => {
+	const child = component('child', { y: 1, h: 2 });
+	const parent = component('container', {
+		type: 'container',
+		y: 4,
+		h: 4,
+		children: [child],
+	});
+	const unsized = { id: 'raw', type: 'kpi', queryId: 'builtin:tasks-all' };
+	const rescaled = rescalePageLayout(
+		[parent, unsized],
+		{ rowHeight: 72, gap: 12 },
+		{ rowHeight: 36, gap: 12 },
+	);
+	assert.equal(rescaled[0].children[0], child);
+	assert.equal(rescaled[1], unsized);
+	assert.notEqual(rescaled[0].h, 4);
 });

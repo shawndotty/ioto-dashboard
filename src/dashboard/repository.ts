@@ -1,4 +1,4 @@
-import { moveItem } from "./layout";
+import { moveItem, rescalePageLayout } from "./layout";
 import {
 	descendantsOf,
 	normalizePageTree,
@@ -29,6 +29,12 @@ import {
 	DASHBOARD_SCHEMA_VERSION,
 	DASHBOARD_STORE_KEY,
 	DEFAULT_DASHBOARD_ID,
+	PAGE_GAP_DEFAULT,
+	PAGE_GAP_MAX,
+	PAGE_GAP_MIN,
+	PAGE_ROW_HEIGHT_DEFAULT,
+	PAGE_ROW_HEIGHT_MAX,
+	PAGE_ROW_HEIGHT_MIN,
 	activeDashboard,
 	activePageOf,
 	createDefaultStore,
@@ -731,15 +737,45 @@ export class DashboardRepository {
 		pageId: string,
 		columns: 12 | 24,
 		rowHeight: number,
+		gap: number,
 	): Promise<DashboardStoreData> {
 		return this.mutate((store) => {
 			const page = this.findPage(store, pageId)?.page;
 			if (!page) return;
+			const oldMetrics = {
+				rowHeight: page.rowHeight ?? PAGE_ROW_HEIGHT_DEFAULT,
+				gap: page.gap ?? PAGE_GAP_DEFAULT,
+			};
+			const nextMetrics = {
+				rowHeight: Number.isFinite(rowHeight)
+					? Math.min(
+							PAGE_ROW_HEIGHT_MAX,
+							Math.max(
+								PAGE_ROW_HEIGHT_MIN,
+								Math.round(rowHeight),
+							),
+						)
+					: PAGE_ROW_HEIGHT_DEFAULT,
+				gap: Number.isFinite(gap)
+					? Math.min(
+							PAGE_GAP_MAX,
+							Math.max(PAGE_GAP_MIN, Math.round(gap)),
+						)
+					: PAGE_GAP_DEFAULT,
+			};
+			if (
+				oldMetrics.rowHeight !== nextMetrics.rowHeight ||
+				oldMetrics.gap !== nextMetrics.gap
+			) {
+				page.components = rescalePageLayout(
+					page.components,
+					oldMetrics,
+					nextMetrics,
+				);
+			}
 			page.columns = columns === 24 ? 24 : 12;
-			page.rowHeight = Math.min(
-				200,
-				Math.max(40, Math.round(rowHeight) || 72),
-			);
+			page.rowHeight = nextMetrics.rowHeight;
+			page.gap = nextMetrics.gap;
 		});
 	}
 

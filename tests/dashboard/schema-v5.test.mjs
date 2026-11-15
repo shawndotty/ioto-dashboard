@@ -134,3 +134,16 @@ test('file and folder query targets survive a load', () => {
 	const ids = imported.queries.map((query) => query.id);
 	assert.deepEqual(ids, ['user:file', 'user:folder']);
 });
+
+test('page row height and gap are clamped to their new ranges', () => {
+	const low = repository().importJson(store({}, { rowHeight: 5, gap: -1 })).dashboards[0].pages[0];
+	assert.equal(low.rowHeight, 10);
+	assert.equal(low.gap, 0);
+
+	const high = repository().importJson(store({}, { rowHeight: 300, gap: 999 })).dashboards[0].pages[0];
+	assert.equal(high.rowHeight, 200);
+	assert.equal(high.gap, 32);
+
+	const bad = repository().importJson(store({}, { gap: '12' })).dashboards[0].pages[0];
+	assert.equal(bad.gap, undefined);
+});

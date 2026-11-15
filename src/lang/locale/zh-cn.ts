@@ -285,7 +285,11 @@ export default {
 	PAGE_LAYOUT_COLUMNS_12: "12 列",
 	PAGE_LAYOUT_COLUMNS_24: "24 列",
 	PAGE_LAYOUT_ROW_HEIGHT: "行高",
-	PAGE_LAYOUT_ROW_HEIGHT_DESC: "每行网格的高度（像素，40-200）。",
+	PAGE_LAYOUT_ROW_HEIGHT_DESC:
+		"每行网格的高度（像素，10-200）。调整后已有卡片会自动等比换算。",
+	PAGE_LAYOUT_GAP: "网格间距",
+	PAGE_LAYOUT_GAP_DESC:
+		"卡片之间的间距（像素，0-32）。调整后纵向位置会自动换算以保持卡片位置。",
 	PAGE_LAST_CANNOT_DELETE: "至少需要保留一个页面。",
 	PAGE_NAME_PLACEHOLDER: "页面名称",
 	PAGE_DEFAULT_NAME: "页面 {0}",

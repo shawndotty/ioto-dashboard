@@ -53,6 +53,8 @@ import {
 	dropIndexX,
 	gridMetrics,
 	insertionLine,
+	pageMaxRows,
+	pageMinRows,
 	snapSize,
 	stepSize,
 	type CardRect,
@@ -77,6 +79,8 @@ import {
 	titleHiddenInMode,
 } from "../dashboard/style-settings";
 import {
+	PAGE_GAP_DEFAULT,
+	PAGE_ROW_HEIGHT_DEFAULT,
 	activeDashboard as activeDashboardOf,
 	activePageOf,
 	findDashboardForPage,
@@ -797,7 +801,11 @@ export class CustomDashboardView extends ItemView {
 		);
 		grid.style.setProperty(
 			"--ioto-dashboard-row-height",
-			`${page?.rowHeight ?? 72}px`,
+			`${page?.rowHeight ?? PAGE_ROW_HEIGHT_DEFAULT}px`,
+		);
+		grid.style.setProperty(
+			"--ioto-dashboard-gap",
+			`${page?.gap ?? PAGE_GAP_DEFAULT}px`,
 		);
 	}
 
@@ -1567,14 +1575,19 @@ export class CustomDashboardView extends ItemView {
 	private openPageLayout(page: DashboardPage): void {
 		new PageLayoutModal(
 			this.app,
-			{ columns: page.columns, rowHeight: page.rowHeight },
-			(columns, rowHeight) => {
+			{
+				columns: page.columns,
+				rowHeight: page.rowHeight,
+				gap: page.gap ?? PAGE_GAP_DEFAULT,
+			},
+			(columns, rowHeight, gap) => {
 				void (async () => {
 					this.store =
 						await this.plugin.dashboardRepository.updatePageLayout(
 							page.id,
 							columns,
 							rowHeight,
+							gap,
 						);
 					this.render();
 				})();
@@ -2329,7 +2342,26 @@ export class CustomDashboardView extends ItemView {
 		const columns = parent
 			? containerColumnsOf(parent.options)
 			: (page?.columns ?? 12);
-		return { ...bounds, maxW: Math.max(bounds.minW, columns) };
+		const maxW = Math.max(bounds.minW, columns);
+		// Only page-level cards follow the page pitch; container children keep
+		// their own row bounds.
+		if (parent || !page) return { ...bounds, maxW };
+		const rowHeight = page.rowHeight ?? PAGE_ROW_HEIGHT_DEFAULT;
+		const gap = page.gap ?? PAGE_GAP_DEFAULT;
+		const stepY = rowHeight + gap;
+		const defaultStep = PAGE_ROW_HEIGHT_DEFAULT + PAGE_GAP_DEFAULT;
+		// Type caps are row counts at the default pitch; keep their pixel size
+		// when rows get shorter, but never tighten an existing cap.
+		const scaledMax = Math.ceil((bounds.maxH * defaultStep) / stepY);
+		return {
+			...bounds,
+			maxW,
+			minH: Math.max(bounds.minH, pageMinRows(rowHeight, gap)),
+			maxH: Math.min(
+				pageMaxRows(rowHeight, gap),
+				Math.max(bounds.maxH, scaledMax),
+			),
+		};
 	}
 
 	private defaultSizeFor(
@@ -2671,10 +2703,10 @@ export class CustomDashboardView extends ItemView {
 							controller.exportPage();
 						}
 					},
-					setLayout: (columns, rowHeight) => {
+					setLayout: (columns, rowHeight, gap) => {
 						const controller = service.current()?.controller;
 						if (controller?.kind === "page") {
-							controller.setPageLayout(columns, rowHeight);
+							controller.setPageLayout(columns, rowHeight, gap);
 						}
 					},
 					setParent: (parentId) => {
@@ -2871,13 +2903,14 @@ export class CustomDashboardView extends ItemView {
 					this.render();
 				})();
 			},
-			setPageLayout: (columns, rowHeight) => {
+			setPageLayout: (columns, rowHeight, gap) => {
 				void (async () => {
 					this.store =
 						await this.plugin.dashboardRepository.updatePageLayout(
 							pageId,
 							columns,
 							rowHeight,
+							gap,
 						);
 					this.render();
 				})();
@@ -2954,7 +2987,8 @@ export class CustomDashboardView extends ItemView {
 			total: pages.length,
 			componentCount: page.components.length,
 			columns: page.columns === 24 ? 24 : 12,
-			rowHeight: page.rowHeight ?? 72,
+			rowHeight: page.rowHeight ?? PAGE_ROW_HEIGHT_DEFAULT,
+			gap: page.gap ?? PAGE_GAP_DEFAULT,
 			canDelete: pages.length - 1 - descendantsOf(pages, pageId).length > 0,
 			parentId: page.parentId ?? null,
 			parentOptions: pages
@@ -3906,7 +3940,11 @@ export class CustomDashboardView extends ItemView {
 				maxWidth,
 				Math.max(60, startRect.width + (pointer.x - startX)),
 			);
-			const rawHeight = Math.max(40, startRect.height + (pointer.y - startY));
+			const rawHeight = Math.max(
+				20,
+				metrics.stepY,
+				startRect.height + (pointer.y - startY),
+			);
 			snapped = snapSize(width, rawHeight, metrics, bounds);
 			const rowHeight = Math.max(1, metrics.stepY - metrics.gap);
 			const snapWidth = snapped.w * metrics.columnWidth + (snapped.w - 1) * metrics.gap;

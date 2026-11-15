@@ -285,7 +285,11 @@ export default {
 	PAGE_LAYOUT_COLUMNS_12: "12 columns",
 	PAGE_LAYOUT_COLUMNS_24: "24 columns",
 	PAGE_LAYOUT_ROW_HEIGHT: "Row height",
-	PAGE_LAYOUT_ROW_HEIGHT_DESC: "Height of each grid row in pixels (40-200).",
+	PAGE_LAYOUT_ROW_HEIGHT_DESC:
+		"Height of each grid row in pixels (10-200). Changing it rescales existing cards.",
+	PAGE_LAYOUT_GAP: "Grid gap",
+	PAGE_LAYOUT_GAP_DESC:
+		"Space between cards in pixels (0-32). Vertical positions are rescaled to keep cards in place.",
 	PAGE_LAST_CANNOT_DELETE: "At least one page is required.",
 	PAGE_NAME_PLACEHOLDER: "Page name",
 	PAGE_DEFAULT_NAME: "Page {0}",

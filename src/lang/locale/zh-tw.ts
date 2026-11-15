@@ -284,7 +284,11 @@ export default {
 	PAGE_LAYOUT_COLUMNS_12: "12 欄",
 	PAGE_LAYOUT_COLUMNS_24: "24 欄",
 	PAGE_LAYOUT_ROW_HEIGHT: "列高",
-	PAGE_LAYOUT_ROW_HEIGHT_DESC: "每列網格的高度（像素，40-200）。",
+	PAGE_LAYOUT_ROW_HEIGHT_DESC:
+		"每列網格的高度（像素，10-200）。調整後既有卡片會自動等比例換算。",
+	PAGE_LAYOUT_GAP: "網格間距",
+	PAGE_LAYOUT_GAP_DESC:
+		"卡片之間的間距（像素，0-32）。調整後縱向位置會自動換算以保持卡片位置。",
 	PAGE_LAST_CANNOT_DELETE: "至少需要保留一個頁面。",
 	PAGE_NAME_PLACEHOLDER: "頁面名稱",
 	PAGE_DEFAULT_NAME: "頁面 {0}",

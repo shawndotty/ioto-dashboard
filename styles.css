@@ -714,7 +714,7 @@
     display: grid;
     grid-template-columns: repeat(var(--ioto-dashboard-columns, 12), minmax(0, 1fr));
     grid-auto-rows: var(--ioto-dashboard-row-height, 72px);
-    gap: 12px;
+    gap: var(--ioto-dashboard-gap, 12px);
     align-items: stretch;
 }
 
@@ -3368,6 +3368,7 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     display: grid;
     width: max-content;
     margin-inline: auto;
+    padding-bottom:2px;
 }
 
 .ioto-heatmap-grid[data-layout="calendar"] {

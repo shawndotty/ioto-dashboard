@@ -2089,3 +2089,63 @@ test('children survive an export / import round trip', async () => {
 	assert.equal(box.children.length, 1);
 	assert.equal(box.children[0].title, 'A');
 });
+
+test('updatePageLayout clamps row height and gap into range', async () => {
+	const host = v4({}, [
+		dashboard({ id: DEFAULT_DASHBOARD_ID, pages: [page({ id: DEFAULT_PAGE_ID })] }),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	let store = await repository.updatePageLayout(DEFAULT_PAGE_ID, 12, 9, -5);
+	assert.equal(store.dashboards[0].pages[0].rowHeight, 10);
+	assert.equal(store.dashboards[0].pages[0].gap, 0);
+
+	store = await repository.updatePageLayout(DEFAULT_PAGE_ID, 12, 300, 99);
+	assert.equal(store.dashboards[0].pages[0].rowHeight, 200);
+	assert.equal(store.dashboards[0].pages[0].gap, 32);
+});
+
+test('updatePageLayout rescales page cards and leaves container children alone', async () => {
+	const child = component({ id: 'component:child', y: 1, h: 2 });
+	const host = v4({}, [
+		dashboard({
+			id: DEFAULT_DASHBOARD_ID,
+			pages: [
+				page({
+					id: DEFAULT_PAGE_ID,
+					rowHeight: 72,
+					gap: 12,
+					components: [
+						component({ id: 'component:top', y: 10, h: 2 }),
+						component({
+							id: 'component:shell',
+							type: 'container',
+							y: 0,
+							h: 6,
+							children: [child],
+						}),
+					],
+				}),
+			],
+		}),
+	]);
+	const repository = new DashboardRepository(host);
+	await repository.load();
+
+	const store = await repository.updatePageLayout(DEFAULT_PAGE_ID, 12, 10, 12);
+	const pageAfter = currentPage(store);
+	const top = pageAfter.components.find((item) => item.id === 'component:top');
+	const shell = pageAfter.components.find(
+		(item) => item.id === 'component:shell',
+	);
+	assert.equal(pageAfter.rowHeight, 10);
+	assert.equal(pageAfter.gap, 12);
+	// 84px pitch → 22px pitch: 840px / 22 ≈ 38 rows, 1008px / 22 ≈ 46 rows.
+	assert.equal(top.y, 38);
+	assert.equal(top.h, 8);
+	assert.equal(shell.y, 0);
+	assert.equal(shell.h, 23);
+	assert.equal(shell.children[0].y, 1);
+	assert.equal(shell.children[0].h, 2);
+});

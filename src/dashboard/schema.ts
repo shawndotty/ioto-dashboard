@@ -4,6 +4,12 @@ import type {
 	DashboardComponentConfig,
 	DashboardPage,
 } from "./types";
+import {
+	PAGE_GAP_MAX,
+	PAGE_GAP_MIN,
+	PAGE_ROW_HEIGHT_MAX,
+	PAGE_ROW_HEIGHT_MIN,
+} from "./types";
 
 /** Load-time validators shared by `repository.normalize` and the import planner. */
 
@@ -142,7 +148,7 @@ export function toPage(
 		id: value.id,
 		name,
 		components: value.components
-			.map(toComponent)
+			.map((component) => toComponent(component))
 			.filter((item): item is DashboardComponentConfig => item !== null),
 	};
 	if (typeof value.parentId === "string" && value.parentId.length > 0) {
@@ -152,7 +158,16 @@ export function toPage(
 		page.columns = value.columns;
 	}
 	if (typeof value.rowHeight === "number" && Number.isFinite(value.rowHeight)) {
-		page.rowHeight = Math.min(200, Math.max(40, Math.round(value.rowHeight)));
+		page.rowHeight = Math.min(
+			PAGE_ROW_HEIGHT_MAX,
+			Math.max(PAGE_ROW_HEIGHT_MIN, Math.round(value.rowHeight)),
+		);
+	}
+	if (typeof value.gap === "number" && Number.isFinite(value.gap)) {
+		page.gap = Math.min(
+			PAGE_GAP_MAX,
+			Math.max(PAGE_GAP_MIN, Math.round(value.gap)),
+		);
 	}
 	return page;
 }

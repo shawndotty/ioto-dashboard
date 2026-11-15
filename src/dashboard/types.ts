@@ -29,6 +29,13 @@ export interface DashboardComponentConfig {
 	children?: DashboardComponentConfig[];
 }
 
+export const PAGE_ROW_HEIGHT_MIN = 10;
+export const PAGE_ROW_HEIGHT_MAX = 200;
+export const PAGE_ROW_HEIGHT_DEFAULT = 72;
+export const PAGE_GAP_MIN = 0;
+export const PAGE_GAP_MAX = 32;
+export const PAGE_GAP_DEFAULT = 12;
+
 export interface DashboardPage {
 	id: string;
 	name: string;
@@ -38,6 +45,8 @@ export interface DashboardPage {
 	columns?: 12 | 24;
 	/** Page-level row height in px. */
 	rowHeight?: number;
+	/** Page-level grid gap in px; defaults to 12 when omitted. */
+	gap?: number;
 	components: DashboardComponentConfig[];
 }
 

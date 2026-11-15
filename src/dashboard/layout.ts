@@ -1,5 +1,10 @@
+import { CARD_HEADER_HEIGHT } from "./container-layout";
 import { clampSize, DEFAULT_SIZE_BOUNDS, type SizeBounds } from "./registry";
-import type { DashboardComponentConfig } from "./types";
+import {
+	PAGE_GAP_DEFAULT,
+	PAGE_ROW_HEIGHT_DEFAULT,
+	type DashboardComponentConfig,
+} from "./types";
 
 export interface CardRect {
 	id: string;
@@ -194,6 +199,83 @@ export function snapSize(
 		Math.round((height + gap) / stepY),
 		bounds,
 	);
+}
+
+export interface PageLayoutMetrics {
+	rowHeight: number;
+	gap: number;
+}
+
+/** Row pitch (row + gap) of the page grid; invalid values fall back to defaults. */
+function pageStep(metrics: PageLayoutMetrics): number {
+	const rowHeight = Number.isFinite(metrics.rowHeight)
+		? Math.max(1, metrics.rowHeight)
+		: PAGE_ROW_HEIGHT_DEFAULT;
+	const gap = Number.isFinite(metrics.gap)
+		? Math.max(0, metrics.gap)
+		: PAGE_GAP_DEFAULT;
+	return rowHeight + gap;
+}
+
+/** Smallest page row count whose card is tall enough for the title bar. */
+export function pageMinRows(
+	rowHeight: number,
+	gap: number,
+	headerHeight: number = CARD_HEADER_HEIGHT,
+): number {
+	const safeHeader = Number.isFinite(headerHeight)
+		? Math.max(0, headerHeight)
+		: CARD_HEADER_HEIGHT;
+	const safeGap = Number.isFinite(gap) ? Math.max(0, gap) : PAGE_GAP_DEFAULT;
+	return Math.max(1, Math.ceil((safeHeader + safeGap) / pageStep({ rowHeight, gap })));
+}
+
+/**
+ * Row-count ceiling expressed in pixels: the historical 24-row cap at the
+ * default 72/12 pitch, widened as rows get shorter so rescaling is not clipped.
+ */
+export function pageMaxRows(rowHeight: number, gap: number): number {
+	const defaultStep = PAGE_ROW_HEIGHT_DEFAULT + PAGE_GAP_DEFAULT;
+	return Math.max(24, Math.ceil((24 * defaultStep) / pageStep({ rowHeight, gap })));
+}
+
+/**
+ * Rewrites top-level card rows so their pixel geometry survives a row-height or
+ * gap change. Children keep their own row counts (container rows are a separate
+ * coordinate space). Components whose y/h did not change keep their identity.
+ */
+export function rescalePageLayout(
+	components: readonly DashboardComponentConfig[],
+	oldMetrics: PageLayoutMetrics,
+	newMetrics: PageLayoutMetrics,
+): DashboardComponentConfig[] {
+	const oldStep = pageStep(oldMetrics);
+	const newStep = pageStep(newMetrics);
+	if (oldStep === newStep) return components as DashboardComponentConfig[];
+	const minRows = pageMinRows(newMetrics.rowHeight, newMetrics.gap);
+	const maxRows = pageMaxRows(newMetrics.rowHeight, newMetrics.gap);
+	let changed = false;
+	const next = components.map((component) => {
+		const height = component.h;
+		if (
+			typeof height !== "number" ||
+			!Number.isFinite(height) ||
+			height <= 0
+		) {
+			return component;
+		}
+		const y = Number.isFinite(component.y) ? (component.y as number) : 0;
+		const start = Math.max(0, Math.round((y * oldStep) / newStep));
+		const end = Math.max(
+			start + 1,
+			Math.round(((y + height) * oldStep) / newStep),
+		);
+		const rows = Math.min(maxRows, Math.max(minRows, end - start));
+		if (start === y && rows === height) return component;
+		changed = true;
+		return { ...component, y: start, h: rows };
+	});
+	return changed ? next : (components as DashboardComponentConfig[]);
 }
 
 export function gridMetrics(
