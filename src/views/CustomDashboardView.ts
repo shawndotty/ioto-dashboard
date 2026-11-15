@@ -91,6 +91,7 @@ import {
 } from "../dashboard/types";
 import { metricKey, type MetricRequest, type MetricResult, type ProjectProgressGroup } from "../metrics/types";
 import { QueryRepository } from "../query/repository";
+import { queryEditMode } from "../query/manager";
 import type { QueryDefinition, QueryTarget } from "../query/types";
 import { ChartBucketModal } from "../ui/chart-bucket-modal";
 import { ComponentPickerModal } from "../ui/component-picker";
@@ -108,6 +109,7 @@ import { armPointerDrag, bindPointerSession } from "../ui/pointer-session";
 import { CommandPickerModal } from "../ui/pickers/command-picker";
 import { NotePickerModal } from "../ui/pickers/note-picker";
 import { ProjectTasksModal } from "../ui/project-tasks-modal";
+import { queryDisplayName, queryTargetLabel } from "../ui/query-labels";
 import {
 	QueryEditModal,
 	QueryManagerModal,
@@ -2683,6 +2685,8 @@ export class CustomDashboardView extends ItemView {
 						this.controller?.pickTarget(picker, key),
 					describeTarget: (picker, value) =>
 						this.controller?.describeTarget(picker, value) ?? value,
+					editQuery: (query) => this.controller?.editQuery(query),
+					createQuery: (target) => this.controller?.createQuery(target),
 				},
 				page: {
 					rename: (name) => {
@@ -2871,6 +2875,10 @@ export class CustomDashboardView extends ItemView {
 			},
 			pickTarget: (picker, key) => this.pickTargetForComponent(picker, key),
 			describeTarget: (picker, value) => this.describeTarget(picker, value),
+			editQuery: (query) =>
+				this.editComponentQuery(query, this.selectedComponentId),
+			createQuery: (target) =>
+				this.createComponentQuery(target, this.selectedComponentId),
 		};
 	}
 
@@ -4188,7 +4196,11 @@ export class CustomDashboardView extends ItemView {
 					const copy: QueryDefinition = {
 						...structuredClone(query),
 						id: uniqueQueryId(takenIds),
-						name: uniqueCopyName(sourceName, takenNames),
+						name: uniqueCopyName(
+							sourceName,
+							takenNames,
+							t("DASHBOARD_COPY_SUFFIX"),
+						),
 					};
 					delete copy.nameKey;
 					this.store = await this.plugin.dashboardRepository.addQuery(copy);
@@ -4244,6 +4256,67 @@ export class CustomDashboardView extends ItemView {
 				},
 			},
 		).open();
+	}
+
+	private editComponentQuery(
+		query: QueryDefinition,
+		componentId: string | null,
+	): void {
+		if (!componentId) return;
+		switch (queryEditMode(query)) {
+			case "missing":
+				return;
+			case "edit":
+				this.openQueryEditor(query);
+				return;
+			case "duplicate": {
+				const all = this.queryRepository().list();
+				const copy: QueryDefinition = {
+					...structuredClone(query),
+					id: uniqueQueryId(new Set(all.map((item) => item.id))),
+					name: uniqueCopyName(
+						queryDisplayName(query),
+						new Set(all.map((item) => item.name)),
+						t("DASHBOARD_COPY_SUFFIX"),
+					),
+				};
+				delete copy.nameKey;
+				this.openQueryEditor(copy, undefined, ({ created }) =>
+					this.adoptComponentQuery(created, componentId),
+				);
+				return;
+			}
+		}
+	}
+
+	private createComponentQuery(
+		target: QueryTarget,
+		componentId: string | null,
+	): void {
+		this.openQueryEditor(null, target, ({ created }) =>
+			this.adoptComponentQuery(created, componentId),
+		);
+	}
+
+	private adoptComponentQuery(
+		created: QueryDefinition,
+		componentId: string | null,
+	): void {
+		const page = this.activePage;
+		if (!componentId || !page) return;
+		const location = findComponentLocation(page.components, componentId);
+		if (!location) return;
+		const definition = this.registry.get(location.config.type);
+		if (!definition) return;
+		if (!queryTargetsFor(definition).includes(created.target)) {
+			new Notice(
+				t("INSPECTOR_QUERY_CREATED_INCOMPATIBLE", [
+					queryTargetLabel(created.target),
+				]),
+			);
+			return;
+		}
+		void this.updateComponent(componentId, { queryId: created.id });
 	}
 
 	private openQueryEditor(
@@ -4493,8 +4566,12 @@ function uniqueQueryId(taken: Set<string>): string {
 	return id;
 }
 
-function uniqueCopyName(name: string, taken: Set<string>): string {
-	const base = `${name} copy`;
+function uniqueCopyName(
+	name: string,
+	taken: Set<string>,
+	suffix = "copy",
+): string {
+	const base = `${name} ${suffix}`;
 	if (!taken.has(base)) return base;
 	let n = 2;
 	while (taken.has(`${base} ${n}`)) n++;

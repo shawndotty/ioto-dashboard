@@ -51,6 +51,8 @@ export interface ComponentInspectorDeps {
 	openPageSettings?(): void;
 	pickTarget?(picker: TargetPickerKind, key: string): void;
 	describeTarget?(picker: TargetPickerKind, value: string): string;
+	editQuery?(query: QueryDefinition): void;
+	createQuery?(target: QueryTarget): void;
 }
 
 type LabelKey = Parameters<typeof t>[0];
@@ -918,6 +920,40 @@ export class ComponentInspector {
 			model.missing ? state.target.config.queryId : null,
 		);
 		select.disabled = !state.editable;
+
+		// Resolve from the stored id: on a missing query the select holds a
+		// placeholder option whose value is the dangling id.
+		const currentQuery = state.queries.find(
+			(query) => query.id === state.target.config.queryId,
+		);
+		const actions = row.createDiv({
+			cls: "ioto-inspector-query-actions",
+		});
+		const edit = actions.createEl("button", {
+			cls: "clickable-icon",
+			attr: {
+				type: "button",
+				"aria-label": t("INSPECTOR_QUERY_EDIT"),
+				title: t("INSPECTOR_QUERY_EDIT"),
+			},
+		});
+		setIcon(edit, "pencil");
+		edit.disabled = !state.editable || !currentQuery;
+		edit.onClickEvent(() => {
+			if (currentQuery) this.deps.editQuery?.(currentQuery);
+		});
+
+		const create = actions.createEl("button", {
+			cls: "clickable-icon",
+			attr: {
+				type: "button",
+				"aria-label": t("INSPECTOR_QUERY_NEW"),
+				title: t("INSPECTOR_QUERY_NEW"),
+			},
+		});
+		setIcon(create, "plus");
+		create.disabled = !state.editable;
+		create.onClickEvent(() => this.deps.createQuery?.(activeTarget));
 
 		typeSelect?.addEventListener("change", () => {
 			const nextTarget = typeSelect.value as QueryTarget;

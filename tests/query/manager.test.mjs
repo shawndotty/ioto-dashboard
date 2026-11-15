@@ -6,6 +6,7 @@ const { QUERY_TARGETS } = await load('../../src/query/types.ts');
 const {
 	firstQueryOfTarget,
 	groupByTarget,
+	queryEditMode,
 	querySourceOf,
 	resolveQueryPicker,
 } = await load('../../src/query/manager.ts');
@@ -233,4 +234,21 @@ test('resolveQueryPicker falls back to all four buckets when nothing is allowed'
 	assert.equal(state.activeTarget, 'folder');
 	assert.equal(state.needsTypeSelect, true);
 	assert.equal(state.legacy, false);
+});
+
+test('queryEditMode edits user queries in place', () => {
+	assert.equal(queryEditMode(query('user:42', 'task')), 'edit');
+});
+
+test('queryEditMode duplicates builtin and saved queries', () => {
+	assert.equal(queryEditMode(query('builtin:tasks-all', 'task')), 'duplicate');
+	assert.equal(queryEditMode(query('saved:1', 'note')), 'duplicate');
+});
+
+test('queryEditMode treats unknown id prefixes as duplicate', () => {
+	assert.equal(queryEditMode(query('legacy:1', 'file')), 'duplicate');
+});
+
+test('queryEditMode reports a missing query', () => {
+	assert.equal(queryEditMode(undefined), 'missing');
 });

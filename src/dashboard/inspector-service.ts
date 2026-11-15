@@ -1,4 +1,4 @@
-import type { QueryDefinition } from "../query/types";
+import type { QueryDefinition, QueryTarget } from "../query/types";
 import type {
 	ComponentDefinition,
 	SizeBounds,
@@ -106,6 +106,10 @@ export interface ComponentInspectorController extends InspectorControllerBase {
 	pickTarget(picker: TargetPickerKind, key: string): void;
 	/** 目标值的只读展示文案；空值返回空串。 */
 	describeTarget(picker: TargetPickerKind, value: string): string;
+	/** 打开当前查询的编辑器；内置/旧版查询由视图层复制后再编辑。 */
+	editQuery(query: QueryDefinition): void;
+	/** 以指定 target 新建查询，保存成功后由视图层决定是否采纳。 */
+	createQuery(target: QueryTarget): void;
 }
 
 export interface PageInspectorController extends InspectorControllerBase {

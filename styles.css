@@ -2955,6 +2955,17 @@ body.mod-macos.is-hidden-frameless:not(.is-fullscreen)
     width: 100%;
 }
 
+.ioto-inspector-query-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+}
+
+.ioto-inspector-query-actions .clickable-icon {
+    flex: 0 0 auto;
+}
+
 .ioto-inspector-query-hint {
     color: var(--text-warning);
 }

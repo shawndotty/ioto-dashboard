@@ -78,6 +78,8 @@ export class CustomInspectorView extends ItemView {
 				pickTarget: (picker, key) => component()?.pickTarget(picker, key),
 				describeTarget: (picker, value) =>
 					component()?.describeTarget(picker, value) ?? value,
+				editQuery: (query) => component()?.editQuery(query),
+				createQuery: (target) => component()?.createQuery(target),
 			},
 			page: {
 				rename: (name) => page()?.renamePage(name),

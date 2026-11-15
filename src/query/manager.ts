@@ -17,6 +17,16 @@ export function querySourceOf(id: string): QuerySource | null {
 	return null;
 }
 
+export type QueryEditMode = "edit" | "duplicate" | "missing";
+
+/** Decides the inspector ✎ behaviour: user queries edit in place, others duplicate. */
+export function queryEditMode(
+	query: QueryDefinition | undefined,
+): QueryEditMode {
+	if (!query) return "missing";
+	return querySourceOf(query.id) === "user" ? "edit" : "duplicate";
+}
+
 /** Buckets queries by target without reordering `queries` inside a bucket. */
 export function groupByTarget(
 	queries: readonly QueryDefinition[],
