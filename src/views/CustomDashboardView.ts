@@ -4359,6 +4359,7 @@ export class CustomDashboardView extends ItemView {
 				})();
 			},
 			initialTarget,
+			this.plugin.getIndexConfig(),
 		).open();
 	}
 

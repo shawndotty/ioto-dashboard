@@ -4,13 +4,13 @@ import {
 	Modal,
 	Notice,
 	Setting,
-	TextComponent,
+	setIcon,
 	TFolder,
 } from "obsidian";
 import { t } from "../lang/helpers";
 import { createDefaultFilterState } from "../data/saved-query-adapter";
 import { normalizeFolder } from "../data/note-source";
-import type { FilterState } from "../data/types";
+import type { FilterState, IndexConfig } from "../data/types";
 import {
 	DATE_PRESETS,
 	DATE_PRESET_LABEL_KEYS,
@@ -28,6 +28,15 @@ import {
 	querySourceOf,
 	type QuerySource,
 } from "../query/manager";
+import { baseRoots } from "../query/extra-roots";
+import {
+	addScopeFolder,
+	findCoveringFolder,
+	findRedundantFolders,
+	normalizeScopeFolders,
+	removeScopeFolderAt,
+	replaceScopeFolderAt,
+} from "../query/scope";
 import {
 	queryDisplayName,
 	queryFilterSummary,
@@ -400,8 +409,7 @@ export class QueryEditModal extends Modal {
 	private dateStartInputEl: HTMLInputElement | null = null;
 	private dateEndInputEl: HTMLInputElement | null = null;
 	private rangeErrorEl: HTMLElement | null = null;
-	private foldersInput: TextComponent | null = null;
-	private foldersHintEl: HTMLElement | null = null;
+	private scopeListEl: HTMLElement | null = null;
 	private saving = false;
 
 	constructor(
@@ -409,6 +417,7 @@ export class QueryEditModal extends Modal {
 		initial: QueryDefinition | null,
 		private onSave: (query: QueryDefinition) => void,
 		initialTarget?: QueryTarget,
+		private indexConfig?: IndexConfig,
 	) {
 		super(app);
 		this.draft = initial
@@ -420,6 +429,9 @@ export class QueryEditModal extends Modal {
 					scope: { folders: [], includeSubfolders: true },
 					filters: createDefaultFilterState(),
 				};
+		this.draft.scope.folders = normalizeScopeFolders(
+			this.draft.scope.folders,
+		);
 		this.draft.filters.datePreset = normalizeDatePreset(
 			this.draft.filters.datePreset,
 		);
@@ -529,8 +541,7 @@ export class QueryEditModal extends Modal {
 		if (!this.dynamicEl) return;
 		const body = this.dynamicEl;
 		body.empty();
-		this.foldersInput = null;
-		this.foldersHintEl = null;
+		this.scopeListEl = null;
 		this.rangeEl = null;
 		this.dateStartInputEl = null;
 		this.dateEndInputEl = null;
@@ -541,42 +552,7 @@ export class QueryEditModal extends Modal {
 			text: t("QUERY_SECTION_SCOPE"),
 		});
 
-		const foldersSetting = new Setting(body)
-			.setName(t("QUERY_FOLDERS"))
-			.setDesc(t("QUERY_FOLDERS_DESC"));
-		foldersSetting.addText((text) => {
-			this.foldersInput = text;
-			text.setPlaceholder(t("QUERY_FOLDERS_PLACEHOLDER"))
-				.setValue(this.draft.scope.folders.join(", "))
-				.onChange((value) => {
-					this.draft.scope.folders = value
-						.split(",")
-						.map((item) => item.trim())
-						.filter((item) => item.length > 0);
-					this.updateScopeHint();
-				});
-		});
-		foldersSetting.addButton((button) =>
-			button
-				.setIcon("folder")
-				.setTooltip(t("QUERY_BROWSE_FOLDER"))
-				.onClick(() => {
-					new FolderPickerModal(this.app, (folder) => {
-						if (!this.draft.scope.folders.includes(folder.path)) {
-							this.draft.scope.folders.push(folder.path);
-						}
-						this.foldersInput?.setValue(
-							this.draft.scope.folders.join(", "),
-						);
-						this.updateScopeHint();
-						this.foldersInput?.inputEl.focus();
-					}).open();
-				}),
-		);
-		this.foldersHintEl = body.createDiv({
-			cls: "ioto-query-scope-hint",
-		});
-		this.updateScopeHint();
+		this.renderFolderScope(body);
 
 		new Setting(body)
 			.setName(t("QUERY_INCLUDE_SUBFOLDERS"))
@@ -585,6 +561,7 @@ export class QueryEditModal extends Modal {
 					.setValue(this.draft.scope.includeSubfolders)
 					.onChange((value) => {
 						this.draft.scope.includeSubfolders = value;
+						this.updateFolderRowStates();
 					}),
 			);
 
@@ -600,22 +577,216 @@ export class QueryEditModal extends Modal {
 		this.renderFilters(body);
 	}
 
-	/** Warn about paths that cannot resolve to a folder, instead of saving a silently empty scope. */
-	private updateScopeHint(): void {
-		const el = this.foldersHintEl;
-		if (!el) return;
-		const missing: string[] = [];
-		for (const raw of this.draft.scope.folders) {
-			const path = normalizeFolder(raw);
-			if (path.length === 0) continue;
-			const node = this.app.vault.getAbstractFileByPath(path);
-			if (!(node instanceof TFolder)) missing.push(path);
+	private renderFolderScope(body: HTMLElement): void {
+		const wrap = body.createDiv({ cls: "ioto-query-scope" });
+		wrap.createDiv({
+			cls: "ioto-query-scope-title",
+			text: t("QUERY_FOLDERS"),
+		});
+		wrap.createDiv({
+			cls: "ioto-query-scope-desc",
+			text: t("QUERY_FOLDERS_DESC"),
+		});
+		this.scopeListEl = wrap.createDiv({ cls: "ioto-query-scope-list" });
+		this.renderFolderRows();
+
+		const add = wrap.createEl("button", {
+			cls: "ioto-query-scope-add",
+			attr: { type: "button" },
+		});
+		setIcon(add, "plus");
+		add.createSpan({ text: t("QUERY_BROWSE_FOLDER") });
+		add.addEventListener("click", () => this.openFolderPicker());
+	}
+
+	private renderFolderRows(focusIndex?: number): void {
+		const list = this.scopeListEl;
+		if (!list) return;
+		list.empty();
+		this.draft.scope.folders.forEach((path, index) => {
+			this.renderFolderItem(list, path, index);
+		});
+		if (this.draft.scope.folders.length === 0) {
+			list.createDiv({
+				cls: "ioto-query-scope-empty",
+				text: this.emptyScopeText(),
+			});
 		}
-		el.setText(
-			missing.length > 0
-				? t("QUERY_SCOPE_MISSING_PATHS", [missing.join(", ")])
-				: "",
+		if (focusIndex !== undefined) {
+			list.querySelectorAll<HTMLInputElement>(
+				".ioto-query-scope-row input",
+			)[focusIndex]?.focus();
+		}
+		this.updateFolderRowStates();
+	}
+
+	private renderFolderItem(
+		list: HTMLElement,
+		path: string,
+		index: number,
+	): void {
+		const item = list.createDiv({
+			cls: "ioto-query-scope-item",
+			attr: { "data-index": String(index) },
+		});
+		const row = item.createDiv({ cls: "ioto-query-scope-row" });
+		const icon = row.createSpan({ cls: "ioto-query-scope-row-icon" });
+		setIcon(icon, "folder");
+
+		const input = row.createEl("input", {
+			attr: {
+				type: "text",
+				placeholder: t("QUERY_FOLDERS_PLACEHOLDER"),
+				"aria-label": t("QUERY_FOLDER_INPUT_LABEL", [
+					String(index + 1),
+				]),
+				title: path,
+			},
+		});
+		input.value = path;
+		input.addEventListener("input", () => {
+			this.draft.scope.folders[index] = input.value;
+		});
+
+		const commit = () => {
+			if (!input.isConnected) return;
+			const next = replaceScopeFolderAt(
+				this.draft.scope.folders,
+				index,
+				input.value,
+			);
+			const same =
+				next.length === this.draft.scope.folders.length &&
+				next.every(
+					(value, itemIndex) =>
+						value === this.draft.scope.folders[itemIndex],
+				);
+			if (same) {
+				const current = this.draft.scope.folders[index];
+				if (current !== undefined) {
+					input.value = current;
+					input.title = current;
+				}
+				return;
+			}
+			this.draft.scope.folders = next;
+			this.renderFolderRows(
+				Math.max(0, Math.min(index, next.length - 1)),
+			);
+		};
+		input.addEventListener("blur", commit);
+		input.addEventListener("keydown", (event) => {
+			if (event.key === "Enter") {
+				event.preventDefault();
+				input.blur();
+			}
+		});
+
+		const label = t("QUERY_FOLDER_REMOVE", [path || "?"]);
+		const remove = row.createEl("button", {
+			cls: "clickable-icon ioto-query-scope-row-remove",
+			attr: { type: "button", "aria-label": label, title: label },
+		});
+		setIcon(remove, "trash-2");
+		// Keep focus in the row so the pending edit commits after the click.
+		remove.addEventListener("mousedown", (event) =>
+			event.preventDefault(),
 		);
+		remove.addEventListener("click", () => {
+			this.draft.scope.folders = removeScopeFolderAt(
+				this.draft.scope.folders,
+				index,
+			);
+			this.renderFolderRows(Math.max(0, index - 1));
+		});
+
+		item.createDiv({ cls: "ioto-query-scope-row-hint" });
+	}
+
+	private updateFolderRowStates(): void {
+		const list = this.scopeListEl;
+		if (!list) return;
+		const folders = this.draft.scope.folders;
+		const redundant = new Set(
+			findRedundantFolders(
+				folders,
+				this.draft.scope.includeSubfolders,
+			),
+		);
+		list.querySelectorAll<HTMLElement>(".ioto-query-scope-item").forEach(
+			(item) => {
+				const index = Number(item.dataset.index);
+				const path = normalizeFolder(folders[index] ?? "");
+				const row = item.querySelector<HTMLElement>(
+					".ioto-query-scope-row",
+				);
+				const hint = item.querySelector<HTMLElement>(
+					".ioto-query-scope-row-hint",
+				);
+				if (!row || !hint || path.length === 0) return;
+				const node = this.app.vault.getAbstractFileByPath(path);
+				if (!(node instanceof TFolder)) {
+					row.classList.add("is-invalid");
+					hint.classList.remove("is-redundant");
+					hint.setText(
+						t(
+							node
+								? "QUERY_SCOPE_NOT_FOLDER"
+								: "QUERY_SCOPE_FOLDER_MISSING",
+						),
+					);
+					return;
+				}
+				row.classList.remove("is-invalid");
+				if (redundant.has(path)) {
+					const parent = findCoveringFolder(folders, path);
+					hint.classList.add("is-redundant");
+					hint.setText(t("QUERY_FOLDER_REDUNDANT", [parent ?? ""]));
+					return;
+				}
+				hint.classList.remove("is-redundant");
+				hint.setText("");
+			},
+		);
+	}
+
+	private openFolderPicker(): void {
+		new FolderPickerModal(this.app, (folder) => {
+			const path = normalizeFolder(folder.path);
+			if (path.length === 0) {
+				new Notice(t("QUERY_FOLDER_ROOT_UNSUPPORTED"));
+				return;
+			}
+			const before = this.draft.scope.folders.length;
+			this.draft.scope.folders = addScopeFolder(
+				this.draft.scope.folders,
+				path,
+			);
+			const added = this.draft.scope.folders.length > before;
+			this.renderFolderRows(
+				added
+					? this.draft.scope.folders.length - 1
+					: this.draft.scope.folders.indexOf(path),
+			);
+		}).open();
+	}
+
+	private emptyScopeText(): string {
+		const label = targetLabel(this.draft.target);
+		const roots = this.defaultRoots();
+		return roots.length > 0
+			? t("QUERY_FOLDERS_EMPTY", [label, roots.join(" · ")])
+			: t("QUERY_FOLDERS_EMPTY_NO_ROOTS", [label]);
+	}
+
+	private defaultRoots(): string[] {
+		const config = this.indexConfig;
+		if (!config) return [];
+		if (this.draft.target === "task") {
+			const taskRoot = normalizeFolder(config.taskFolder);
+			return taskRoot.length > 0 ? [taskRoot] : [];
+		}
+		return baseRoots(config);
 	}
 
 	private renderFileFilters(body: HTMLElement): void {
@@ -896,6 +1067,9 @@ export class QueryEditModal extends Modal {
 			return;
 		}
 		this.saving = true;
+		this.draft.scope.folders = normalizeScopeFolders(
+			this.draft.scope.folders,
+		);
 		this.close();
 		this.onSave(this.draft);
 	}

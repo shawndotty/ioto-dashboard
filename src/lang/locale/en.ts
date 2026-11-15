@@ -434,10 +434,17 @@ export default {
 	QUERY_TARGET_FOLDER: "Folders",
 	QUERY_FOLDERS: "Folders",
 	QUERY_FOLDERS_DESC:
-		"Comma-separated vault paths; empty means the target's default root. Paths outside the four framework roots are indexed on demand.",
-	QUERY_SCOPE_MISSING_PATHS:
-		"These paths do not exist or are not folders: {0}",
-	QUERY_FOLDERS_PLACEHOLDER: "3-Tasks, 1-Inputs",
+		"Each row is one vault path; empty means the target's default root. Paths outside the four framework roots are indexed on demand.",
+	QUERY_FOLDERS_PLACEHOLDER: "Vault path",
+	QUERY_FOLDER_INPUT_LABEL: "Folder path {0}",
+	QUERY_FOLDER_REMOVE: "Remove folder {0}",
+	QUERY_FOLDER_REDUNDANT: "Already covered by {0}",
+	QUERY_SCOPE_FOLDER_MISSING: "Folder does not exist",
+	QUERY_SCOPE_NOT_FOLDER: "Not a folder",
+	QUERY_FOLDERS_EMPTY: "No folders · using the default scope for {0}: {1}",
+	QUERY_FOLDERS_EMPTY_NO_ROOTS: "No folders · using the default scope for {0}",
+	QUERY_FOLDER_ROOT_UNSUPPORTED:
+		"The vault root can't be used as a scope; pick a folder instead",
 	QUERY_INCLUDE_SUBFOLDERS: "Include subfolders",
 	QUERY_BROWSE_FOLDER: "Add folder",
 	QUERY_FILTER_NAME: "Name contains",
