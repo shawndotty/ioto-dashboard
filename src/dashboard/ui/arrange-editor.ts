@@ -1,4 +1,4 @@
-import { setIcon } from "obsidian";
+import { setIcon, setTooltip } from "obsidian";
 import { t } from "../../lang/helpers";
 import {
 	groupLabelKey,
@@ -377,15 +377,20 @@ export function buildArrangeEditor(
 
 		const actions = section.createDiv({ cls: "ioto-arrange-filter-actions" });
 		const add = actions.createEl("button", {
-			cls: "ioto-arrange-action",
-			text: t("ARRANGE_FILTER_ADD"),
+			cls: "ioto-arrange-action clickable-icon",
 			attr: { type: "button", "data-arrange-focus": "filter-add" },
 		});
+		setIcon(add, "plus");
+		add.setAttribute("aria-label", t("ARRANGE_FILTER_ADD"));
+		setTooltip(add, t("ARRANGE_FILTER_ADD"));
+
 		const clear = actions.createEl("button", {
-			cls: "ioto-arrange-action ioto-arrange-filter-clear",
-			text: t("ARRANGE_CLEAR_FILTERS"),
+			cls: "ioto-arrange-action ioto-arrange-filter-clear clickable-icon",
 			attr: { type: "button" },
 		});
+		setIcon(clear, "trash-2");
+		clear.setAttribute("aria-label", t("ARRANGE_CLEAR_FILTERS"));
+		setTooltip(clear, t("ARRANGE_CLEAR_FILTERS"));
 		add.disabled = disabled;
 		add.addEventListener("click", () => {
 			if (filters.length >= MAX_FILTERS) return;
@@ -416,15 +421,6 @@ export function buildArrangeEditor(
 	}
 	if (options.onSave || options.onReset) {
 		const footer = host.createDiv({ cls: "ioto-arrange-footer" });
-		if (options.onSave) {
-			const save = footer.createEl("button", {
-				cls: "ioto-arrange-action mod-cta",
-				text: t("ARRANGE_SAVE_DEFAULT"),
-				attr: { type: "button", "data-arrange-focus": "save" },
-			});
-			save.disabled = disabled;
-			save.addEventListener("click", () => options.onSave?.());
-		}
 		if (options.onReset) {
 			const reset = footer.createEl("button", {
 				cls: "ioto-arrange-action",
@@ -433,6 +429,15 @@ export function buildArrangeEditor(
 			});
 			reset.disabled = disabled;
 			reset.addEventListener("click", () => options.onReset?.());
+		}
+		if (options.onSave) {
+			const save = footer.createEl("button", {
+				cls: "ioto-arrange-action mod-cta",
+				text: t("ARRANGE_SAVE_DEFAULT"),
+				attr: { type: "button", "data-arrange-focus": "save" },
+			});
+			save.disabled = disabled;
+			save.addEventListener("click", () => options.onSave?.());
 		}
 	}
 
