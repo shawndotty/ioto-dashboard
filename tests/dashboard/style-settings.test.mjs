@@ -7,6 +7,7 @@ const {
 	STYLE_SETTINGS,
 	STYLE_SETTING_KEYS,
 	DISPLAY_SETTINGS,
+	arrangeSettingsOf,
 	cardSurfaceOf,
 	cardStyleVars,
 	settingsOf,
@@ -223,7 +224,7 @@ test('settingsOf appends style settings and hides alignment where unsupported', 
 		);
 		assert.deepEqual(
 			merged.slice(own.length + DISPLAY_SETTINGS.length),
-			STYLE_SETTINGS,
+			[...STYLE_SETTINGS, ...arrangeSettingsOf(component)],
 		);
 
 		const align = merged.find((setting) => setting.key === 'textAlign');

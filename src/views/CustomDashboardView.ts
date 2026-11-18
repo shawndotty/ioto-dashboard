@@ -33,7 +33,22 @@ import {
 	findComponentLocation,
 	walkComponents,
 } from "../dashboard/hierarchy";
-import { datasetKey, type DatasetRequest } from "../dashboard/dataset/types";
+import {
+	datasetKey,
+	type DataObject,
+	type Dataset,
+	type DatasetColumn,
+	type DatasetRequest,
+} from "../dashboard/dataset/types";
+import { columnsForObject } from "../dashboard/dataset/columns";
+import {
+	arrangeFiltersActive,
+	normalizeArrange,
+	parseArrange,
+	sameFilters,
+	serializeArrange,
+	type PresentationSpec,
+} from "../dashboard/dataset/presentation";
 import {
 	CARD_HEADER_HEIGHT,
 	effectiveContainerRowHeight,
@@ -108,6 +123,13 @@ import { ComponentPickerModal } from "../ui/component-picker";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { ContainerPickerModal, type ContainerTarget } from "../ui/container-picker";
 import {
+	ARRANGE_TOOL_CLASSES,
+	mountCardToolsPanel,
+	mountCardToolsToggle,
+	type CardToolsPanelHandle,
+} from "../dashboard/ui/card-tools";
+import { buildArrangeEditor } from "../dashboard/ui/arrange-editor";
+import {
 	DashboardManagerModal,
 	uniqueDashboardName,
 } from "../ui/dashboard-manager";
@@ -153,6 +175,31 @@ interface CoreBaseEmbedContext {
 	depth: number;
 }
 
+/** Per-leaf, per-card presentation preview; filters stay here until saved. */
+interface ArrangeSession {
+	queryId: string;
+	object: DataObject;
+	columns: readonly DatasetColumn[];
+	spec: PresentationSpec;
+	/** Persisted defaults; group/sort edits rewrite this, filters wait for save. */
+	saved: PresentationSpec;
+	open: boolean;
+	focusKey?: string;
+	filtersDirty: boolean;
+	refreshBody?: () => void;
+	refreshBadge?: (active: boolean) => void;
+}
+
+function cloneArrangeSpec(spec: PresentationSpec): PresentationSpec {
+	const next: PresentationSpec = { v: 1 };
+	if (spec.group) next.group = spec.group;
+	if (spec.sort) next.sort = { ...spec.sort };
+	if (spec.filters && spec.filters.length > 0) {
+		next.filters = spec.filters.map((filter) => ({ ...filter }));
+	}
+	return next;
+}
+
 type CoreBaseEmbedCreator = (
 	ctx: CoreBaseEmbedContext,
 	file: TFile,
@@ -180,6 +227,7 @@ export class CustomDashboardView extends ItemView {
 		.toString(36)
 		.slice(2, 8)}`;
 	private selectedComponentId: string | null = null;
+	private readonly arrangeSessions = new Map<string, ArrangeSession>();
 	private controller: ComponentInspectorController | null = null;
 	private inspectorEl: HTMLElement | null = null;
 	private inspector: InspectorPanel | null = null;
@@ -295,6 +343,7 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	async onClose(): Promise<void> {
+		this.arrangeSessions.clear();
 		this.destroyInlineInspector();
 		this.plugin.inspectorService.clear(this.leafId);
 		for (const unsubscribe of this.unsubscribers) unsubscribe();
@@ -660,6 +709,8 @@ export class CustomDashboardView extends ItemView {
 			this.editMode ? t("DASHBOARD_VIEW_MODE") : t("DASHBOARD_EDIT_MODE"),
 			() => {
 				this.editMode = !this.editMode;
+				// Preview overrides never leak between view and edit modes.
+				if (this.editMode) this.arrangeSessions.clear();
 				this.render();
 			},
 		);
@@ -2124,6 +2175,7 @@ export class CustomDashboardView extends ItemView {
 			});
 			return card;
 		}
+		const arrange = this.arrangeContextFor(config, definition, dataset);
 		const ctx: ComponentRenderContext = {
 			config,
 			query,
@@ -2154,6 +2206,14 @@ export class CustomDashboardView extends ItemView {
 			patchComponent: (patch) => void this.updateComponent(config.id, patch),
 			mountBaseEmbed: (body, path, view, hideToolbar) =>
 				this.mountBaseEmbed(config.id, body, path, view, hideToolbar),
+			arrange: arrange
+				? {
+						get spec() {
+							return arrange.spec;
+						},
+						clearFilters: () => this.clearArrangeFilters(config, arrange),
+					}
+				: undefined,
 		};
 		try {
 			definition.render(body, ctx);
@@ -2173,6 +2233,17 @@ export class CustomDashboardView extends ItemView {
 		// `render` 先执行，头部钩子才能拿到已创建的列表句柄恢复过滤态。
 		if (!this.editMode && (status === "ready" || status === "empty")) {
 			definition.renderHeaderActions?.(header, ctx);
+		}
+		if (arrange && !this.editMode) {
+			this.mountArrangeTools(
+				card,
+				header,
+				body,
+				config,
+				definition,
+				ctx,
+				arrange,
+			);
 		}
 		return card;
 	}
@@ -2545,6 +2616,247 @@ export class CustomDashboardView extends ItemView {
 			patch,
 		);
 		this.render();
+	}
+
+	/** Session overrides the persisted spec; query changes start a clean preview. */
+	private arrangeContextFor(
+		config: DashboardComponentConfig,
+		definition: ComponentDefinition,
+		dataset: Dataset | undefined,
+	): ArrangeSession | null {
+		if (!definition.arrange || this.editMode) return null;
+		const object = definition.objects?.[0];
+		if (!object) return null;
+		const columns =
+			dataset?.columns && dataset.columns.length > 0
+				? dataset.columns
+				: columnsForObject(object);
+		const persisted = normalizeArrange(
+			parseArrange(config.options?.arrange),
+			columns,
+			object,
+		);
+		let session = this.arrangeSessions.get(config.id);
+		if (!session || session.queryId !== config.queryId) {
+			session = {
+				queryId: config.queryId,
+				object,
+				columns,
+				spec: cloneArrangeSpec(persisted),
+				saved: cloneArrangeSpec(persisted),
+				open: false,
+				filtersDirty: false,
+			};
+			this.arrangeSessions.set(config.id, session);
+		} else {
+			session.object = object;
+			session.columns = columns;
+		}
+		return session;
+	}
+
+	private mountArrangeTools(
+		card: HTMLElement,
+		header: HTMLElement,
+		body: HTMLElement,
+		config: DashboardComponentConfig,
+		definition: ComponentDefinition,
+		ctx: ComponentRenderContext,
+		session: ArrangeSession,
+	): void {
+		const { columns, object } = session;
+		let panelHandle: CardToolsPanelHandle | null = null;
+		let hintEl: HTMLElement | null = null;
+
+		const setHint = (dirty: boolean): void => {
+			hintEl?.toggleClass("is-hidden", !dirty);
+		};
+
+		const rebuildContent = (): void => {
+			if (!panelHandle) return;
+			const panel = panelHandle.panelEl;
+			const titlebar = panel.querySelector(
+				`.${ARRANGE_TOOL_CLASSES.titlebar}`,
+			);
+			for (const child of Array.from(panel.children)) {
+				if (child !== titlebar) child.remove();
+			}
+			buildContent(panel);
+		};
+
+		const buildContent = (panel: HTMLElement): void => {
+			hintEl = null;
+			buildArrangeEditor(panel, {
+				columns,
+				object,
+				spec: session.spec,
+				capability: definition.arrange ?? {},
+				filtersDirty: false,
+				onChange: (change) => {
+					session.spec = change.spec;
+					if (change.focusKey) session.focusKey = change.focusKey;
+					// Filters stay in the session; sort/group are discrete and persist.
+					const dirty = !sameFilters(
+						session.spec.filters,
+						session.saved.filters,
+					);
+					session.filtersDirty = dirty;
+					setHint(dirty);
+					toggle.setActive(
+						dirty || arrangeFiltersActive(session.saved),
+					);
+					if (change.persist) {
+						const saved = cloneArrangeSpec(session.saved);
+						if (change.spec.group) saved.group = change.spec.group;
+						else delete saved.group;
+						if (change.spec.sort) saved.sort = { ...change.spec.sort };
+						else delete saved.sort;
+						session.saved = saved;
+						session.open = true;
+						void this.persistArrange(config.id, saved);
+						return;
+					}
+					session.refreshBody?.();
+				},
+				onSave: () => {
+					session.saved = cloneArrangeSpec(session.spec);
+					session.filtersDirty = false;
+					session.open = true;
+					setHint(false);
+					toggle.setActive(arrangeFiltersActive(session.saved));
+					void this.persistArrange(config.id, session.saved);
+				},
+				onReset: () => {
+					const empty: PresentationSpec = { v: 1 };
+					session.saved = empty;
+					session.spec = cloneArrangeSpec(empty);
+					session.filtersDirty = false;
+					session.open = true;
+					setHint(false);
+					toggle.setActive(false);
+					void this.persistArrange(config.id, empty);
+				},
+			});
+			hintEl = panel.createDiv({
+				cls: "ioto-arrange-hint",
+				text: t("ARRANGE_UNSAVED_HINT"),
+			});
+			setHint(session.filtersDirty);
+		};
+
+		const setOpen = (open: boolean): void => {
+			const wasOpen = session.open;
+			session.open = open;
+			toggle.setOpen(open);
+			if (open === wasOpen) return;
+			if (open) {
+				panelHandle?.setOpen(true);
+				this.focusArrangeControl(card, session.focusKey);
+				return;
+			}
+			panelHandle?.setOpen(false);
+			if (!session.filtersDirty) return;
+			// Closing discards preview-only filters; saved defaults survive.
+			session.spec = cloneArrangeSpec(session.saved);
+			session.filtersDirty = false;
+			setHint(false);
+			toggle.setActive(arrangeFiltersActive(session.saved));
+			session.refreshBody?.();
+			rebuildContent();
+		};
+
+		const toggle = mountCardToolsToggle(header, {
+			icon: "sliders-horizontal",
+			title: t("ARRANGE_PANEL_TITLE"),
+			open: session.open,
+			active: session.filtersDirty || arrangeFiltersActive(session.saved),
+			classes: ARRANGE_TOOL_CLASSES,
+			onToggle: setOpen,
+		});
+
+		const headerHeight = header.getBoundingClientRect().height;
+		panelHandle = mountCardToolsPanel({
+			host: card,
+			classes: ARRANGE_TOOL_CLASSES,
+			title: t("ARRANGE_PANEL_TITLE"),
+			closeLabel: t("ARRANGE_PANEL_CLOSE"),
+			open: false,
+			topOffset: headerHeight > 0 ? headerHeight + 4 : 4,
+			topVar: "--ioto-arrange-panel-top",
+			setOpen,
+			buildContent,
+		});
+		toggle.setControls(panelHandle.panelId);
+
+		session.refreshBody = () => {
+			body.empty();
+			try {
+				definition.render(body, ctx);
+			} catch (error) {
+				console.error(
+					"IOTO Dashboard: component re-render failed",
+					config.id,
+					config.type,
+					error,
+				);
+			}
+		};
+		session.refreshBadge = (active) => toggle.setActive(active);
+
+		if (session.open) {
+			panelHandle.setOpen(true);
+			this.focusArrangeControl(card, session.focusKey);
+		}
+	}
+
+	private clearArrangeFilters(
+		config: DashboardComponentConfig,
+		session: ArrangeSession,
+	): void {
+		const next = cloneArrangeSpec(session.spec);
+		delete next.filters;
+		session.spec = next;
+		const saved = cloneArrangeSpec(session.saved);
+		session.filtersDirty = false;
+		session.refreshBadge?.(false);
+		if (arrangeFiltersActive(saved)) {
+			delete saved.filters;
+			session.saved = saved;
+			session.open = true;
+			void this.persistArrange(config.id, saved);
+			return;
+		}
+		session.refreshBody?.();
+	}
+
+	private async persistArrange(
+		componentId: string,
+		spec: PresentationSpec,
+	): Promise<void> {
+		const pageId = this.activePage?.id;
+		if (!pageId) return;
+		// `undefined` removes the key, restoring the component's own default.
+		const patch = {
+			options: { arrange: serializeArrange(spec) },
+		} as unknown as Partial<DashboardComponentConfig>;
+		this.store = await this.plugin.dashboardRepository.updateComponent(
+			pageId,
+			componentId,
+			patch,
+		);
+		this.render();
+	}
+
+	private focusArrangeControl(card: HTMLElement, key?: string): void {
+		window.setTimeout(() => {
+			if (!card.isConnected) return;
+			const target = key
+				? card.querySelector<HTMLElement>(
+						`[data-arrange-focus="${key}"]`,
+					)
+				: card.querySelector<HTMLElement>(".ioto-arrange-panel select");
+			target?.focus();
+		}, 0);
 	}
 
 	private requestRender(): void {
@@ -4259,6 +4571,7 @@ export class CustomDashboardView extends ItemView {
 						config,
 					);
 					this.editMode = true;
+					this.arrangeSessions.clear();
 					this.selectedComponentId = config.id;
 					this.render();
 					this.selectComponent(config.id, "first");

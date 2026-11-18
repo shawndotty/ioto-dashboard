@@ -112,6 +112,10 @@ export interface PagedListOptions<T> {
 	listClass?: string;
 	labels: PagerLabels;
 	renderItem(item: T, index: number): HTMLElement;
+	/** 分组标签；返回 null 表示该条不参与分组标题。 */
+	groupOf?(item: T): string | null;
+	/** 跨段分页：标签变化或翻到新一页的段首时插入组标题。 */
+	renderGroupHead?(label: string, count: number): HTMLElement;
 	onPageChange?(page: number): void;
 }
 
@@ -134,12 +138,32 @@ export function renderPagedList<T>(
 	const draw = (): void => {
 		listEl.empty();
 		const start = (page - 1) * size;
-		items
-			.slice(start, start + size)
-			.forEach((item, index) =>
-				listEl.appendChild(opts.renderItem(item, start + index)),
-			);
+		const visible = items.slice(start, start + size);
+		const grouped = opts.groupOf !== undefined && opts.renderGroupHead !== undefined;
+		const counts = grouped ? countGroups() : undefined;
+		let lastGroup: string | null = null;
+		visible.forEach((item, index) => {
+			if (grouped) {
+				const group = opts.groupOf?.(item) ?? null;
+				if (group !== null && group !== lastGroup) {
+					const head = opts.renderGroupHead?.(group, counts?.get(group) ?? 0);
+					if (head) listEl.appendChild(head);
+				}
+				lastGroup = group;
+			}
+			listEl.appendChild(opts.renderItem(item, start + index));
+		});
 		controls.update(page, pageCount, items.length);
+	};
+	/** 组标题的条数口径是整份（过滤后的）列表，而不是当前页。 */
+	const countGroups = (): Map<string, number> => {
+		const counts = new Map<string, number>();
+		for (const item of items) {
+			const group = opts.groupOf?.(item) ?? null;
+			if (group === null) continue;
+			counts.set(group, (counts.get(group) ?? 0) + 1);
+		}
+		return counts;
 	};
 	const goTo = (target: number): void => {
 		const next = clampPage(target, pageCount);

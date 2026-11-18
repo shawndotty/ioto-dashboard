@@ -6,7 +6,13 @@ import {
 	renderPager,
 	type PagerControls,
 } from "../../ui/pager";
-import type { DataObject, Dataset, DatasetCell, DatasetRow } from "../types";
+import type { Dataset, DatasetCell, DatasetRow } from "../types";
+import {
+	groupTableRows,
+	matchesTableRow,
+	sortTableRows,
+	type TableGroup,
+} from "../presentation";
 
 export type CellLinkKind = "task" | "auto";
 
@@ -28,136 +34,19 @@ export function resolveCellLink(cell: DatasetCell | undefined): CellLink | null 
 	};
 }
 
-export const TABLE_GROUPS = [
-	"none",
-	"project",
-	"section",
-	"status",
-	"ioType",
-	"folder",
-	"extension",
-] as const;
-
-export type TableGroup = (typeof TABLE_GROUPS)[number];
-
-const GROUPS_BY_OBJECT: Record<DataObject, TableGroup[]> = {
-	task: ["none", "project", "section", "status"],
-	note: ["none", "ioType", "folder"],
-	file: ["none", "extension", "folder"],
-	folder: ["none"],
-	project: ["none"],
-};
-
-const GROUP_LABEL_KEYS: Record<Exclude<TableGroup, "none">, string> = {
-	project: "TABLE_GROUP_PROJECT",
-	section: "TABLE_GROUP_SECTION",
-	status: "TABLE_GROUP_STATUS",
-	ioType: "TABLE_GROUP_IO_TYPE",
-	folder: "TABLE_GROUP_FOLDER",
-	extension: "TABLE_GROUP_EXTENSION",
-};
-
-/** Grouping dimensions offered for one dataset object. */
-export function groupsForObject(object: DataObject): TableGroup[] {
-	return [...(GROUPS_BY_OBJECT[object] ?? ["none"])];
-}
-
-export function groupLabelKey(group: TableGroup): string {
-	return group === "none"
-		? "TABLE_GROUP_NONE"
-		: (GROUP_LABEL_KEYS[group] ?? "TABLE_GROUP_NONE");
-}
-
-export function resolveTableGroup(value: unknown): TableGroup {
-	return typeof value === "string" &&
-		(TABLE_GROUPS as readonly string[]).includes(value)
-		? (value as TableGroup)
-		: "none";
-}
-
-/** Stored grouping may come from another object; unusable dimensions fall back. */
-export function resolveGroupFor(
-	object: DataObject,
-	value: unknown,
-): TableGroup {
-	const group = resolveTableGroup(value);
-	return groupsForObject(object).includes(group) ? group : "none";
-}
-
-/** Every cell text matches, so search spans all visible and hidden columns. */
-export function matchesTableRow(row: DatasetRow, query: string): boolean {
-	const needle = query.trim().toLocaleLowerCase();
-	if (needle.length === 0) return true;
-	return Object.values(row.cells).some((cell) =>
-		(cell?.text ?? "").toLocaleLowerCase().includes(needle),
-	);
-}
-
-function sortValueOf(row: DatasetRow, key: string): string | number {
-	const cell = row.cells[key];
-	return cell?.sortValue ?? cell?.text ?? "";
-}
-
-/** Numbers compare numerically; strings compare with numeric-aware locale order. */
-export function compareTableValues(
-	left: string | number,
-	right: string | number,
-	direction: 1 | -1,
-): number {
-	if (typeof left === "number" && typeof right === "number") {
-		return (left - right) * direction;
-	}
-	return (
-		String(left).localeCompare(String(right), undefined, {
-			numeric: true,
-			sensitivity: "base",
-		}) * direction
-	);
-}
-
-export function sortTableRows(
-	rows: readonly DatasetRow[],
-	key: string,
-	direction: 1 | -1,
-): DatasetRow[] {
-	return [...rows].sort((a, b) =>
-		compareTableValues(sortValueOf(a, key), sortValueOf(b, key), direction),
-	);
-}
-
-export interface TableGroupSegment {
-	key: string;
-	label: string;
-	rows: DatasetRow[];
-}
-
-/**
- * Groups rows without reordering: the group order follows the first appearance
- * in the (already sorted) row list, so groups stay contiguous.
- */
-export function groupTableRows(
-	rows: readonly DatasetRow[],
-	group: TableGroup,
-): TableGroupSegment[] {
-	if (group === "none") {
-		return rows.length === 0
-			? []
-			: [{ key: "", label: "", rows: [...rows] }];
-	}
-	const segments: TableGroupSegment[] = [];
-	const index = new Map<string, TableGroupSegment>();
-	for (const row of rows) {
-		const label = row.cells[group]?.text ?? "—";
-		let segment = index.get(label);
-		if (!segment) {
-			segment = { key: label, label, rows: [] };
-			index.set(label, segment);
-			segments.push(segment);
-		}
-		segment.rows.push(row);
-	}
-	return segments;
-}
+export {
+	TABLE_GROUPS,
+	compareTableValues,
+	groupLabelKey,
+	groupTableRows,
+	groupsForObject,
+	matchesTableRow,
+	resolveGroupFor,
+	resolveTableGroup,
+	sortTableRows,
+	type TableGroup,
+	type TableGroupSegment,
+} from "../presentation";
 
 export interface TableViewState {
 	page?: number;

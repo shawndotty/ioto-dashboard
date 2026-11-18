@@ -1,5 +1,12 @@
 import { t } from "../../lang/helpers";
-import type { DatasetRow } from "../dataset/types";
+import {
+	applyArrange,
+	groupLabelOf,
+	parseArrange,
+	type ArrangeSort,
+	type PresentationSpec,
+} from "../dataset/presentation";
+import type { DatasetColumn, DatasetRow } from "../dataset/types";
 import type { ComponentDefinition } from "../registry";
 import type { DashboardComponentConfig } from "../types";
 import {
@@ -18,9 +25,18 @@ const pageMemory = new WeakMap<
 	{ queryId: string; page: number }
 >();
 
+const NOTE_SORT_COLUMNS: DatasetColumn[] = [
+	{ key: "mtime", labelKey: "DATASET_COL_MTIME", type: "date" },
+];
+
+const NOTE_DEFAULT_SORT: ArrangeSort = { key: "mtime", dir: -1 };
+
 interface NoteCardState {
 	queryId: string;
 	rows: readonly DatasetRow[];
+	spec: PresentationSpec;
+	columns: readonly DatasetColumn[];
+	clearFilters?: () => void;
 	list?: PagedListHandle<DatasetRow>;
 	search?: CardSearchHandle;
 	emptyEl?: HTMLElement;
@@ -31,7 +47,12 @@ const cardStates = new WeakMap<DashboardComponentConfig, NoteCardState>();
 function stateOf(config: DashboardComponentConfig): NoteCardState {
 	let state = cardStates.get(config);
 	if (!state || state.queryId !== config.queryId) {
-		state = { queryId: config.queryId, rows: [] };
+		state = {
+			queryId: config.queryId,
+			rows: [],
+			spec: { v: 1 },
+			columns: NOTE_SORT_COLUMNS,
+		};
 		cardStates.set(config, state);
 	}
 	return state;
@@ -44,14 +65,10 @@ function rememberedPage(config: DashboardComponentConfig): number {
 
 /** 最近修改在前；同一时间戳按路径升序兜底，保证分页顺序稳定。 */
 export function sortNoteRows(rows: readonly DatasetRow[]): DatasetRow[] {
-	return [...rows].sort(
-		(a, b) =>
-			Number(b.cells.mtime?.sortValue ?? 0) -
-				Number(a.cells.mtime?.sortValue ?? 0) ||
-			String(a.cells.note?.path ?? a.id).localeCompare(
-				String(b.cells.note?.path ?? b.id),
-			),
-	);
+	return applyArrange(rows, { v: 1 }, {
+		columns: NOTE_SORT_COLUMNS,
+		defaultSort: NOTE_DEFAULT_SORT,
+	}).rows;
 }
 
 /** 标题、文件夹或 IO 类型任一命中即保留；空关键词视为全部命中。 */
@@ -71,16 +88,42 @@ function applyFilter(
 ): void {
 	const text = state.search?.text ?? cardSearchText(config);
 	const query = text.trim();
-	const isFiltering = query.length > 0;
-	const filtered = isFiltering
-		? state.rows.filter((row) => matchesNoteRow(row, text))
-		: state.rows;
+	const keywordFiltered =
+		query.length > 0
+			? state.rows.filter((row) => matchesNoteRow(row, text))
+			: state.rows;
+	const arranged = applyArrange(keywordFiltered, state.spec, {
+		columns: state.columns,
+		defaultSort: NOTE_DEFAULT_SORT,
+	});
+	const keywordEmpty = state.rows.length > 0 && keywordFiltered.length === 0;
+	const fieldFilteredEmpty =
+		keywordFiltered.length > 0 && arranged.rows.length === 0;
 	if (state.emptyEl) {
-		state.emptyEl.toggle(isFiltering && filtered.length === 0);
-		if (isFiltering) state.emptyEl.setText(t("NOTE_LIST_NO_MATCH", [query]));
+		state.emptyEl.empty();
+		state.emptyEl.toggle(keywordEmpty || fieldFilteredEmpty);
+		if (keywordEmpty) {
+			state.emptyEl.createDiv({
+				text: t("NOTE_LIST_NO_MATCH", [text.trim()]),
+			});
+		} else if (fieldFilteredEmpty) {
+			state.emptyEl.createDiv({ text: t("ARRANGE_FILTERED_EMPTY") });
+			if (state.clearFilters) {
+				const clear = state.emptyEl.createEl("button", {
+					cls: "mod-cta",
+					text: t("ARRANGE_CLEAR_FILTERS"),
+					attr: { type: "button" },
+				});
+				clear.addEventListener("click", () => state.clearFilters?.());
+			}
+		}
 	}
-	state.list?.setItems(filtered, { resetPage: true });
-	if (isFiltering) {
+	state.list?.setItems(arranged.rows, { resetPage: true });
+	if (
+		keywordEmpty ||
+		fieldFilteredEmpty ||
+		keywordFiltered.length !== state.rows.length
+	) {
 		pageMemory.set(config, { queryId: config.queryId, page: 1 });
 	}
 }
@@ -119,6 +162,12 @@ export const noteListComponent: ComponentDefinition = {
 		},
 		{ key: "title", kind: "text", group: "display" },
 	],
+	arrange: {
+		group: true,
+		sort: true,
+		filter: true,
+		defaultSort: NOTE_DEFAULT_SORT,
+	},
 	toDatasetRequest: (config) => ({
 		object: "note",
 		measure: "count",
@@ -129,10 +178,15 @@ export const noteListComponent: ComponentDefinition = {
 	isEmpty: () => false,
 	render: (el, ctx) => {
 		el.addClass("ioto-note-list");
-		const rows = sortNoteRows(ctx.dataset?.rows ?? []);
+		const persisted = parseArrange(ctx.config.options?.arrange);
 		const state = stateOf(ctx.config);
-		state.rows = rows;
-		if (rows.length === 0) {
+		state.rows = ctx.dataset?.rows ?? [];
+		state.columns = ctx.dataset?.columns ?? NOTE_SORT_COLUMNS;
+		state.spec = ctx.arrange?.spec ?? persisted;
+		state.clearFilters = ctx.arrange
+			? () => ctx.arrange?.clearFilters()
+			: undefined;
+		if (state.rows.length === 0) {
 			el.createDiv({ cls: "ioto-empty-state", text: t("NOTE_LIST_EMPTY") });
 			return;
 		}
@@ -144,14 +198,36 @@ export const noteListComponent: ComponentDefinition = {
 			range: (from, to, total) =>
 				t("PAGINATION_RANGE", [String(from), String(to), String(total)]),
 		};
+		const group = state.spec.group;
+		const arranged = applyArrange(state.rows, state.spec, {
+			columns: state.columns,
+			defaultSort: NOTE_DEFAULT_SORT,
+		});
 		state.list = renderPagedList({
 			host: el,
-			items: rows,
+			items: arranged.rows,
 			pageSize,
 			initialPage: rememberedPage(ctx.config),
 			tagName: "ul",
 			listClass: "ioto-note-list-items",
 			labels,
+			groupOf: group ? (row) => groupLabelOf(row, group) : undefined,
+			renderGroupHead: group
+				? (label, count) => {
+						const head = document.createElement("li");
+						head.className = "ioto-list-group-head";
+						head.setAttr("role", "presentation");
+						head.createSpan({
+							cls: "ioto-list-group-label",
+							text: label,
+						});
+						head.createSpan({
+							cls: "ioto-list-group-count",
+							text: t("TABLE_GROUP_COUNT", [String(count)]),
+						});
+						return head;
+					}
+				: undefined,
 			renderItem: (row) => {
 				const noteCell = row.cells.note;
 				const folderCell = row.cells.folder;
@@ -219,7 +295,9 @@ export const noteListComponent: ComponentDefinition = {
 			cls: "ioto-empty-state ioto-note-list-no-match",
 		});
 		state.emptyEl.hide();
-		if (cardSearchText(ctx.config).length > 0) applyFilter(state, ctx.config);
+		const keyword = cardSearchText(ctx.config);
+		const groupedEmpty = arranged.rows.length === 0;
+		if (keyword.length > 0 || groupedEmpty) applyFilter(state, ctx.config);
 	},
 	renderHeaderActions: (header, ctx) => {
 		const rows = ctx.dataset?.rows ?? [];

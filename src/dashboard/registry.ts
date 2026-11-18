@@ -13,6 +13,9 @@ import type {
 	TimelineBucket,
 	ViewId,
 } from "./dataset/types";
+import type { ArrangeSort, PresentationSpec } from "./dataset/presentation";
+import { normalizeArrange, serializeArrange } from "./dataset/presentation";
+import { columnsForObject } from "./dataset/columns";
 import type { FieldAxis } from "./dataset/field-roles";
 import type { TimelineSourceRef } from "./dataset/timeline";
 import type { DashboardComponentConfig } from "./types";
@@ -35,6 +38,7 @@ export interface ChartBucketPayload {
 
 export type ComponentSettingGroup =
 	| "data"
+	| "arrange"
 	| "axes"
 	| "axesX"
 	| "axesY"
@@ -46,6 +50,15 @@ export type ComponentCategory =
 	| "analysis"
 	| "navigation"
 	| "utility";
+
+/** Row-level arrange features a component opts into; absent means unsupported. */
+export interface ArrangeCapability {
+	group?: boolean;
+	sort?: boolean;
+	filter?: boolean;
+	/** Fallback order when the stored spec has no explicit sort. */
+	defaultSort?: ArrangeSort;
+}
 
 /** Inspector state a setting may depend on; absent means "no query resolved". */
 export interface SettingContext {
@@ -164,6 +177,16 @@ export type ComponentSetting = SettingBase &
 				target?: "options";
 		  }
 		| {
+				/** Group / sort / filter editor, shared by inspector and card panel. */
+				key: "arrange";
+				kind: "arrange";
+				group: "arrange";
+				labelKey: string;
+				target: "options";
+				/** Dataset columns and group dimensions the editor validates against. */
+				object: DataObject;
+		  }
+		| {
 				/** A note / command / dashboard page chosen through a picker. */
 				key: string;
 				kind: "target";
@@ -220,6 +243,11 @@ export interface ComponentRenderContext {
 	): Promise<BaseMountResult>;
 	/** Lets a component patch its own config from inside the canvas. */
 	patchComponent?(patch: Partial<DashboardComponentConfig>): void;
+	/** Effective row-level presentation for this card (session overrides config). */
+	arrange?: {
+		spec: PresentationSpec;
+		clearFilters(): void;
+	};
 }
 
 export interface SizeBounds {
@@ -269,6 +297,8 @@ export interface ComponentDefinition {
 	size?: Partial<SizeBounds>;
 	/** Declarative settings rendered by the inspector panel, in display order. */
 	settings?: ComponentSetting[];
+	/** Enables the arrange section, header toggle and floating panel. */
+	arrange?: ArrangeCapability;
 }
 
 const OBJECT_TO_TARGETS: Record<DataObject, QueryTarget[]> = {
@@ -406,6 +436,15 @@ export function coerceSettingValue(
 			return setting.target === "options"
 				? optionPatch(setting.key, values.join(",") || undefined)
 				: {};
+		}
+		case "arrange": {
+			const normalized = normalizeArrange(
+				raw,
+				columnsForObject(setting.object),
+				setting.object,
+			);
+			// An empty spec removes the key so the component falls back to its default.
+			return optionPatch(setting.key, serializeArrange(normalized));
 		}
 		case "target": {
 			// The picker is the only writer; validity is checked at execution time.

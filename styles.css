@@ -4075,6 +4075,190 @@ button.ioto-heatmap-cell:hover {
     margin-block: -6px;
 }
 
+/* Arrange tools panel (sort / group / filter) shares the card-tools shell. */
+.ioto-arrange-toggle {
+    position: relative;
+}
+
+.ioto-arrange-toggle.has-filter::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--interactive-accent);
+}
+
+.ioto-arrange-panel {
+    --ioto-arrange-space-inline: 4px;
+    --ioto-arrange-space-field: 10px;
+    --ioto-arrange-space-section: 12px;
+    position: absolute;
+    top: var(--ioto-arrange-panel-top, 4px);
+    right: 8px;
+    z-index: 5;
+    display: none;
+    width: min(304px, calc(100% - 16px));
+    max-height: calc(100% - var(--ioto-arrange-panel-top, 4px) - 8px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m, 8px);
+    background: var(--background-primary);
+    box-shadow: var(--shadow-l);
+    color: var(--text-normal);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+}
+
+.ioto-arrange-panel.is-open {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ioto-arrange-space-section);
+}
+
+.ioto-arrange-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ioto-arrange-space-inline);
+}
+
+.ioto-arrange-title {
+    font-weight: var(--font-semibold, 600);
+}
+
+.ioto-arrange-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+}
+
+.ioto-arrange-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ioto-arrange-space-inline);
+}
+
+.ioto-arrange-label {
+    color: var(--text-muted);
+    font-weight: var(--font-medium, 500);
+}
+
+.ioto-arrange-row {
+    display: flex;
+    align-items: center;
+    gap: var(--ioto-arrange-space-inline);
+}
+
+.ioto-arrange-select {
+    min-width: 0;
+    height: 28px;
+}
+
+.ioto-arrange-sort-key {
+    flex: 1 1 auto;
+}
+
+.ioto-arrange-dir {
+    flex: 0 0 auto;
+}
+
+.ioto-arrange-filters {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ioto-arrange-space-field);
+    padding-top: var(--ioto-arrange-space-section);
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.ioto-arrange-filters-title {
+    color: var(--text-muted);
+    font-weight: var(--font-semibold, 600);
+}
+
+.ioto-arrange-filter-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ioto-arrange-space-inline);
+}
+
+.ioto-arrange-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ioto-arrange-space-inline);
+}
+
+.ioto-arrange-filter-col {
+    flex: 1 1 100%;
+}
+
+.ioto-arrange-filter-op {
+    flex: 1 1 42%;
+}
+
+.ioto-arrange-value {
+    flex: 1 1 42%;
+    min-width: 0;
+    height: 28px;
+}
+
+.ioto-arrange-filter-remove {
+    flex: 0 0 auto;
+}
+
+.ioto-arrange-empty {
+    color: var(--text-faint);
+}
+
+.ioto-arrange-filter-actions,
+.ioto-arrange-footer {
+    display: flex;
+    align-items: center;
+    gap: var(--ioto-arrange-space-inline);
+}
+
+.ioto-arrange-action {
+    height: 28px;
+    padding: 0 10px;
+}
+
+.ioto-arrange-hint {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-arrange-hint.is-hidden {
+    display: none;
+}
+
+/* Group heads rendered by paged lists (note / task list). */
+.ioto-list-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 4px 2px;
+    list-style: none;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-semibold, 600);
+}
+
+.ioto-list-group-count {
+    color: var(--text-faint);
+    font-weight: var(--font-normal, 400);
+    font-variant-numeric: tabular-nums;
+}
+
 /* Pie / donut slices */
 .ioto-chart-slice {
     fill: var(--ioto-series-color, var(--interactive-accent));

@@ -3,6 +3,11 @@ import { t } from "../../lang/helpers";
 import type { HeatmapFilter } from "../dataset/heatmap-filter";
 import type { HeatmapCell, HeatmapModel } from "../dataset/heatmap-model";
 import {
+	HEATMAP_TOOL_CLASSES,
+	mountCardToolsPanel,
+	mountCardToolsToggle,
+} from "./card-tools";
+import {
 	formatHeatmapDay,
 	presetOf,
 	summarizeExtremes,
@@ -40,7 +45,6 @@ export interface HeatmapPanelOptions {
 }
 
 const INPUT_DEBOUNCE = 150;
-let panelSeq = 0;
 
 function readInput(input: HTMLInputElement): number | null {
 	const raw = input.value.trim();
@@ -57,35 +61,20 @@ export function mountHeatmapToolsToggle(
 		onToggle(open: boolean): void;
 	},
 ): HeatmapToolsToggleHandle {
-	let open = options.open;
-	const button = header.createEl("button", {
-		cls: "clickable-icon ioto-heatmap-tools-toggle",
-		attr: { type: "button" },
+	const activeTitle = `${t("HEATMAP_TOOLS_TITLE")} · ${t("HEATMAP_TOOLS_FILTER_ACTIVE")}`;
+	const handle = mountCardToolsToggle(header, {
+		icon: "sliders-horizontal",
+		title: t("HEATMAP_TOOLS_TITLE"),
+		activeTitle,
+		open: options.open,
+		active: options.filterActive === true,
+		classes: HEATMAP_TOOL_CLASSES,
+		onToggle: (open) => options.onToggle(open),
 	});
-	setIcon(button, "sliders-horizontal");
-
-	const setFilterActive = (active: boolean): void => {
-		const text = active
-			? `${t("HEATMAP_TOOLS_TITLE")} · ${t("HEATMAP_TOOLS_FILTER_ACTIVE")}`
-			: t("HEATMAP_TOOLS_TITLE");
-		button.toggleClass("has-filter", active);
-		button.setAttribute("aria-label", text);
-		setTooltip(button, text);
-	};
-
-	const setOpen = (next: boolean): void => {
-		open = next;
-		button.setAttribute("aria-expanded", String(next));
-	};
-
-	setOpen(open);
-	setFilterActive(options.filterActive === true);
-	button.addEventListener("click", () => options.onToggle(!open));
-
 	return {
-		setOpen,
-		setFilterActive,
-		setControls: (panelId) => button.setAttribute("aria-controls", panelId),
+		setOpen: (open) => handle.setOpen(open),
+		setFilterActive: (active) => handle.setActive(active, activeTitle),
+		setControls: (panelId) => handle.setControls(panelId),
 	};
 }
 
@@ -94,40 +83,25 @@ export function mountHeatmapPanel(
 	options: HeatmapPanelOptions,
 ): HeatmapPanelHandle {
 	const { model, callbacks } = options;
-	panelSeq += 1;
-	const panelId = `ioto-heatmap-tools-panel-${panelSeq}`;
-	const titleId = `${panelId}-title`;
-
-	const panel = host.createDiv({ cls: "ioto-heatmap-tools-panel" });
-	panel.id = panelId;
-	panel.setAttribute("role", "dialog");
-	panel.setAttribute("aria-labelledby", titleId);
-	if (options.topOffset !== undefined) {
-		panel.style.setProperty(
-			"--ioto-heatmap-panel-top",
-			`${options.topOffset}px`,
-		);
-	}
+	const shell = mountCardToolsPanel({
+		host,
+		classes: HEATMAP_TOOL_CLASSES,
+		title: t("HEATMAP_TOOLS_TITLE"),
+		closeLabel: t("HEATMAP_TOOLS_CLOSE"),
+		open: options.open,
+		topOffset: options.topOffset,
+		topVar: "--ioto-heatmap-panel-top",
+		setOpen: (open) => callbacks.setOpen(open),
+		buildContent: () => {},
+	});
+	const panel = shell.panelEl;
+	const panelId = shell.panelId;
 
 	let lastLocated: string | null = null;
 	const locate = (key: string): void => {
 		lastLocated = key;
 		callbacks.locate(key);
 	};
-
-	const titlebar = panel.createDiv({ cls: "ioto-heatmap-tools-titlebar" });
-	const title = titlebar.createDiv({
-		cls: "ioto-heatmap-tools-title",
-		text: t("HEATMAP_TOOLS_TITLE"),
-	});
-	title.id = titleId;
-	const closeButton = titlebar.createEl("button", {
-		cls: "clickable-icon ioto-heatmap-tools-close",
-		attr: { type: "button", "aria-label": t("HEATMAP_TOOLS_CLOSE") },
-	});
-	setIcon(closeButton, "x");
-	setTooltip(closeButton, t("HEATMAP_TOOLS_CLOSE"));
-	closeButton.addEventListener("click", () => callbacks.setOpen(false));
 
 	const renderExtremeRow = (
 		parent: HTMLElement,
@@ -385,100 +359,10 @@ export function mountHeatmapPanel(
 	};
 	refresh(options.state);
 
-	const focusables = (): HTMLElement[] =>
-		Array.from(
-			panel.querySelectorAll<HTMLElement>(
-				'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-			),
-		).filter((element) => element.offsetParent !== null);
-
-	panel.addEventListener("keydown", (event) => {
-		if (event.key !== "Tab") return;
-		const items = focusables();
-		const first = items[0];
-		const last = items[items.length - 1];
-		if (!first || !last) return;
-		if (event.shiftKey && document.activeElement === first) {
-			event.preventDefault();
-			last.focus();
-			return;
-		}
-		if (!event.shiftKey && document.activeElement === last) {
-			event.preventDefault();
-			first.focus();
-		}
-	});
-
-	const onDocumentKeydown = (event: KeyboardEvent): void => {
-		if (!panel.isConnected) {
-			document.removeEventListener("keydown", onDocumentKeydown);
-			return;
-		}
-		if (event.key !== "Escape") return;
-		event.stopPropagation();
-		callbacks.setOpen(false);
-	};
-
-	let outside: ((event: PointerEvent) => void) | null = null;
-	const detachOutside = (): void => {
-		if (!outside) return;
-		document.removeEventListener("pointerdown", outside);
-		outside = null;
-	};
-	const attachOutside = (): void => {
-		if (outside) return;
-		outside = (event: PointerEvent) => {
-			if (!host.isConnected) {
-				detachOutside();
-				return;
-			}
-			const target = event.target;
-			if (!(target instanceof Node)) return;
-			if (panel.contains(target)) return;
-			if (
-				target instanceof HTMLElement &&
-				target.closest(".ioto-heatmap-tools-toggle")
-			) {
-				return;
-			}
-			callbacks.setOpen(false);
-		};
-		document.addEventListener("pointerdown", outside);
-	};
-
-	let open = options.open;
-	const syncPanel = (next: boolean): void => {
-		panel.toggleClass("is-open", next);
-		panel.setAttribute("aria-hidden", String(!next));
-		if (next) attachOutside();
-		else detachOutside();
-	};
-	syncPanel(open);
-
-	const focusToggle = (): void => {
-		panel
-			.closest(".ioto-dashboard-card")
-			?.querySelector<HTMLElement>(".ioto-heatmap-tools-toggle")
-			?.focus();
-	};
-
 	const setOpen = (next: boolean): void => {
-		if (next === open) return;
-		open = next;
 		if (!next) clearTimer();
-		syncPanel(next);
-		if (next) {
-			document.addEventListener("keydown", onDocumentKeydown);
-			closeButton.focus();
-			return;
-		}
-		document.removeEventListener("keydown", onDocumentKeydown);
-		focusToggle();
+		shell.setOpen(next);
 	};
-
-	if (options.open) {
-		document.addEventListener("keydown", onDocumentKeydown);
-	}
 
 	return {
 		panelId,

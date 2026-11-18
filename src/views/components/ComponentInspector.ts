@@ -22,7 +22,9 @@ import {
 	columnMatchesAxis,
 	fieldAxisFor,
 } from "../../dashboard/dataset/field-roles";
+import { parseArrange } from "../../dashboard/dataset/presentation";
 import { settingsOf } from "../../dashboard/style-settings";
+import { buildArrangeEditor } from "../../dashboard/ui/arrange-editor";
 import type { DashboardComponentConfig } from "../../dashboard/types";
 import {
 	firstQueryOfTarget,
@@ -268,6 +270,15 @@ export class ComponentInspector {
 		if (dataSettings.length > 0) {
 			const section = this.createSection("INSPECTOR_SECTION_DATA");
 			for (const setting of dataSettings) {
+				this.buildSetting(section, setting, state);
+			}
+		}
+		const arrangeSettings = settings.filter(
+			(setting) => setting.group === "arrange",
+		);
+		if (arrangeSettings.length > 0) {
+			const section = this.createSection("INSPECTOR_SECTION_ARRANGE");
+			for (const setting of arrangeSettings) {
 				this.buildSetting(section, setting, state);
 			}
 		}
@@ -815,6 +826,37 @@ export class ComponentInspector {
 				for (const box of boxes) {
 					box.input.addEventListener("change", commit);
 				}
+				return;
+			}
+			case "arrange": {
+				const query = state.queries.find(
+					(item) => item.id === state.target.config.queryId,
+				);
+				const object = objectForComponentType(
+					state.target.definition?.type,
+					query,
+					state.target.config.options,
+				);
+				const columns = columnsForObject(object);
+				if (columns.length === 0) return;
+				const spec = parseArrange(
+					this.storedSettingValue(state, setting),
+				);
+				const queryIds = new Set(
+					state.queries.map((item) => item.id),
+				);
+				buildArrangeEditor(field, {
+					columns,
+					object,
+					spec,
+					capability: state.target.definition?.arrange ?? {},
+					disabled: !state.editable,
+					onChange: (change) => {
+						this.deps.patch(
+							coerceSettingValue(setting, change.spec, queryIds),
+						);
+					},
+				});
 				return;
 			}
 		}

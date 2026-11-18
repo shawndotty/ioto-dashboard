@@ -328,3 +328,55 @@ test('the table writes defaults its settings advertise', () => {
 	assert.equal(created.options?.groupBy, 'none');
 	assert.equal(created.options?.showRowNumber, false);
 });
+
+test('note and task lists opt into the arrange capability', () => {
+	assert.deepEqual(noteListComponent.arrange, {
+		group: true,
+		sort: true,
+		filter: true,
+		defaultSort: { key: 'mtime', dir: -1 },
+	});
+	assert.deepEqual(taskListComponent.arrange, {
+		group: true,
+		sort: true,
+		filter: true,
+	});
+	const others = COMPONENTS.filter(
+		(component) => component !== noteListComponent && component !== taskListComponent,
+	);
+	for (const component of others) {
+		assert.equal(component.arrange, undefined, `${component.type} stays out of arrange`);
+	}
+});
+
+test('arrange coercion normalizes against the object and removes empty specs', () => {
+	const setting = {
+		key: 'arrange',
+		kind: 'arrange',
+		group: 'arrange',
+		labelKey: 'INSPECTOR_SECTION_ARRANGE',
+		target: 'options',
+		object: 'note',
+	};
+	const result = coerceSettingValue(
+		setting,
+		{
+			v: 1,
+			group: 'status',
+			sort: { key: 'mtime', dir: -1 },
+			filters: [{ key: 'note', op: 'contains', value: 'x' }],
+		},
+		QUERY_IDS,
+	);
+	assert.equal(
+		result.options.arrange,
+		JSON.stringify({
+			v: 1,
+			sort: { key: 'mtime', dir: -1 },
+			filters: [{ key: 'note', op: 'contains', value: 'x' }],
+		}),
+	);
+	assert.deepEqual(coerceSettingValue(setting, { v: 1 }, QUERY_IDS), {
+		options: { arrange: undefined },
+	});
+});

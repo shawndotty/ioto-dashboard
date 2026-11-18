@@ -1,5 +1,11 @@
 import { t } from "../../lang/helpers";
-import type { DatasetRow } from "../dataset/types";
+import {
+	applyArrange,
+	groupLabelOf,
+	parseArrange,
+	type PresentationSpec,
+} from "../dataset/presentation";
+import type { DatasetColumn, DatasetRow } from "../dataset/types";
 import type { ComponentDefinition } from "../registry";
 import type { DashboardComponentConfig } from "../types";
 import {
@@ -31,6 +37,9 @@ const pageMemory = new WeakMap<
 interface TaskCardState {
 	queryId: string;
 	rows: readonly DatasetRow[];
+	spec: PresentationSpec;
+	columns: readonly DatasetColumn[];
+	clearFilters?: () => void;
 	list?: PagedListHandle<DatasetRow>;
 	search?: CardSearchHandle;
 	emptyEl?: HTMLElement;
@@ -41,7 +50,12 @@ const cardStates = new WeakMap<DashboardComponentConfig, TaskCardState>();
 function stateOf(config: DashboardComponentConfig): TaskCardState {
 	let state = cardStates.get(config);
 	if (!state || state.queryId !== config.queryId) {
-		state = { queryId: config.queryId, rows: [] };
+		state = {
+			queryId: config.queryId,
+			rows: [],
+			spec: { v: 1 },
+			columns: [],
+		};
 		cardStates.set(config, state);
 	}
 	return state;
@@ -71,16 +85,41 @@ function applyFilter(
 ): void {
 	const text = state.search?.text ?? cardSearchText(config);
 	const query = text.trim();
-	const isFiltering = query.length > 0;
-	const filtered = isFiltering
-		? state.rows.filter((row) => matchesTaskRow(row, text))
-		: state.rows;
+	const keywordFiltered =
+		query.length > 0
+			? state.rows.filter((row) => matchesTaskRow(row, text))
+			: state.rows;
+	const arranged = applyArrange(keywordFiltered, state.spec, {
+		columns: state.columns,
+	});
+	const keywordEmpty = state.rows.length > 0 && keywordFiltered.length === 0;
+	const fieldFilteredEmpty =
+		keywordFiltered.length > 0 && arranged.rows.length === 0;
 	if (state.emptyEl) {
-		state.emptyEl.toggle(isFiltering && filtered.length === 0);
-		if (isFiltering) state.emptyEl.setText(t("TASK_LIST_NO_MATCH", [query]));
+		state.emptyEl.empty();
+		state.emptyEl.toggle(keywordEmpty || fieldFilteredEmpty);
+		if (keywordEmpty) {
+			state.emptyEl.createDiv({
+				text: t("TASK_LIST_NO_MATCH", [text.trim()]),
+			});
+		} else if (fieldFilteredEmpty) {
+			state.emptyEl.createDiv({ text: t("ARRANGE_FILTERED_EMPTY") });
+			if (state.clearFilters) {
+				const clear = state.emptyEl.createEl("button", {
+					cls: "mod-cta",
+					text: t("ARRANGE_CLEAR_FILTERS"),
+					attr: { type: "button" },
+				});
+				clear.addEventListener("click", () => state.clearFilters?.());
+			}
+		}
 	}
-	state.list?.setItems(filtered, { resetPage: true });
-	if (isFiltering) {
+	state.list?.setItems(arranged.rows, { resetPage: true });
+	if (
+		keywordEmpty ||
+		fieldFilteredEmpty ||
+		keywordFiltered.length !== state.rows.length
+	) {
 		pageMemory.set(config, { queryId: config.queryId, page: 1 });
 	}
 }
@@ -121,6 +160,11 @@ export const taskListComponent: ComponentDefinition = {
 		},
 		{ key: "title", kind: "text", group: "display" },
 	],
+	arrange: {
+		group: true,
+		sort: true,
+		filter: true,
+	},
 	toDatasetRequest: (config) => ({
 		object: "task",
 		measure: config.measure ?? "count",
@@ -131,10 +175,15 @@ export const taskListComponent: ComponentDefinition = {
 	isEmpty: (result) => (result.items ?? []).length === 0,
 	render: (el, ctx) => {
 		el.addClass("ioto-task-list");
-		const rows = ctx.dataset?.rows ?? [];
+		const persisted = parseArrange(ctx.config.options?.arrange);
 		const state = stateOf(ctx.config);
-		state.rows = rows;
-		if (rows.length === 0) {
+		state.rows = ctx.dataset?.rows ?? [];
+		state.columns = ctx.dataset?.columns ?? [];
+		state.spec = ctx.arrange?.spec ?? persisted;
+		state.clearFilters = ctx.arrange
+			? () => ctx.arrange?.clearFilters()
+			: undefined;
+		if (state.rows.length === 0) {
 			el.createDiv({ cls: "ioto-empty-state", text: t("TASK_LIST_EMPTY") });
 			return;
 		}
@@ -148,14 +197,35 @@ export const taskListComponent: ComponentDefinition = {
 			range: (from, to, total) =>
 				t("PAGINATION_RANGE", [String(from), String(to), String(total)]),
 		};
+		const group = state.spec.group;
+		const arranged = applyArrange(state.rows, state.spec, {
+			columns: state.columns,
+		});
 		state.list = renderPagedList({
 			host: el,
-			items: rows,
+			items: arranged.rows,
 			pageSize,
 			initialPage: rememberedPage(ctx.config),
 			tagName: "ul",
 			listClass: "contains-task-list ioto-task-list-items",
 			labels,
+			groupOf: group ? (row) => groupLabelOf(row, group) : undefined,
+			renderGroupHead: group
+				? (label, count) => {
+						const head = document.createElement("li");
+						head.className = "ioto-list-group-head";
+						head.setAttr("role", "presentation");
+						head.createSpan({
+							cls: "ioto-list-group-label",
+							text: label,
+						});
+						head.createSpan({
+							cls: "ioto-list-group-count",
+							text: t("TABLE_GROUP_COUNT", [String(count)]),
+						});
+						return head;
+					}
+				: undefined,
 			renderItem: (row) => {
 				const textCell = row.cells.text;
 				const noteCell = row.cells.note;
@@ -228,7 +298,9 @@ export const taskListComponent: ComponentDefinition = {
 			cls: "ioto-empty-state ioto-task-list-no-match",
 		});
 		state.emptyEl.hide();
-		if (cardSearchText(ctx.config).length > 0) applyFilter(state, ctx.config);
+		const keyword = cardSearchText(ctx.config);
+		const groupedEmpty = arranged.rows.length === 0;
+		if (keyword.length > 0 || groupedEmpty) applyFilter(state, ctx.config);
 	},
 	renderHeaderActions: (header, ctx) => {
 		const rows = ctx.dataset?.rows ?? [];

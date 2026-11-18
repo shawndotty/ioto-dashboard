@@ -136,12 +136,35 @@ export const DISPLAY_SETTINGS: ComponentSetting[] = [
 	},
 ];
 
-/** A component's own settings, then shared display and style settings. */
+/**
+ * Arrange settings are synthesised from `definition.arrange` so components do
+ * not hand-write the row. Components without the capability get no section.
+ */
+export function arrangeSettingsOf(
+	definition: ComponentDefinition,
+): ComponentSetting[] {
+	if (!definition.arrange) return [];
+	const object = definition.objects?.[0];
+	if (!object) return [];
+	return [
+		{
+			key: "arrange",
+			kind: "arrange",
+			group: "arrange",
+			labelKey: "INSPECTOR_SECTION_ARRANGE",
+			target: "options",
+			object,
+		},
+	];
+}
+
+/** A component's own settings, then shared display, style and arrange rows. */
 export function settingsOf(definition: ComponentDefinition): ComponentSetting[] {
 	return [
 		...(definition.settings ?? []),
 		...DISPLAY_SETTINGS,
 		...STYLE_SETTINGS,
+		...arrangeSettingsOf(definition),
 	];
 }
 
