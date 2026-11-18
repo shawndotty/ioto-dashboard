@@ -56,6 +56,19 @@ function opNeedsValue(op: RowFilterOp): boolean {
 	return op !== "empty" && op !== "notEmpty";
 }
 
+/** Native input type for a column's filter value; date/number get pickers. */
+function valueInputType(column: DatasetColumn): "date" | "number" | "text" {
+	if (column.type === "date") return "date";
+	if (
+		column.type === "number" ||
+		column.type === "size" ||
+		column.type === "percent"
+	) {
+		return "number";
+	}
+	return "text"; // text / path and anything else stay a text box
+}
+
 function cloneSpec(spec: PresentationSpec): PresentationSpec {
 	const next: PresentationSpec = { v: 1 };
 	if (spec.group) next.group = spec.group;
@@ -88,10 +101,10 @@ export function buildArrangeEditor(
 		options.onChange({ spec: cloneSpec(spec), persist, focusKey });
 	};
 
-	const buildField = (parent: HTMLElement, label: string): HTMLElement => {
-		const field = parent.createDiv({ cls: "ioto-arrange-field" });
-		field.createEl("label", { cls: "ioto-arrange-label", text: label });
-		return field;
+	const buildSection = (title: string): HTMLElement => {
+		const section = host.createDiv({ cls: "ioto-arrange-section" });
+		section.createDiv({ cls: "ioto-arrange-section-title", text: title });
+		return section;
 	};
 
 	/* ------------------------------- Group -------------------------------- */
@@ -99,8 +112,8 @@ export function buildArrangeEditor(
 	if (capability.group !== false) {
 		const groups = groupsForObject(object).filter((group) => group !== "none");
 		if (groups.length > 0) {
-			const field = buildField(host, t("ARRANGE_GROUP_LABEL"));
-			const select = field.createEl("select", {
+			const section = buildSection(t("ARRANGE_GROUP_LABEL"));
+			const select = section.createEl("select", {
 				cls: "dropdown ioto-arrange-select",
 				attr: { "data-arrange-focus": "group" },
 			});
@@ -127,8 +140,8 @@ export function buildArrangeEditor(
 	/* -------------------------------- Sort -------------------------------- */
 
 	if (capability.sort !== false) {
-		const field = buildField(host, t("ARRANGE_SORT_LABEL"));
-		const row = field.createDiv({ cls: "ioto-arrange-row" });
+		const section = buildSection(t("ARRANGE_SORT_LABEL"));
+		const row = section.createDiv({ cls: "ioto-arrange-row" });
 		const select = row.createEl("select", {
 			cls: "dropdown ioto-arrange-select ioto-arrange-sort-key",
 			attr: { "data-arrange-focus": "sort" },
@@ -177,9 +190,9 @@ export function buildArrangeEditor(
 	/* ------------------------------- Filters ------------------------------ */
 
 	if (capability.filter !== false) {
-		const section = host.createDiv({ cls: "ioto-arrange-filters" });
+		const section = host.createDiv({ cls: "ioto-arrange-section" });
 		section.createDiv({
-			cls: "ioto-arrange-filters-title",
+			cls: "ioto-arrange-section-title",
 			text: t("ARRANGE_FILTER_LABEL"),
 		});
 		const list = section.createDiv({ cls: "ioto-arrange-filter-list" });
@@ -242,39 +255,61 @@ export function buildArrangeEditor(
 			opSelect.value = op;
 			opSelect.disabled = disabled;
 
-			if (opNeedsValue(op)) {
-				const value = row.createEl("input", {
+			const inputType = valueInputType(column);
+			const group = opNeedsValue(op)
+				? row.createDiv({ cls: "ioto-arrange-value-group" })
+				: null;
+
+			if (group) {
+				const value = group.createEl("input", {
 					cls: "ioto-arrange-value",
-					type: "text",
+					type: inputType,
 					attr: {
 						"data-arrange-focus": `filter-${index}-value`,
 						"aria-label": t("ARRANGE_FILTER_LABEL"),
 						placeholder: t("ARRANGE_VALUE_PLACEHOLDER"),
+						...(inputType === "number" ? { step: "any" } : {}),
 					},
 				});
 				value.value = filter.value ?? "";
 				value.disabled = disabled;
-				value.addEventListener("input", () => {
-					filter.value = value.value;
-					scheduleInput(filter, index);
-				});
+				if (inputType === "text") {
+					value.addEventListener("input", () => {
+						filter.value = value.value;
+						scheduleInput(filter, index);
+					});
+				} else {
+					// Discrete pickers: bind change only, commit immediately.
+					value.addEventListener("change", () => {
+						filter.value = value.value;
+						flushInput(filter, index);
+					});
+				}
 			}
-			if (op === "between") {
-				const value2 = row.createEl("input", {
+			if (op === "between" && group) {
+				const value2 = group.createEl("input", {
 					cls: "ioto-arrange-value",
-					type: "text",
+					type: inputType,
 					attr: {
 						"data-arrange-focus": `filter-${index}-value2`,
 						"aria-label": t("ARRANGE_VALUE2_PLACEHOLDER"),
 						placeholder: t("ARRANGE_VALUE2_PLACEHOLDER"),
+						...(inputType === "number" ? { step: "any" } : {}),
 					},
 				});
 				value2.value = filter.value2 ?? "";
 				value2.disabled = disabled;
-				value2.addEventListener("input", () => {
-					filter.value2 = value2.value;
-					scheduleInput(filter, index);
-				});
+				if (inputType === "text") {
+					value2.addEventListener("input", () => {
+						filter.value2 = value2.value;
+						scheduleInput(filter, index);
+					});
+				} else {
+					value2.addEventListener("change", () => {
+						filter.value2 = value2.value;
+						flushInput(filter, index);
+					});
+				}
 			}
 
 			const remove = row.createEl("button", {
@@ -293,8 +328,16 @@ export function buildArrangeEditor(
 					columns.find((item) => item.key === columnSelect.value) ?? column;
 				filter.key = nextColumn.key;
 				const nextOps = operatorsForColumn(nextColumn.type);
+				let resetValue = false;
 				if (!nextOps.includes(filter.op)) {
 					filter.op = nextOps[0] ?? "contains";
+					resetValue = true;
+				}
+				// A text value left in a date/number box would silently fail parsing.
+				if (valueInputType(nextColumn) !== valueInputType(column)) {
+					resetValue = true;
+				}
+				if (resetValue) {
 					delete filter.value;
 					delete filter.value2;
 				}
@@ -326,7 +369,7 @@ export function buildArrangeEditor(
 			if (filters.length === 0) {
 				list.createDiv({
 					cls: "ioto-arrange-empty",
-					text: t("ARRANGE_FILTER_LABEL"),
+					text: t("ARRANGE_FILTER_EMPTY_HINT"),
 				});
 			}
 			clear.disabled = disabled || filters.length === 0;

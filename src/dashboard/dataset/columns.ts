@@ -1,4 +1,5 @@
-import type { DataObject, DatasetColumn } from "./types";
+import type { DataObject, Dataset, DatasetColumn } from "./types";
+import { arrangeColumnsFor } from "./presentation";
 import { FILE_COLUMNS } from "./adapters/file";
 import { FOLDER_COLUMNS } from "./adapters/folder";
 import { NOTE_COLUMNS } from "./adapters/note";
@@ -24,6 +25,21 @@ export function columnsForObject(object: DataObject): DatasetColumn[] {
 
 export function seriesColumnsForTask(): DatasetColumn[] {
 	return TASK_SERIES_COLUMNS;
+}
+
+/**
+ * Columns used by the shared arrange pickers: prefer the live dataset columns,
+ * fall back to the static catalogue, then drop fields the object cannot use.
+ */
+export function columnsForArrange(
+	object: DataObject,
+	dataset?: Dataset,
+): DatasetColumn[] {
+	const raw =
+		dataset?.columns && dataset.columns.length > 0
+			? dataset.columns
+			: columnsForObject(object);
+	return arrangeColumnsFor(object, raw);
 }
 
 /** `config.options.columns` is a comma-separated key list; empty means "all". */

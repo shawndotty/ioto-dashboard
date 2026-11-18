@@ -80,6 +80,22 @@ export function treemapObjectForQuery(
 	}
 }
 
+/**
+ * Object used by the shared arrange (sort/group/filter) pickers. A component's
+ * declared `objects` win so the side inspector and the card popover resolve
+ * the same object; the type/query fallback covers definitions without one.
+ */
+export function objectForArrange(
+	definition: { objects?: readonly DataObject[] } | undefined,
+	type: string | undefined,
+	query: QueryDefinition | undefined,
+	options?: Record<string, unknown>,
+): DataObject {
+	return (
+		definition?.objects?.[0] ?? objectForComponentType(type, query, options)
+	);
+}
+
 /** Field-picker object mapping; unknown component types read the query object. */
 export function objectForComponentType(
 	type: string | undefined,

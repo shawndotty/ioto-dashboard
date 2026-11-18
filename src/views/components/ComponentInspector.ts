@@ -10,11 +10,13 @@ import {
 	type TargetPickerKind,
 } from "../../dashboard/registry";
 import {
+	columnsForArrange,
 	columnsForObject,
 	parseColumnSelection,
 	timelineColumnsForObject,
 } from "../../dashboard/dataset/columns";
 import {
+	objectForArrange,
 	objectForComponentType,
 	objectForQuery,
 } from "../../dashboard/dataset/object";
@@ -832,12 +834,13 @@ export class ComponentInspector {
 				const query = state.queries.find(
 					(item) => item.id === state.target.config.queryId,
 				);
-				const object = objectForComponentType(
+				const object = objectForArrange(
+					state.target.definition,
 					state.target.definition?.type,
 					query,
 					state.target.config.options,
 				);
-				const columns = columnsForObject(object);
+				const columns = columnsForArrange(object);
 				if (columns.length === 0) return;
 				const spec = parseArrange(
 					this.storedSettingValue(state, setting),

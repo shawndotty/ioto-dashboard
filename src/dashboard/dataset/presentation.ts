@@ -126,6 +126,39 @@ export function groupLabelKey(group: TableGroup): string {
 		: (GROUP_LABEL_KEYS[group] ?? "TABLE_GROUP_NONE");
 }
 
+/* -------------------------------------------------------------------------- */
+/* Arrange column whitelist (shared by sort and filter pickers)                */
+/* -------------------------------------------------------------------------- */
+
+/** Default to every column and subtract only fields the object does not have. */
+const EXCLUDED_ARRANGE_KEYS: Partial<Record<DataObject, readonly string[]>> = {
+	note: ["tasks", "completed"], // notes have no completion state
+	// task / file / folder / project keep every column (task.status included).
+};
+
+/** Columns offered by the sort/filter pickers for one dataset object. */
+export function arrangeColumnsFor(
+	object: DataObject,
+	columns: readonly DatasetColumn[],
+): DatasetColumn[] {
+	const excluded = new Set(EXCLUDED_ARRANGE_KEYS[object] ?? []);
+	return columns.filter((column) => !excluded.has(column.key));
+}
+
+export function sortColumnsForObject(
+	object: DataObject,
+	columns: readonly DatasetColumn[],
+): DatasetColumn[] {
+	return arrangeColumnsFor(object, columns);
+}
+
+export function filterColumnsForObject(
+	object: DataObject,
+	columns: readonly DatasetColumn[],
+): DatasetColumn[] {
+	return arrangeColumnsFor(object, columns);
+}
+
 export function resolveTableGroup(value: unknown): TableGroup {
 	return typeof value === "string" &&
 		(TABLE_GROUPS as readonly string[]).includes(value)

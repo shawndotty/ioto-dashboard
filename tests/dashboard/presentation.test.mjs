@@ -4,7 +4,9 @@ import { load } from '../data/helpers.mjs';
 
 const {
 	applyArrange,
+	arrangeColumnsFor,
 	arrangeFiltersActive,
+	filterColumnsForObject,
 	groupsForObject,
 	matchesRowFilter,
 	normalizeArrange,
@@ -12,13 +14,25 @@ const {
 	parseArrange,
 	sameFilters,
 	serializeArrange,
+	sortColumnsForObject,
 } = await load('../../src/dashboard/dataset/presentation.ts');
 
 const NOTE_COLUMNS = [
 	{ key: 'note', labelKey: 'DATASET_COL_NOTE', type: 'text' },
 	{ key: 'folder', labelKey: 'DATASET_COL_FOLDER', type: 'path' },
 	{ key: 'ioType', labelKey: 'DATASET_COL_IO_TYPE', type: 'text' },
+	{ key: 'tasks', labelKey: 'DATASET_COL_TASKS', type: 'number' },
+	{ key: 'completed', labelKey: 'DATASET_COL_COMPLETED', type: 'number' },
+	{ key: 'size', labelKey: 'DATASET_COL_SIZE', type: 'size' },
 	{ key: 'mtime', labelKey: 'DATASET_COL_MTIME', type: 'date' },
+];
+
+const TASK_COLUMNS = [
+	{ key: 'text', labelKey: 'DATASET_COL_TEXT', type: 'text' },
+	{ key: 'note', labelKey: 'DATASET_COL_NOTE', type: 'text' },
+	{ key: 'project', labelKey: 'DATASET_COL_PROJECT', type: 'text' },
+	{ key: 'section', labelKey: 'DATASET_COL_SECTION', type: 'text' },
+	{ key: 'status', labelKey: 'DATASET_COL_STATUS', type: 'text' },
 ];
 
 function note(id, { folder = 'X', ioType = 'Input', mtime = 0 } = {}) {
@@ -283,4 +297,61 @@ test('arrangeFiltersActive and sameFilters treat undefined as empty', () => {
 		]),
 		false,
 	);
+});
+
+test('arrangeColumnsFor hides note completion fields but keeps the rest in order', () => {
+	const source = JSON.parse(JSON.stringify(NOTE_COLUMNS));
+	const result = arrangeColumnsFor('note', source);
+	const keys = result.map((column) => column.key);
+	assert.deepEqual(keys, ['note', 'folder', 'ioType', 'size', 'mtime']);
+	assert.ok(!keys.includes('tasks'));
+	assert.ok(!keys.includes('completed'));
+	// Same objects, same types, original order preserved — no cloning/renaming.
+	assert.deepEqual(
+		result.map((column) => [column.key, column.type]),
+		[
+			['note', 'text'],
+			['folder', 'path'],
+			['ioType', 'text'],
+			['size', 'size'],
+			['mtime', 'date'],
+		],
+	);
+	// Non-destructive: the input array is untouched.
+	assert.deepEqual(source, NOTE_COLUMNS);
+});
+
+test('arrangeColumnsFor keeps every task column including status', () => {
+	const result = arrangeColumnsFor('task', TASK_COLUMNS);
+	assert.deepEqual(result.map((column) => column.key), [
+		'text',
+		'note',
+		'project',
+		'section',
+		'status',
+	]);
+});
+
+test('arrangeColumnsFor handles unknown objects and empty input', () => {
+	assert.deepEqual(arrangeColumnsFor('unknown', TASK_COLUMNS), TASK_COLUMNS);
+	assert.deepEqual(arrangeColumnsFor('note', []), []);
+});
+
+test('sort/filter column helpers share one whitelist', () => {
+	assert.deepEqual(sortColumnsForObject('note', NOTE_COLUMNS), arrangeColumnsFor('note', NOTE_COLUMNS));
+	assert.deepEqual(filterColumnsForObject('note', NOTE_COLUMNS), arrangeColumnsFor('note', NOTE_COLUMNS));
+	assert.deepEqual(sortColumnsForObject('task', TASK_COLUMNS), filterColumnsForObject('task', TASK_COLUMNS));
+});
+
+test('normalizeArrange trims a stored completion field that is no longer offered', () => {
+	const normalized = normalizeArrange(
+		{
+			v: 1,
+			sort: { key: 'completed', dir: -1 },
+			filters: [{ key: 'tasks', op: 'gte', value: '2' }],
+		},
+		arrangeColumnsFor('note', NOTE_COLUMNS),
+		'note',
+	);
+	assert.deepEqual(normalized, { v: 1 });
 });

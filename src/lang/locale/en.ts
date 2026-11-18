@@ -258,6 +258,7 @@ export default {
 	ARRANGE_FILTER_REMOVE: "Remove filter",
 	ARRANGE_VALUE_PLACEHOLDER: "Value",
 	ARRANGE_VALUE2_PLACEHOLDER: "Upper bound",
+	ARRANGE_FILTER_EMPTY_HINT: "No filters yet — add one below",
 	ARRANGE_OP_CONTAINS: "Contains",
 	ARRANGE_OP_NOT_CONTAINS: "Does not contain",
 	ARRANGE_OP_IS: "Is",

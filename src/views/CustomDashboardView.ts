@@ -40,7 +40,8 @@ import {
 	type DatasetColumn,
 	type DatasetRequest,
 } from "../dashboard/dataset/types";
-import { columnsForObject } from "../dashboard/dataset/columns";
+import { columnsForArrange } from "../dashboard/dataset/columns";
+import { objectForArrange } from "../dashboard/dataset/object";
 import {
 	arrangeFiltersActive,
 	normalizeArrange,
@@ -2175,7 +2176,7 @@ export class CustomDashboardView extends ItemView {
 			});
 			return card;
 		}
-		const arrange = this.arrangeContextFor(config, definition, dataset);
+		const arrange = this.arrangeContextFor(config, definition, dataset, query);
 		const ctx: ComponentRenderContext = {
 			config,
 			query,
@@ -2623,14 +2624,16 @@ export class CustomDashboardView extends ItemView {
 		config: DashboardComponentConfig,
 		definition: ComponentDefinition,
 		dataset: Dataset | undefined,
+		query: QueryDefinition | undefined,
 	): ArrangeSession | null {
 		if (!definition.arrange || this.editMode) return null;
-		const object = definition.objects?.[0];
-		if (!object) return null;
-		const columns =
-			dataset?.columns && dataset.columns.length > 0
-				? dataset.columns
-				: columnsForObject(object);
+		const object = objectForArrange(
+			definition,
+			definition.type,
+			query,
+			config.options,
+		);
+		const columns = columnsForArrange(object, dataset);
 		const persisted = normalizeArrange(
 			parseArrange(config.options?.arrange),
 			columns,

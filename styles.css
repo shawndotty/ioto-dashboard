@@ -4106,6 +4106,7 @@ button.ioto-heatmap-cell:hover {
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
     padding: 12px;
+    container-type: inline-size;
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-m, 8px);
     background: var(--background-primary);
@@ -4141,15 +4142,20 @@ button.ioto-heatmap-cell:hover {
     padding: 0;
 }
 
-.ioto-arrange-field {
+.ioto-arrange-section {
     display: flex;
     flex-direction: column;
-    gap: var(--ioto-arrange-space-inline);
+    gap: var(--ioto-arrange-space-field);
 }
 
-.ioto-arrange-label {
+.ioto-arrange-section + .ioto-arrange-section {
+    padding-top: var(--ioto-arrange-space-section);
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.ioto-arrange-section-title {
     color: var(--text-muted);
-    font-weight: var(--font-medium, 500);
+    font-weight: var(--font-semibold, 600);
 }
 
 .ioto-arrange-row {
@@ -4171,19 +4177,6 @@ button.ioto-heatmap-cell:hover {
     flex: 0 0 auto;
 }
 
-.ioto-arrange-filters {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ioto-arrange-space-field);
-    padding-top: var(--ioto-arrange-space-section);
-    border-top: 1px solid var(--background-modifier-border);
-}
-
-.ioto-arrange-filters-title {
-    color: var(--text-muted);
-    font-weight: var(--font-semibold, 600);
-}
-
 .ioto-arrange-filter-list {
     display: flex;
     flex-direction: column;
@@ -4191,28 +4184,54 @@ button.ioto-heatmap-cell:hover {
 }
 
 .ioto-arrange-filter-row {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--ioto-arrange-space-inline);
 }
 
 .ioto-arrange-filter-col {
-    flex: 1 1 100%;
+    grid-column: 1 / -1;
+    grid-row: 1;
 }
 
 .ioto-arrange-filter-op {
-    flex: 1 1 42%;
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.ioto-arrange-value-group {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
 }
 
 .ioto-arrange-value {
-    flex: 1 1 42%;
+    width: 100%;
     min-width: 0;
     height: 28px;
 }
 
 .ioto-arrange-filter-remove {
-    flex: 0 0 auto;
+    grid-column: 3;
+    grid-row: 2;
+}
+
+@container (max-width: 240px) {
+    .ioto-arrange-filter-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ioto-arrange-filter-col,
+    .ioto-arrange-filter-op,
+    .ioto-arrange-value-group,
+    .ioto-arrange-filter-remove {
+        grid-column: 1;
+        grid-row: auto;
+    }
 }
 
 .ioto-arrange-empty {
