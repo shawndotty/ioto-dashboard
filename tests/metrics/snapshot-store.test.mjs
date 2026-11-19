@@ -43,9 +43,11 @@ function memoryAdapter(initial = {}) {
 			files.set(path, data);
 		},
 		rename: async (from, to) => {
+			if (files.has(to)) throw new Error('Destination file already exists!');
 			files.set(to, files.get(from));
 			files.delete(from);
 		},
+		remove: async (path) => { files.delete(path); },
 	};
 }
 
@@ -100,7 +102,7 @@ function snapshot() {
 	};
 }
 
-test('writes only the snapshot file via tmp + rename', async () => {
+test('writes the snapshot file directly with no tmp residue', async () => {
 	const adapter = memoryAdapter();
 	const now = new Date(2026, 10, 8, 10, 0).getTime();
 	await collectDailySnapshot(snapshot(), CONFIG, store(adapter, now), now);
@@ -110,6 +112,19 @@ test('writes only the snapshot file via tmp + rename', async () => {
 	assert.equal(parsed.days['2026-11-08'].totals.tasks, 3);
 	assert.equal(parsed.days['2026-11-08'].totals.open, 1);
 	assert.equal(parsed.days['2026-11-08'].totals.cancelled, 1);
+});
+
+test('reused store updates the real file on consecutive saves and leaves no .tmp', async () => {
+	const adapter = memoryAdapter();
+	const day1 = new Date(2026, 10, 8, 9, 0).getTime();
+	const day2 = new Date(2026, 10, 9, 9, 0).getTime();
+	// 复用同一 store；now() 取足够晚，保证 prune 不丢 day1
+	const shared = store(adapter, day2);
+	await collectDailySnapshot(snapshot(), CONFIG, shared, day1);
+	await collectDailySnapshot(snapshot(), CONFIG, shared, day2);
+	assert.deepEqual([...adapter.files.keys()], [`${DIR}/metrics-snapshots.json`]); // 无 .tmp 残留
+	const parsed = JSON.parse(adapter.files.get(`${DIR}/metrics-snapshots.json`));
+	assert.deepEqual(Object.keys(parsed.days).sort(), ['2026-11-08', '2026-11-09']);
 });
 
 test('same day overwrites, next day appends', async () => {

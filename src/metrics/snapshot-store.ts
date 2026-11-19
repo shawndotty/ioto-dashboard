@@ -51,6 +51,7 @@ export interface SnapshotAdapter {
 	read(path: string): Promise<string>;
 	write(path: string, data: string): Promise<void>;
 	rename(from: string, to: string): Promise<void>;
+	remove(path: string): Promise<void>;
 }
 
 export function emptyBucketCounts(): BucketCounts {
@@ -300,8 +301,11 @@ export class SnapshotStore {
 		const path = this.filePath();
 		const tmp = `${path}.tmp`;
 		try {
-			await this.adapter.write(tmp, JSON.stringify(pruned, null, 2));
-			await this.adapter.rename(tmp, path);
+			// 清理历史遗留的 .tmp（旧版本每次失败都会留一个）
+			if (await this.adapter.exists(tmp)) {
+				await this.adapter.remove(tmp);
+			}
+			await this.adapter.write(path, JSON.stringify(pruned, null, 2));
 		} catch (error) {
 			console.warn("IOTO Dashboard: failed to write snapshot file", error);
 		}
