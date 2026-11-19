@@ -165,7 +165,6 @@ export default {
 	// Custom Dashboard
 	CUSTOM_DASHBOARD_TITLE: "Custom Dashboard",
 	RIBBON_CUSTOM_DASHBOARD_TITLE: "Open Custom Dashboard",
-	COMMAND_OPEN_CUSTOM_DASHBOARD: "Open Custom Dashboard",
 	DASHBOARD_MANAGE_QUERIES: "Manage queries",
 	DASHBOARD_ADD_COMPONENT: "Add component",
 	DASHBOARD_EDIT_MODE: "Edit",

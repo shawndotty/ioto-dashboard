@@ -105,7 +105,6 @@ Notes:
     - `open-ioto-dashboard`
     - `open-ioto-task-view`
     - `open-ioto-note-view`
-    - `open-ioto-custom-dashboard`
     - `open-ioto-canvas-picker` (dashboard picker)
     - `open-ioto-canvas-<slug>` (one per dashboard, generated from its id)
     - `toggle-dashboard-quick-search`

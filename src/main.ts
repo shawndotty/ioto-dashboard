@@ -216,14 +216,6 @@ export default class IotoDashboardPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: "open-ioto-custom-dashboard",
-			name: t("COMMAND_OPEN_CUSTOM_DASHBOARD"),
-			callback: () => {
-				void this.activateCustomDashboardView();
-			},
-		});
-
-		this.addCommand({
 			id: "open-ioto-canvas-picker",
 			name: t("COMMAND_OPEN_DASHBOARD_PICKER"),
 			callback: () => {

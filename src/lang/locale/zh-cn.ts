@@ -167,7 +167,6 @@ export default {
 	// Custom Dashboard
 	CUSTOM_DASHBOARD_TITLE: "自定义仪表盘",
 	RIBBON_CUSTOM_DASHBOARD_TITLE: "打开自定义仪表盘",
-	COMMAND_OPEN_CUSTOM_DASHBOARD: "打开自定义仪表盘",
 	DASHBOARD_MANAGE_QUERIES: "管理查询",
 	DASHBOARD_ADD_COMPONENT: "添加组件",
 	DASHBOARD_EDIT_MODE: "编辑",
