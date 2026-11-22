@@ -1,9 +1,9 @@
 {
   "kind": "ioto-dashboard-page",
   "formatVersion": 1,
-  "pluginVersion": "2.8.0",
+  "pluginVersion": "2.8.1",
   "storeSchemaVersion": 7,
-  "exportedAt": "2026-11-22T03:08:59.423Z",
+  "exportedAt": "2026-11-22T11:43:05.934Z",
   "source": {
     "dashboardName": "My Dashboard",
     "pageNames": [
@@ -14,7 +14,8 @@
       "outputFolder": "2-输出",
       "taskFolder": "3-任务",
       "outcomeFolder": "4-成果"
-    }
+    },
+    "description": "使用三栏的形式，显示一周内更新的输入、输出和成果笔记"
   },
   "payload": {
     "pages": [
