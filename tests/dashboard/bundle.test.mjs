@@ -9,6 +9,7 @@ const {
 	buildQueryBundle,
 	buildBackupBundle,
 	serializeBundle,
+	applyDescription,
 	parseBundle,
 	planImport,
 	hasImportErrors,
@@ -205,6 +206,45 @@ test('serializeBundle round-trips through parseBundle', () => {
 	const parsed = parseBundle(serializeBundle(buildBackupBundle(ctx).envelope));
 	assert.equal(parsed.ok, true);
 	assert.equal(parsed.envelope.kind, 'ioto-dashboard-backup');
+});
+
+test('applyDescription writes source.description and re-serializes; parseBundle passes it through', () => {
+	const ctx = context();
+	const result = buildPageBundle(ctx, 'dashboard:1', 'page:1');
+	// source exists (dashboardName/pageNames/roots); description is added alongside.
+	const json = applyDescription(result.envelope, '一段模板介绍');
+	const parsed = parseBundle(json);
+	assert.equal(parsed.ok, true);
+	assert.equal(parsed.envelope.source.description, '一段模板介绍');
+	assert.equal(parsed.envelope.source.dashboardName, 'Main');
+	assert.deepEqual(parsed.envelope.source.roots, ROOTS);
+	// formatVersion stays 1 and the payload is untouched.
+	assert.equal(parsed.envelope.formatVersion, BUNDLE_FORMAT_VERSION);
+	assert.deepEqual(
+		parsed.envelope.payload.pages.map((item) => item.id),
+		['page:1'],
+	);
+	// Re-applying with an empty string is allowed (UI clears the field).
+	const cleared = parseBundle(applyDescription(result.envelope, ''));
+	assert.equal(cleared.ok, true);
+	assert.equal(cleared.envelope.source.description, '');
+});
+
+test('applyDescription builds source when the envelope has none', () => {
+	// A bundle without `source` (e.g. a hand-built envelope) still gets a source object.
+	const json = applyDescription(
+		{
+			kind: 'ioto-dashboard-page',
+			formatVersion: 1,
+			pluginVersion: '',
+			storeSchemaVersion: 7,
+			exportedAt: '2026-01-01T00:00:00.000Z',
+			payload: { queries: [] },
+			warnings: [],
+		},
+		'介绍',
+	);
+	assert.equal(parseBundle(json).envelope.source.description, '介绍');
 });
 
 test('planImport appends a page with fresh ids and deduped names', () => {

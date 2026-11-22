@@ -32,9 +32,14 @@ function extractMeta(bundle, key) {
 		source && typeof source.dashboardName === "string"
 			? source.dashboardName
 			: "";
+	const description =
+		source && typeof source.description === "string"
+			? source.description
+			: "";
 	return {
 		name,
 		subtitle,
+		description,
 		kind: typeof kind === "string" ? kind : "",
 		supported: kind === "ioto-dashboard-page",
 	};

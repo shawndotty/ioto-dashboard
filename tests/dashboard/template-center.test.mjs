@@ -88,11 +88,11 @@ function makeFetch(opts = {}) {
 		const items =
 			source === 'gitee'
 				? [
-						{ key: 'team-overview', meta: { name: giteeName, subtitle: 'Alpha', kind: 'ioto-dashboard-page', supported: true }, bundle: giteeTeam },
-						{ key: 'dashboard-only', meta: { name: 'dashboard-only', subtitle: '', kind: 'ioto-dashboard', supported: false }, bundle: giteeDash },
+						{ key: 'team-overview', meta: { name: giteeName, subtitle: 'Alpha', description: '来自索引的介绍', kind: 'ioto-dashboard-page', supported: true }, bundle: giteeTeam },
+						{ key: 'dashboard-only', meta: { name: 'dashboard-only', subtitle: '', description: '', kind: 'ioto-dashboard', supported: false }, bundle: giteeDash },
 					]
 				: [
-						{ key: 'team-overview', meta: { name: '团队总览', subtitle: 'Alpha', kind: 'ioto-dashboard-page', supported: true }, bundle: envelope },
+						{ key: 'team-overview', meta: { name: '团队总览', subtitle: 'Alpha', description: '', kind: 'ioto-dashboard-page', supported: true }, bundle: envelope },
 					];
 		return { version: 1, generatedAt: '2026-11-22T00:00:00.000Z', templates: items };
 	};
@@ -191,11 +191,29 @@ test('extractTemplateMeta uses pageNames[0] / dashboardName / slug', () => {
 		key: 'team-overview',
 		name: '团队总览',
 		subtitle: 'Alpha',
+		description: '',
 		kind: 'ioto-dashboard-page',
 		supported: true,
 	});
 	assert.equal(tc.extractTemplateMeta(null, 'x'), null);
 	assert.equal(tc.extractTemplateMeta({ kind: 'x' }, 'x').name, 'x');
+});
+
+test('extractTemplateMeta reads source.description and normalizes missing/empty to ""', () => {
+	const withDesc = tc.extractTemplateMeta(
+		{
+			kind: 'ioto-dashboard-page',
+			source: { pageNames: ['P'], dashboardName: 'D', description: '一段介绍' },
+		},
+		'slug',
+	);
+	assert.equal(withDesc.description, '一段介绍');
+	assert.equal(withDesc.name, 'P');
+	assert.equal(withDesc.subtitle, 'D');
+	// Old bundles without the field, and non-string values, degrade to "" (fallback to subtitle in UI).
+	assert.equal(tc.extractTemplateMeta({ kind: 'x', source: { dashboardName: 'D' } }, 's').description, '');
+	assert.equal(tc.extractTemplateMeta({ kind: 'x', source: { description: 42 } }, 's').description, '');
+	assert.equal(tc.extractTemplateMeta({ kind: 'x', source: { description: '' } }, 's').description, '');
 });
 
 test('listTemplates filters hidden kinds and marks unsupported ones', async () => {
@@ -280,6 +298,11 @@ test('index hit: list and import cost 0 API; bundleByKey serves fetchTemplateJso
 	const { fetchImpl, calls } = makeFetch({ index: 'hit' });
 	const list = await tc.listTemplates('gitee', { fetchImpl, now: 1000 });
 	assert.deepEqual(list.map((item) => item.key).sort(), ['dashboard-only', 'team-overview']);
+	assert.equal(
+		list.find((item) => item.key === 'team-overview').description,
+		'来自索引的介绍',
+		'index path reads description straight from meta',
+	);
 	const afterList = calls.length;
 	assert.equal(apiCalls(calls).length, 0, 'list via index = 0 API');
 	assert.equal(calls.includes(tc.indexUrl('gitee')), true);

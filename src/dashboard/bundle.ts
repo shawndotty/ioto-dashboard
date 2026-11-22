@@ -46,6 +46,8 @@ export interface BundleEnvelope {
 		dashboardName?: string;
 		pageNames?: string[];
 		roots?: BundleRoots;
+		/** Optional free-text template introduction shown in the template center. */
+		description?: string;
 	};
 	payload: {
 		queries: QueryDefinition[];
@@ -339,6 +341,22 @@ export function buildBackupBundle(ctx: BundleContext): ExportResult {
 
 export function serializeBundle(bundle: BundleEnvelope): string {
 	return JSON.stringify(bundle, null, 2);
+}
+
+/**
+ * Writes a template description into the envelope's `source` and returns the
+ * freshly serialized JSON. Mutates `bundle.source` in place so callers can keep
+ * one envelope instance across edits (e.g. the export modal's textarea).
+ */
+export function applyDescription(
+	bundle: BundleEnvelope,
+	description: string,
+): string {
+	bundle.source = {
+		...(bundle.source ?? {}),
+		description,
+	};
+	return serializeBundle(bundle);
 }
 
 const BUNDLE_KINDS: ReadonlySet<string> = new Set<BundleKind>([

@@ -1,12 +1,14 @@
 import { App, ButtonComponent, Modal, Notice, Setting, normalizePath } from "obsidian";
 import { t } from "../lang/helpers";
-import type { ImportPlan } from "../dashboard/bundle";
-import { hasImportErrors } from "../dashboard/bundle";
+import type { BundleEnvelope, ImportPlan } from "../dashboard/bundle";
+import { applyDescription, hasImportErrors } from "../dashboard/bundle";
 import { applyModalShell } from "./modal-shell";
 import { ConfirmModal } from "./ConfirmModal";
 
 export interface ExportModalOptions {
 	json: string;
+	/** The envelope backing `json`; edited live when a description is typed. */
+	envelope: BundleEnvelope;
 	summary: string;
 	warnings: string[];
 	defaultFolder: string;
@@ -14,11 +16,15 @@ export interface ExportModalOptions {
 }
 
 export class TransferExportModal extends Modal {
+	/** Always the latest serialized JSON shared by preview / copy / save. */
+	private currentJson = "";
+
 	constructor(
 		app: App,
 		private options: ExportModalOptions,
 	) {
 		super(app);
+		this.currentJson = options.json;
 	}
 
 	onOpen(): void {
@@ -43,11 +49,27 @@ export class TransferExportModal extends Modal {
 			}
 		}
 
+		new Setting(body)
+			.setName(t("TRANSFER_DESCRIPTION_NAME"))
+			.setDesc(t("TRANSFER_DESCRIPTION_DESC"))
+			.addTextArea((text) => {
+				text.inputEl.maxLength = 200;
+				text.setPlaceholder(t("TRANSFER_DESCRIPTION_PLACEHOLDER")).onChange(
+					(value) => {
+						this.currentJson = applyDescription(
+							this.options.envelope,
+							value,
+						);
+						preview.value = this.currentJson;
+					},
+				);
+			});
+
 		const preview = body.createEl("textarea", {
 			cls: "ioto-transfer-json",
 			attr: { readonly: "true", rows: "12", spellcheck: "false" },
 		});
-		preview.value = this.options.json;
+		preview.value = this.currentJson;
 
 		let folder = this.options.defaultFolder;
 		new Setting(body)
@@ -79,7 +101,7 @@ export class TransferExportModal extends Modal {
 
 	private async copy(preview: HTMLTextAreaElement): Promise<void> {
 		try {
-			await navigator.clipboard.writeText(this.options.json);
+			await navigator.clipboard.writeText(this.currentJson);
 			new Notice(t("TRANSFER_COPIED"));
 			return;
 		} catch {
@@ -102,7 +124,7 @@ export class TransferExportModal extends Modal {
 		try {
 			const dir = path.slice(0, path.lastIndexOf("/"));
 			if (dir) await this.app.vault.adapter.mkdir(dir).catch(() => undefined);
-			await this.app.vault.adapter.write(path, this.options.json);
+			await this.app.vault.adapter.write(path, this.currentJson);
 			new Notice(t("TRANSFER_SAVED", [path]));
 			this.close();
 		} catch (error) {

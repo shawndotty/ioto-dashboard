@@ -1,12 +1,13 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-22T11:00:37.240Z",
+  "generatedAt": "2026-11-22T11:38:04.521Z",
   "templates": [
     {
       "key": "ioo-notes",
       "meta": {
         "name": "本周更新",
         "subtitle": "My Dashboard",
+        "description": "",
         "kind": "ioto-dashboard-page",
         "supported": true
       },

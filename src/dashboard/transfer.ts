@@ -85,6 +85,7 @@ export class DashboardTransfer {
 	): void {
 		new TransferExportModal(this.plugin.app, {
 			json: result.json,
+			envelope: result.envelope,
 			summary,
 			warnings: result.envelope.warnings,
 			defaultFolder: DEFAULT_TRANSFER_FOLDER,

@@ -238,7 +238,12 @@ export class TemplateCenterModal extends Modal {
 
 		const info = card.createDiv({ cls: "ioto-template-center__card-info" });
 		info.createDiv({ cls: "ioto-template-center__card-name", text: meta.name });
-		if (meta.subtitle) {
+		if (meta.description) {
+			info.createDiv({
+				cls: "ioto-template-center__card-description",
+				text: meta.description,
+			});
+		} else if (meta.subtitle) {
 			info.createDiv({
 				cls: "ioto-template-center__card-subtitle",
 				text: meta.subtitle,

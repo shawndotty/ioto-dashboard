@@ -20,6 +20,8 @@ export interface TemplateMeta {
 	key: string;
 	name: string;
 	subtitle: string;
+	/** Optional template introduction from `source.description`. */
+	description: string;
 	kind: string;
 	/** Whether this kind can be imported (page bundles only in v1). */
 	supported: boolean;
@@ -284,10 +286,15 @@ export function extractTemplateMeta(
 		source && typeof source.dashboardName === "string"
 			? source.dashboardName
 			: "";
+	const description =
+		source && typeof source.description === "string"
+			? source.description
+			: "";
 	return {
 		key: slug,
 		name,
 		subtitle,
+		description,
 		kind: typeof kind === "string" ? kind : "",
 		supported: isSupportedKind(kind),
 	};
@@ -430,6 +437,7 @@ function metaFromIndex(raw: unknown, key: string): TemplateMeta | null {
 		key,
 		name: raw.name,
 		subtitle: typeof raw.subtitle === "string" ? raw.subtitle : "",
+		description: typeof raw.description === "string" ? raw.description : "",
 		kind: raw.kind,
 		supported: isSupportedKind(raw.kind),
 	};

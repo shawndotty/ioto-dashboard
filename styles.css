@@ -5516,6 +5516,16 @@ body.is-mobile .ioto-pages-handle {
     color: var(--text-muted);
 }
 
+.ioto-dashboard-modal--template-center .ioto-template-center__card-description {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
 .ioto-dashboard-modal--template-center .ioto-template-center__badge {
     display: inline-block;
     margin-top: 4px;
