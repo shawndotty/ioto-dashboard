@@ -23,7 +23,8 @@ export class ConfirmModal extends Modal {
 		contentEl.empty();
 
 		contentEl.createEl("h2", { text: this.title });
-		contentEl.createEl("p", { text: this.message });
+		const messageEl = contentEl.createEl("p", { text: this.message });
+		messageEl.setCssStyles({ whiteSpace: "pre-line" });
 
 		const btnContainer = contentEl.createDiv({
 			cls: "confirm-modal-buttons",

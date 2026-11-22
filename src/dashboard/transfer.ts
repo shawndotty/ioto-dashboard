@@ -240,7 +240,7 @@ export class DashboardTransfer {
 		]);
 		if (plan.warnings.length > 0) {
 			message += `\n${t("TEMPLATE_CENTER_CONFIRM_WARNINGS", [
-				plan.warnings.map((item) => item.message).join("\n"),
+				plan.warnings.map((item) => `• ${item.message}`).join("\n"),
 			])}`;
 		}
 		new ConfirmModal(

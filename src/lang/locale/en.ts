@@ -1020,7 +1020,7 @@ export default {
 	TEMPLATE_CENTER_KIND_QUERY: "Query",
 	TEMPLATE_CENTER_CONFIRM_TITLE: "Import template",
 	TEMPLATE_CENTER_CONFIRM_SUMMARY:
-		"Add {0} page(s) and {1} query(ies) to this dashboard?",
+		"Importing will make these changes:\n• Add {0} page(s)\n• Add {1} query(ies)",
 	TEMPLATE_CENTER_CONFIRM_WARNINGS: "Warnings:\n{0}",
 	TEMPLATE_CENTER_IMPORT_FAILED: "Template import failed.",
 	TEMPLATE_CENTER_IMPORT_UNSUPPORTED:
