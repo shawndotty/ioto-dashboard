@@ -21,7 +21,7 @@ import {
 	TransferExportModal,
 	TransferImportModal,
 } from "../ui/transfer-modal";
-import { ConfirmModal } from "../ui/ConfirmModal";
+import { ConfirmModal, type ConfirmDetailGroup } from "../ui/ConfirmModal";
 
 export const DEFAULT_TRANSFER_FOLDER = "0-辅助/Temp";
 
@@ -234,20 +234,37 @@ export class DashboardTransfer {
 			);
 			return;
 		}
-		let message = t("TEMPLATE_CENTER_CONFIRM_SUMMARY", [
+		const message = t("TEMPLATE_CENTER_CONFIRM_SUMMARY", [
 			String(plan.pages.length),
 			String(plan.queries.length),
 		]);
-		if (plan.warnings.length > 0) {
-			message += `\n${t("TEMPLATE_CENTER_CONFIRM_WARNINGS", [
-				plan.warnings.map((item) => `• ${item.message}`).join("\n"),
-			])}`;
+		const details: ConfirmDetailGroup[] = [];
+		const adapted = plan.warnings.filter((item) => item.level === "info");
+		const skipped = plan.warnings.filter((item) => item.level === "warn");
+		if (adapted.length) {
+			details.push({
+				title: t("TEMPLATE_CENTER_CONFIRM_ADAPTED"),
+				items: adapted.map((item) => ({
+					text: item.message,
+					level: "info" as const,
+				})),
+			});
+		}
+		if (skipped.length) {
+			details.push({
+				title: t("TEMPLATE_CENTER_CONFIRM_NOTICE"),
+				items: skipped.map((item) => ({
+					text: item.message,
+					level: "warn" as const,
+				})),
+			});
 		}
 		new ConfirmModal(
 			this.plugin.app,
 			t("TEMPLATE_CENTER_CONFIRM_TITLE"),
 			message,
 			() => void this.applyTemplatePlan(plan),
+			details,
 		).open();
 	}
 

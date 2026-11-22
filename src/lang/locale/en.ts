@@ -924,7 +924,7 @@ export default {
 	TRANSFER_IMPORT_HINT:
 		"Paste a package below, or load the newest .json file from the folder.",
 	TRANSFER_IMPORT_PLACEHOLDER: "Paste the package JSON here",
-	TRANSFER_WARNINGS_TITLE: "Warnings",
+	TRANSFER_WARNINGS_TITLE: "Notes",
 	TRANSFER_FOLDER_NAME: "Folder",
 	TRANSFER_FOLDER_DESC: "Used for saving or reading the .json file.",
 	TRANSFER_DESCRIPTION_NAME: "Template description",
@@ -988,7 +988,8 @@ export default {
 		"Component “{0}” cannot use a {1} query; it now uses its default query.",
 	TRANSFER_WARN_BUTTON_PAGE:
 		"Button “{0}” links to a page outside the bundle.",
-	TRANSFER_WARN_PATH_REWRITTEN: "Folder {0} → {1}",
+	TRANSFER_WARN_PATH_REWRITTEN:
+		"Query folder scope was automatically adjusted from {0} to {1} to match this vault",
 	TRANSFER_WARN_PATH_UNMATCHED:
 		"Folder {0} is outside the source roots and was kept as is.",
 	COMMAND_EXPORT_CANVAS_PAGE: "Export current page…",
@@ -1022,6 +1023,8 @@ export default {
 	TEMPLATE_CENTER_CONFIRM_SUMMARY:
 		"Importing will make these changes:\n• Add {0} page(s)\n• Add {1} query(ies)",
 	TEMPLATE_CENTER_CONFIRM_WARNINGS: "Warnings:\n{0}",
+	TEMPLATE_CENTER_CONFIRM_ADAPTED: "Automatically adapted:",
+	TEMPLATE_CENTER_CONFIRM_NOTICE: "These items will be skipped:",
 	TEMPLATE_CENTER_IMPORT_FAILED: "Template import failed.",
 	TEMPLATE_CENTER_IMPORT_UNSUPPORTED:
 		"This template kind cannot be imported yet.",
