@@ -4,6 +4,7 @@ import {
 	fetchTemplateJson,
 	listTemplates,
 	reload,
+	TemplateHttpError,
 	type TemplateMeta,
 	type TemplateSource,
 } from "../dashboard/template-center";
@@ -32,6 +33,8 @@ export class TemplateCenterModal extends Modal {
 	private state: "loading" | "ready" | "error" = "loading";
 	private templates: TemplateMeta[] = [];
 	private error = "";
+	private rateLimited = false;
+	private cooldownUntil = 0;
 	private listEl: HTMLElement | null = null;
 	private loadSeq = 0;
 	private readonly sourceButtons = new Map<TemplateSource, HTMLButtonElement>();
@@ -51,6 +54,8 @@ export class TemplateCenterModal extends Modal {
 		});
 		this.source = "gitee";
 		this.error = "";
+		this.rateLimited = false;
+		this.cooldownUntil = 0;
 		this.templates = [];
 		this.state = "loading";
 
@@ -130,11 +135,24 @@ export class TemplateCenterModal extends Modal {
 			if (seq !== this.loadSeq) return;
 			this.templates = templates;
 			this.error = "";
+			this.rateLimited = false;
+			this.cooldownUntil = 0;
 			this.state = "ready";
 		} catch (error) {
 			if (seq !== this.loadSeq) return;
 			this.error =
 				error instanceof Error ? error.message : t("TEMPLATE_CENTER_ERROR");
+			this.rateLimited =
+				error instanceof TemplateHttpError && error.rateLimited;
+			if (
+				this.rateLimited &&
+				error instanceof TemplateHttpError &&
+				error.retryAfterSec != null
+			) {
+				this.cooldownUntil = Date.now() + error.retryAfterSec * 1000;
+			} else {
+				this.cooldownUntil = 0;
+			}
 			this.state = "error";
 		}
 		this.renderList();
@@ -153,16 +171,53 @@ export class TemplateCenterModal extends Modal {
 		}
 		if (this.state === "error") {
 			const box = root.createDiv({ cls: "ioto-template-center__placeholder is-error" });
-			box.createSpan({ text: t("TEMPLATE_CENTER_ERROR") });
-			if (this.error) {
-				box.createEl("small", { text: this.error });
+			const remaining = Math.max(
+				0,
+				Math.ceil((this.cooldownUntil - Date.now()) / 1000),
+			);
+			if (this.rateLimited) {
+				const other = this.source === "gitee" ? "GitHub" : "Gitee";
+				box.createSpan({
+					text: t("TEMPLATE_CENTER_ERROR_RATE_LIMITED", [other]),
+				});
+				if (this.cooldownUntil > 0 && remaining > 0) {
+					box.createSpan({
+						cls: "ioto-template-center__retry-after",
+						text: t("TEMPLATE_CENTER_ERROR_RETRY_AFTER", [
+							String(remaining),
+						]),
+					});
+				}
+				const switchButton = box.createEl("button", {
+					cls: "ioto-template-center__switch-source",
+					text: t("TEMPLATE_CENTER_ERROR_SWITCH_SOURCE", [other]),
+					attr: { type: "button" },
+				});
+				switchButton.addEventListener("click", () => {
+					this.source = this.source === "gitee" ? "github" : "gitee";
+					this.renderSource();
+					void this.loadList();
+				});
+			} else {
+				box.createSpan({ text: t("TEMPLATE_CENTER_ERROR") });
+				if (this.error) {
+					box.createEl("small", { text: this.error });
+				}
 			}
 			const retry = box.createEl("button", {
 				cls: "ioto-template-center__retry",
 				text: t("TEMPLATE_CENTER_RETRY"),
 				attr: { type: "button" },
 			});
-			retry.addEventListener("click", () => void this.loadList());
+			if (this.rateLimited && remaining > 0) {
+				retry.disabled = true;
+				retry.setAttribute(
+					"title",
+					t("TEMPLATE_CENTER_ERROR_RETRY_AFTER", [String(remaining)]),
+				);
+			} else {
+				retry.addEventListener("click", () => void this.loadList());
+			}
 			return;
 		}
 		if (this.templates.length === 0) {

@@ -13,6 +13,23 @@ const bundled = Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64')
 function makeFetch(giteeName = '团队总览') {
 	const calls = [];
 	const data = {
+		'https://gitee.com/api/v5/repos/johnnylearns/ioto-dashboard/git/trees/master?recursive=1':
+			{
+				truncated: false,
+				tree: [
+					{ type: 'blob', mode: '100644', path: 'templates/team-overview/dashboard.json', sha: 'sha-gitee' },
+					{ type: 'blob', mode: '100644', path: 'templates/dashboard-only/dashboard.json', sha: 'sha-dash' },
+					{ type: 'blob', mode: '100644', path: 'templates/backup-only/dashboard.json', sha: 'sha-backup' },
+					{ type: 'blob', mode: '100644', path: 'templates/team-overview/README.md', sha: 'sha-readme' },
+				],
+			},
+		'https://api.github.com/repos/shawndotty/ioto-dashboard/git/trees/master?recursive=1':
+			{
+				truncated: false,
+				tree: [
+					{ type: 'blob', mode: '100644', path: 'templates/team-overview/dashboard.json', sha: 'sha-github' },
+				],
+			},
 		'https://gitee.com/api/v5/repos/johnnylearns/ioto-dashboard/contents/templates?ref=master':
 			[
 				{ type: 'dir', name: 'team-overview' },
@@ -53,7 +70,7 @@ function makeFetch(giteeName = '团队总览') {
 		if (!(key in data)) return { ok: false, status: 404, json: async () => ({}) };
 		return { ok: true, status: 200, json: async () => data[key] };
 	};
-	return { fetchImpl, calls };
+	return { fetchImpl, calls, data };
 }
 
 test('source → list URL: Gitee never carries access_token', () => {
@@ -137,4 +154,197 @@ test('fetchTemplateJson decodes the bundle text directly', async () => {
 	const { fetchImpl } = makeFetch();
 	const text = await tc.fetchTemplateJson('github', 'team-overview', { fetchImpl });
 	assert.equal(JSON.parse(text).kind, 'ioto-dashboard-page');
+});
+
+// ---- P0-1：错误诊断透出与分级 ----
+
+function errorFetch(status, text, headers) {
+	const calls = [];
+	const fetchImpl = async (url) => {
+		calls.push(url);
+		return { ok: false, status, text, headers, json: async () => ({}) };
+	};
+	return { fetchImpl, calls };
+}
+
+test('403 diagnostics: firewall plain text is rate-limited, JSON 403 keeps detail', async () => {
+	tc.clearTemplateCache();
+	const firewall = errorFetch(403, 'forbidden by firewall', {});
+	await assert.rejects(
+		() => tc.listTemplates('gitee', { fetchImpl: firewall.fetchImpl, now: 1000 }),
+		(err) => {
+			assert.equal(err instanceof tc.TemplateHttpError, true);
+			assert.equal(err.status, 403);
+			assert.equal(err.rateLimited, true);
+			assert.equal(err.retryAfterSec, null);
+			assert.match(err.message, /rate limited/);
+			return true;
+		},
+	);
+
+	tc.clearTemplateCache();
+	const permission = errorFetch(403, JSON.stringify({ message: 'no permission' }), {});
+	await assert.rejects(
+		() => tc.listTemplates('gitee', { fetchImpl: permission.fetchImpl, now: 1000 }),
+		(err) => {
+			assert.equal(err.rateLimited, false);
+			assert.match(err.message, /no permission/);
+			return true;
+		},
+	);
+});
+
+test('parseRetryAfter: delta seconds, HTTP date, reset header, missing', () => {
+	const now = Date.parse('2026-11-22T12:00:00Z');
+	assert.equal(tc.parseRetryAfter({ 'retry-after': '9' }, now), 9);
+	assert.equal(tc.parseRetryAfter({ 'Retry-After': '6' }, now), 6);
+	assert.equal(
+		tc.parseRetryAfter({ 'Retry-After': new Date(now + 15000).toUTCString() }, now),
+		15,
+	);
+	assert.equal(tc.parseRetryAfter({ 'X-RateLimit-Reset': String(now / 1000 + 20) }, now), 20);
+	assert.equal(tc.parseRetryAfter({ 'X-RateLimit-Reset': '7' }, now), 7);
+	assert.equal(tc.parseRetryAfter({}, now), null);
+	assert.equal(tc.parseRetryAfter(undefined, now), null);
+});
+
+test('Retry-After header is carried into the error and the retry message', async () => {
+	tc.clearTemplateCache();
+	const limitedWithHeader = errorFetch(403, 'firewall', { 'Retry-After': '12' });
+	await assert.rejects(
+		() => tc.listTemplates('gitee', { fetchImpl: limitedWithHeader.fetchImpl, now: 1000 }),
+		(err) => {
+			assert.equal(err.rateLimited, true);
+			assert.equal(err.retryAfterSec, 12);
+			return true;
+		},
+	);
+});
+
+test('plain-text body is classified without touching the json getter', async () => {
+	tc.clearTemplateCache();
+	let jsonReads = 0;
+	const fetchImpl = async () => ({
+		ok: false,
+		status: 403,
+		text: 'denied by firewall',
+		headers: { 'Retry-After': '15' },
+		get json() {
+			jsonReads += 1;
+			throw new Error('json getter must not be read on an error response');
+		},
+	});
+	await assert.rejects(
+		() => tc.listTemplates('gitee', { fetchImpl, now: 1000 }),
+		(err) => {
+			assert.equal(err instanceof tc.TemplateHttpError, true);
+			assert.equal(err.rateLimited, true);
+			assert.equal(err.retryAfterSec, 15);
+			return true;
+		},
+	);
+	assert.equal(jsonReads, 0);
+});
+
+test('200 with a plain-text body reports a readable error', async () => {
+	tc.clearTemplateCache();
+	const fetchImpl = async () => ({
+		ok: true,
+		status: 200,
+		text: 'access denied by gateway',
+		headers: {},
+		json: async () => { throw new SyntaxError('Unexpected token'); },
+	});
+	await assert.rejects(
+		() => tc.listTemplates('gitee', { fetchImpl, now: 1000 }),
+		(err) => {
+			assert.equal(err instanceof tc.TemplateHttpError, true);
+			assert.equal(err.status, 200);
+			assert.match(err.message, /access denied by gateway/);
+			return true;
+		},
+	);
+});
+
+// ---- P1-1：git/trees 转正 ----
+
+test('tree URL + extractTemplateShas classify by type, not mode', () => {
+	assert.equal(
+		tc.treeUrl('gitee'),
+		'https://gitee.com/api/v5/repos/johnnylearns/ioto-dashboard/git/trees/master?recursive=1',
+	);
+	const shas = tc.extractTemplateShas({
+		truncated: false,
+		tree: [
+			{ type: 'blob', mode: '40000', path: 'templates/a/dashboard.json', sha: 'sha-a' },
+			{ type: 'blob', mode: '040000', path: 'templates/b/dashboard.json', sha: 'sha-b' },
+			{ type: 'tree', mode: '40000', path: 'templates/c/dashboard.json', sha: 'sha-c' },
+			{ type: 'blob', path: 'templates/a/README.md', sha: 'sha-r' },
+			{ type: 'blob', path: 'docs/dashboard.json', sha: 'sha-d' },
+		],
+	});
+	assert.deepEqual([...shas.entries()], [['a', 'sha-a'], ['b', 'sha-b']]);
+	assert.equal(tc.extractTemplateShas({ truncated: true, tree: [] }), null);
+	assert.equal(tc.extractTemplateShas({ tree: 'oops' }), null);
+	assert.equal(tc.extractTemplateShas(null), null);
+});
+
+test('tree path costs 1+N; truncated tree falls back to contents (1+2N)', async () => {
+	tc.clearTemplateCache();
+	const good = makeFetch();
+	const treeList = await tc.listTemplates('gitee', { fetchImpl: good.fetchImpl, now: 1000 });
+	assert.deepEqual(treeList.map((item) => item.key).sort(), ['dashboard-only', 'team-overview']);
+	assert.equal(good.calls.length, 4, '1 tree request + 3 blob requests');
+	assert.equal(good.calls[0], tc.treeUrl('gitee'));
+
+	tc.clearTemplateCache();
+	const fallbackCalls = [];
+	const fallbackFetch = async (url) => {
+		fallbackCalls.push(url);
+		if (url === tc.treeUrl('gitee')) {
+			return { ok: true, status: 200, json: async () => ({ truncated: true, tree: [] }) };
+		}
+		if (!(url in good.data)) return { ok: false, status: 404, json: async () => ({}) };
+		return { ok: true, status: 200, json: async () => good.data[url] };
+	};
+	const fallbackList = await tc.listTemplates('gitee', { fetchImpl: fallbackFetch, now: 1000 });
+	assert.deepEqual(fallbackList.map((item) => item.key).sort(), ['dashboard-only', 'team-overview']);
+	assert.equal(fallbackCalls.length, 8, '1 tree + 1 contents + 3 dirs + 3 blobs');
+	assert.equal(fallbackCalls[1], tc.listTemplatesUrl('gitee'));
+});
+
+// ---- P1-2 / P1-3：负缓存与指数退避 ----
+
+test('rate-limit cooldown suppresses repeat requests until cleared', async () => {
+	tc.clearTemplateCache();
+	let now = 1000;
+	const limited = errorFetch(429, 'slow down', { 'Retry-After': '30' });
+	await assert.rejects(() => tc.listTemplates('gitee', { fetchImpl: limited.fetchImpl, now }));
+	assert.equal(limited.calls.length, 1);
+
+	now += 1000;
+	await assert.rejects(() => tc.listTemplates('gitee', { fetchImpl: limited.fetchImpl, now }));
+	assert.equal(limited.calls.length, 1, 'cooldown must not send a request');
+
+	tc.clearTemplateCooldown();
+	const good = makeFetch();
+	const restored = await tc.listTemplates('gitee', { fetchImpl: good.fetchImpl, now });
+	assert.equal(restored.length, 2);
+	assert.equal(good.calls.length, 4);
+});
+
+test('exponential backoff doubles the cooldown across consecutive failures', async () => {
+	tc.clearTemplateCache();
+	let now = 1000;
+	const limited = errorFetch(403, 'firewall', {});
+	await assert.rejects(() => tc.listTemplates('gitee', { fetchImpl: limited.fetchImpl, now }));
+	assert.equal(limited.calls.length, 1, 'streak 1 → 2s cooldown');
+
+	now += 2500;
+	await assert.rejects(() => tc.listTemplates('gitee', { fetchImpl: limited.fetchImpl, now }));
+	assert.equal(limited.calls.length, 2, 'streak 2 → 4s cooldown');
+
+	now += 1000;
+	await assert.rejects(() => tc.listTemplates('gitee', { fetchImpl: limited.fetchImpl, now }));
+	assert.equal(limited.calls.length, 2, 'still inside the 4s window');
 });

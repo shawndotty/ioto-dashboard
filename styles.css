@@ -5468,6 +5468,20 @@ body.is-mobile .ioto-pages-handle {
     margin-top: 4px;
 }
 
+.ioto-dashboard-modal--template-center .ioto-template-center__retry:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ioto-dashboard-modal--template-center .ioto-template-center__retry-after {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+.ioto-dashboard-modal--template-center .ioto-template-center__switch-source {
+    margin-top: 4px;
+}
+
 .ioto-dashboard-modal--template-center .ioto-template-center__card {
     display: flex;
     align-items: center;
