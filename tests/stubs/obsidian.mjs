@@ -55,6 +55,10 @@ export const Platform = {
 	isTablet: false,
 };
 
+export const requestUrl = async () => {
+	throw new Error('requestUrl is not available in unit tests');
+};
+
 export const setIcon = () => {};
 
 export const setTooltip = () => {};

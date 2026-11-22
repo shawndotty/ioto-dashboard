@@ -6,6 +6,7 @@ import {
 	buildDashboardBundle,
 	buildPageBundle,
 	buildQueryBundle,
+	hasImportErrors,
 	parseBundle,
 	planImport,
 	type BundleContext,
@@ -20,6 +21,7 @@ import {
 	TransferExportModal,
 	TransferImportModal,
 } from "../ui/transfer-modal";
+import { ConfirmModal } from "../ui/ConfirmModal";
 
 export const DEFAULT_TRANSFER_FOLDER = "0-辅助/Temp";
 
@@ -200,6 +202,67 @@ export class DashboardTransfer {
 			requireConfirm: true,
 			onDone,
 		});
+	}
+
+	/** Import a remote template bundle directly, without the textarea modal. */
+	importTemplate(json: string, targetDashboardId?: string): void {
+		const parsed = parseBundle(json);
+		if (!parsed.ok || !parsed.envelope) {
+			new Notice(parsed.error?.message ?? t("TRANSFER_ERROR_INVALID_JSON"));
+			return;
+		}
+		if (parsed.envelope.kind !== "ioto-dashboard-page") {
+			new Notice(t("TEMPLATE_CENTER_IMPORT_UNSUPPORTED"));
+			return;
+		}
+		const ctx = this.context();
+		if (!ctx) {
+			new Notice(t("TRANSFER_ERROR_NO_STORE"));
+			return;
+		}
+		const plan = planImport(parsed.envelope, {
+			store: ctx.store,
+			settings: ctx.settings,
+			targetDashboardId,
+			targetsFor: this.targetsFor,
+		});
+		if (hasImportErrors(plan)) {
+			new Notice(
+				plan.warnings.find((item) => item.level === "error")?.message ??
+					t("TEMPLATE_CENTER_IMPORT_FAILED"),
+			);
+			return;
+		}
+		let message = t("TEMPLATE_CENTER_CONFIRM_SUMMARY", [
+			String(plan.pages.length),
+			String(plan.queries.length),
+		]);
+		if (plan.warnings.length > 0) {
+			message += `\n${t("TEMPLATE_CENTER_CONFIRM_WARNINGS", [
+				plan.warnings.map((item) => item.message).join("\n"),
+			])}`;
+		}
+		new ConfirmModal(
+			this.plugin.app,
+			t("TEMPLATE_CENTER_CONFIRM_TITLE"),
+			message,
+			() => void this.applyTemplatePlan(plan),
+		).open();
+	}
+
+	private async applyTemplatePlan(plan: ImportPlan): Promise<void> {
+		try {
+			const { store, customFilters } =
+				await this.plugin.dashboardRepository.applyImport(plan);
+			if (customFilters) {
+				this.plugin.settings.customFilters = customFilters;
+			}
+			new Notice(t("TRANSFER_IMPORTED"));
+			this.navigateAfterImport(plan, store.activeDashboardId);
+		} catch (error) {
+			console.warn("IOTO Dashboard: template import failed", error);
+			new Notice(t("TEMPLATE_CENTER_IMPORT_FAILED"));
+		}
 	}
 
 	private openImport(options: {

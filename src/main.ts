@@ -1,4 +1,4 @@
-import { Command, Plugin, WorkspaceLeaf } from "obsidian";
+import { Command, Notice, Plugin, WorkspaceLeaf } from "obsidian";
 import { DashboardView } from "./views/DashboardView";
 import { TaskView } from "./views/TaskView";
 import { NoteView } from "./views/NoteView";
@@ -29,6 +29,7 @@ import type {
 	DashboardStoreData,
 } from "./dashboard/types";
 import { DashboardPickerModal } from "./ui/dashboard-picker";
+import { TemplateCenterModal } from "./ui/template-center-modal";
 import { DashboardInspectorService } from "./dashboard/inspector-service";
 import {
 	SnapshotStore,
@@ -327,6 +328,16 @@ export default class IotoDashboardPlugin extends Plugin {
 			callback: () => this.transfer.restoreBackup(),
 		});
 
+		this.addCommand({
+			id: "open-ioto-template-center",
+			name: t("COMMAND_OPEN_TEMPLATE_CENTER"),
+			callback: () => {
+				new TemplateCenterModal(this.app, (json) => {
+					this.importTemplateBundle(json);
+				}).open();
+			},
+		});
+
 		// Settings Tab
 		this.addSettingTab(new DashboardSettingTab(this.app, this));
 	}
@@ -537,6 +548,26 @@ export default class IotoDashboardPlugin extends Plugin {
 				void this.activateCustomDashboard(dashboard.id);
 			},
 		).open();
+	}
+
+	/** Template imports need a target Dashboard; pick one when there are many. */
+	private importTemplateBundle(json: string): void {
+		const dashboards = this.dashboardStore?.dashboards ?? [];
+		const apply = (dashboardId?: string): void => {
+			try {
+				this.transfer.importTemplate(json, dashboardId);
+			} catch (error) {
+				console.warn("IOTO Dashboard: template import failed", error);
+				new Notice(t("TEMPLATE_CENTER_IMPORT_FAILED"));
+			}
+		};
+		if (dashboards.length <= 1) {
+			apply(dashboards[0]?.id);
+			return;
+		}
+		new DashboardPickerModal(this.app, dashboards, (dashboard) => {
+			apply(dashboard.id);
+		}).open();
 	}
 
 	private scheduleDashboardCommandSync(): void {

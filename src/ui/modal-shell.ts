@@ -15,7 +15,8 @@ export type ModalKind =
 	| "project-tasks"
 	| "folder-contents"
 	| "chart-bucket"
-	| "transfer";
+	| "transfer"
+	| "template-center";
 
 export interface ModalShellOptions {
 	kind: ModalKind;

@@ -995,4 +995,29 @@ export default {
 	SETTINGS_BACKUP_NAME: "Dashboard backup",
 	SETTINGS_BACKUP_DESC:
 		"Export every dashboard and query, or restore a previous backup.",
+
+	// Template center
+	COMMAND_OPEN_TEMPLATE_CENTER: "Open template center…",
+	TEMPLATE_CENTER_TITLE: "Template center",
+	TEMPLATE_CENTER_SOURCE_LABEL: "Template source",
+	TEMPLATE_CENTER_SOURCE_GITEE: "Load templates from Gitee",
+	TEMPLATE_CENTER_SOURCE_GITHUB: "Load templates from GitHub",
+	TEMPLATE_CENTER_RELOAD: "Reload templates",
+	TEMPLATE_CENTER_LOADING: "Loading templates…",
+	TEMPLATE_CENTER_EMPTY: "No templates found in this repository.",
+	TEMPLATE_CENTER_ERROR: "Could not load templates.",
+	TEMPLATE_CENTER_RETRY: "Retry",
+	TEMPLATE_CENTER_IMPORT: "Import",
+	TEMPLATE_CENTER_UNSUPPORTED: "Not supported yet",
+	TEMPLATE_CENTER_KIND_PAGE: "Page",
+	TEMPLATE_CENTER_KIND_DASHBOARD: "Dashboard",
+	TEMPLATE_CENTER_KIND_QUERY: "Query",
+	TEMPLATE_CENTER_CONFIRM_TITLE: "Import template",
+	TEMPLATE_CENTER_CONFIRM_SUMMARY:
+		"Add {0} page(s) and {1} query(ies) to this dashboard?",
+	TEMPLATE_CENTER_CONFIRM_WARNINGS: "Warnings:\n{0}",
+	TEMPLATE_CENTER_IMPORT_FAILED: "Template import failed.",
+	TEMPLATE_CENTER_IMPORT_UNSUPPORTED:
+		"This template kind cannot be imported yet.",
+	TEMPLATE_CENTER_FETCH_FAILED: "Could not download the template.",
 };
