@@ -1,22 +1,263 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-22T11:38:04.521Z",
+  "generatedAt": "2026-11-22T11:58:40.416Z",
   "templates": [
     {
-      "key": "ioo-notes",
+      "key": "heatmap180",
       "meta": {
-        "name": "本周更新",
+        "name": "笔记热图",
         "subtitle": "My Dashboard",
-        "description": "",
+        "description": "使用热力图来显示180天内的输入、输出和成果笔记的更新情况",
         "kind": "ioto-dashboard-page",
         "supported": true
       },
       "bundle": {
         "kind": "ioto-dashboard-page",
         "formatVersion": 1,
-        "pluginVersion": "2.8.0",
+        "pluginVersion": "2.8.1",
         "storeSchemaVersion": 7,
-        "exportedAt": "2026-11-22T03:08:59.423Z",
+        "exportedAt": "2026-11-22T11:48:53.610Z",
+        "source": {
+          "dashboardName": "My Dashboard",
+          "pageNames": [
+            "笔记热图"
+          ],
+          "roots": {
+            "inputFolder": "1-输入",
+            "outputFolder": "2-输出",
+            "taskFolder": "3-任务",
+            "outcomeFolder": "4-成果"
+          },
+          "description": "使用热力图来显示180天内的输入、输出和成果笔记的更新情况"
+        },
+        "payload": {
+          "pages": [
+            {
+              "id": "page:1794657019090",
+              "name": "笔记热图",
+              "components": [
+                {
+                  "id": "component:1794691390364",
+                  "type": "markdown",
+                  "queryId": "",
+                  "options": {
+                    "markdown": "\n## 180天内IOO笔记活跃度\n这里呈现的是过去180内，IOTO库中整体笔记的更新热度",
+                    "hideTitle": true,
+                    "surface": "flat",
+                    "textAlign": "center"
+                  },
+                  "y": 0,
+                  "w": 12,
+                  "h": 5
+                },
+                {
+                  "id": "component:1794657031406",
+                  "type": "heatmap",
+                  "queryId": "builtin:notes-all",
+                  "title": "所有笔记",
+                  "measure": "timeline",
+                  "options": {
+                    "range": "180",
+                    "dateField": "modified",
+                    "layout": "auto",
+                    "fill": "stretch",
+                    "showMonthLabels": true,
+                    "showWeekdayLabels": true,
+                    "showLegend": true,
+                    "showSummary": true,
+                    "hideTitle": false
+                  },
+                  "y": 0,
+                  "w": 6,
+                  "h": 13
+                },
+                {
+                  "id": "component:1794690981693",
+                  "type": "heatmap",
+                  "queryId": "user:1794617434385",
+                  "title": "成果笔记",
+                  "measure": "timeline",
+                  "options": {
+                    "range": "180",
+                    "dateField": "modified",
+                    "layout": "auto",
+                    "fill": "stretch",
+                    "showMonthLabels": true,
+                    "showWeekdayLabels": true,
+                    "showLegend": true,
+                    "showSummary": true
+                  },
+                  "y": 0,
+                  "w": 6,
+                  "h": 13
+                },
+                {
+                  "id": "component:1794690843958",
+                  "type": "heatmap",
+                  "queryId": "user:1794617409400",
+                  "title": "输出笔记",
+                  "measure": "timeline",
+                  "options": {
+                    "range": "180",
+                    "dateField": "modified",
+                    "layout": "auto",
+                    "fill": "stretch",
+                    "showMonthLabels": true,
+                    "showWeekdayLabels": true,
+                    "showLegend": true,
+                    "showSummary": true
+                  },
+                  "y": 0,
+                  "w": 6,
+                  "h": 13
+                },
+                {
+                  "id": "component:1794690894708",
+                  "type": "heatmap",
+                  "queryId": "user:1794492551309",
+                  "title": "输入笔记",
+                  "measure": "timeline",
+                  "options": {
+                    "range": "180",
+                    "dateField": "modified",
+                    "layout": "auto",
+                    "fill": "stretch",
+                    "showMonthLabels": true,
+                    "showWeekdayLabels": true,
+                    "showLegend": true,
+                    "showSummary": true
+                  },
+                  "y": 0,
+                  "w": 6,
+                  "h": 13
+                }
+              ],
+              "columns": 12,
+              "rowHeight": 10,
+              "gap": 12
+            }
+          ],
+          "queries": [
+            {
+              "id": "builtin:notes-all",
+              "name": "All notes",
+              "nameKey": "QUERY_BUILTIN_NOTES_ALL",
+              "target": "note",
+              "scope": {
+                "folders": [],
+                "includeSubfolders": true
+              },
+              "filters": {
+                "name": "",
+                "project": "",
+                "subject": "",
+                "dateType": "created",
+                "dateStart": "",
+                "dateEnd": "",
+                "status": "all",
+                "fileStatus": "",
+                "taskType": [],
+                "noteType": [],
+                "datePreset": "all",
+                "custom": {}
+              }
+            },
+            {
+              "id": "user:1794617434385",
+              "name": "成果笔记",
+              "target": "note",
+              "scope": {
+                "folders": [
+                  "4-成果"
+                ],
+                "includeSubfolders": true
+              },
+              "filters": {
+                "name": "",
+                "project": "",
+                "subject": "",
+                "dateType": "created",
+                "dateStart": "",
+                "dateEnd": "",
+                "status": "all",
+                "fileStatus": "",
+                "taskType": [],
+                "noteType": [],
+                "datePreset": "all",
+                "custom": {}
+              }
+            },
+            {
+              "id": "user:1794617409400",
+              "name": "输出笔记",
+              "target": "note",
+              "scope": {
+                "folders": [
+                  "2-输出"
+                ],
+                "includeSubfolders": true
+              },
+              "filters": {
+                "name": "",
+                "project": "",
+                "subject": "",
+                "dateType": "created",
+                "dateStart": "",
+                "dateEnd": "",
+                "status": "all",
+                "fileStatus": "",
+                "taskType": [],
+                "noteType": [],
+                "datePreset": "all",
+                "custom": {}
+              }
+            },
+            {
+              "id": "user:1794492551309",
+              "name": "输入笔记",
+              "target": "note",
+              "scope": {
+                "folders": [
+                  "1-输入"
+                ],
+                "includeSubfolders": true
+              },
+              "filters": {
+                "name": "",
+                "project": "",
+                "subject": "",
+                "dateType": "created",
+                "dateStart": "",
+                "dateEnd": "",
+                "status": "all",
+                "fileStatus": "",
+                "taskType": [],
+                "noteType": [],
+                "datePreset": "all",
+                "custom": {}
+              }
+            }
+          ],
+          "customFilters": []
+        },
+        "warnings": []
+      }
+    },
+    {
+      "key": "ioo-notes",
+      "meta": {
+        "name": "本周更新",
+        "subtitle": "My Dashboard",
+        "description": "使用三栏的形式，显示一周内更新的输入、输出和成果笔记",
+        "kind": "ioto-dashboard-page",
+        "supported": true
+      },
+      "bundle": {
+        "kind": "ioto-dashboard-page",
+        "formatVersion": 1,
+        "pluginVersion": "2.8.1",
+        "storeSchemaVersion": 7,
+        "exportedAt": "2026-11-22T11:43:05.934Z",
         "source": {
           "dashboardName": "My Dashboard",
           "pageNames": [
@@ -27,7 +268,8 @@
             "outputFolder": "2-输出",
             "taskFolder": "3-任务",
             "outcomeFolder": "4-成果"
-          }
+          },
+          "description": "使用三栏的形式，显示一周内更新的输入、输出和成果笔记"
         },
         "payload": {
           "pages": [
