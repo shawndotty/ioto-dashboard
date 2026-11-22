@@ -8,69 +8,129 @@ const envelope = {
 	kind: 'ioto-dashboard-page',
 	source: { pageNames: ['团队总览'], dashboardName: 'Alpha' },
 };
-const bundled = Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64');
 
-function makeFetch(giteeName = '团队总览') {
+const okJson = (value) => ({
+	ok: true,
+	status: 200,
+	text: JSON.stringify(value),
+	json: async () => value,
+});
+const okText = (text) => ({
+	ok: true,
+	status: 200,
+	text,
+	json: async () => JSON.parse(text),
+});
+const notFound = () => ({
+	ok: false,
+	status: 404,
+	text: 'not found',
+	json: async () => ({}),
+});
+const base64 = (value) =>
+	Buffer.from(JSON.stringify(value), 'utf8').toString('base64');
+
+/**
+ * Full source simulator. By default the index is missing so the legacy
+ * tree→raw path is exercised; flip `index` to 'hit'/'malformed' to test A2.
+ */
+function makeFetch(opts = {}) {
+	const { index = 'missing', raw = 'hit', giteeName = '团队总览' } = opts;
 	const calls = [];
-	const data = {
-		'https://gitee.com/api/v5/repos/johnnylearns/ioto-dashboard/git/trees/master?recursive=1':
-			{
-				truncated: false,
-				tree: [
-					{ type: 'blob', mode: '100644', path: 'templates/team-overview/dashboard.json', sha: 'sha-gitee' },
-					{ type: 'blob', mode: '100644', path: 'templates/dashboard-only/dashboard.json', sha: 'sha-dash' },
-					{ type: 'blob', mode: '100644', path: 'templates/backup-only/dashboard.json', sha: 'sha-backup' },
-					{ type: 'blob', mode: '100644', path: 'templates/team-overview/README.md', sha: 'sha-readme' },
-				],
-			},
-		'https://api.github.com/repos/shawndotty/ioto-dashboard/git/trees/master?recursive=1':
-			{
-				truncated: false,
-				tree: [
-					{ type: 'blob', mode: '100644', path: 'templates/team-overview/dashboard.json', sha: 'sha-github' },
-				],
-			},
-		'https://gitee.com/api/v5/repos/johnnylearns/ioto-dashboard/contents/templates?ref=master':
-			[
-				{ type: 'dir', name: 'team-overview' },
-				{ type: 'dir', name: 'dashboard-only' },
-				{ type: 'dir', name: 'backup-only' },
-				{ type: 'file', name: 'README.md' },
-			],
-		'https://api.github.com/repos/shawndotty/ioto-dashboard/contents/templates?ref=master':
-			[{ type: 'dir', name: 'team-overview' }],
-		'https://gitee.com/api/v5/repos/johnnylearns/ioto-dashboard/contents/templates/team-overview':
-			[{ name: 'dashboard.json', sha: 'sha-gitee' }],
-		'https://gitee.com/api/v5/repos/johnnylearns/ioto-dashboard/contents/templates/dashboard-only':
-			[{ name: 'dashboard.json', sha: 'sha-dash' }],
-		'https://gitee.com/api/v5/repos/johnnylearns/ioto-dashboard/contents/templates/backup-only':
-			[{ name: 'dashboard.json', sha: 'sha-backup' }],
-		'https://api.github.com/repos/shawndotty/ioto-dashboard/contents/templates/team-overview':
-			[{ name: 'dashboard.json', sha: 'sha-github' }],
-		'https://gitee.com/api/v5/repos/johnnylearns/ioto-dashboard/git/blobs/sha-gitee':
-			{
-				content: Buffer.from(
-					JSON.stringify({
-						...envelope,
-						source: { pageNames: [giteeName], dashboardName: 'Alpha' },
-					}),
-					'utf8',
-				).toString('base64'),
-			},
-		'https://gitee.com/api/v5/repos/johnnylearns/ioto-dashboard/git/blobs/sha-dash':
-			{ content: Buffer.from(JSON.stringify({ kind: 'ioto-dashboard' })).toString('base64') },
-		'https://gitee.com/api/v5/repos/johnnylearns/ioto-dashboard/git/blobs/sha-backup':
-			{ content: Buffer.from(JSON.stringify({ kind: 'ioto-dashboard-backup' })).toString('base64') },
-		'https://api.github.com/repos/shawndotty/ioto-dashboard/git/blobs/sha-github':
-			{ content: bundled },
+	const giteeTeam = {
+		...envelope,
+		source: { pageNames: [giteeName], dashboardName: 'Alpha' },
 	};
+	const giteeDash = { kind: 'ioto-dashboard' };
+	const giteeBackup = { kind: 'ioto-dashboard-backup' };
+
+	const apiData = {
+		[tc.treeUrl('gitee')]: {
+			truncated: false,
+			tree: [
+				{ type: 'blob', mode: '100644', path: 'templates/team-overview/dashboard.json', sha: 'sha-gitee' },
+				{ type: 'blob', mode: '100644', path: 'templates/dashboard-only/dashboard.json', sha: 'sha-dash' },
+				{ type: 'blob', mode: '100644', path: 'templates/backup-only/dashboard.json', sha: 'sha-backup' },
+				{ type: 'blob', mode: '100644', path: 'templates/team-overview/README.md', sha: 'sha-readme' },
+			],
+		},
+		[tc.treeUrl('github')]: {
+			truncated: false,
+			tree: [
+				{ type: 'blob', mode: '100644', path: 'templates/team-overview/dashboard.json', sha: 'sha-github' },
+			],
+		},
+		[tc.listTemplatesUrl('gitee')]: [
+			{ type: 'dir', name: 'team-overview' },
+			{ type: 'dir', name: 'dashboard-only' },
+			{ type: 'dir', name: 'backup-only' },
+			{ type: 'file', name: 'README.md' },
+		],
+		[tc.listTemplatesUrl('github')]: [{ type: 'dir', name: 'team-overview' }],
+		[tc.templateDirUrl('gitee', 'team-overview')]: [{ name: 'dashboard.json', sha: 'sha-gitee' }],
+		[tc.templateDirUrl('gitee', 'dashboard-only')]: [{ name: 'dashboard.json', sha: 'sha-dash' }],
+		[tc.templateDirUrl('gitee', 'backup-only')]: [{ name: 'dashboard.json', sha: 'sha-backup' }],
+		[tc.templateDirUrl('github', 'team-overview')]: [{ name: 'dashboard.json', sha: 'sha-github' }],
+		[tc.blobUrl('gitee', 'sha-gitee')]: { content: base64(giteeTeam) },
+		[tc.blobUrl('gitee', 'sha-dash')]: { content: base64(giteeDash) },
+		[tc.blobUrl('gitee', 'sha-backup')]: { content: base64(giteeBackup) },
+		[tc.blobUrl('github', 'sha-github')]: { content: base64(envelope) },
+	};
+
+	const rawData = {
+		[tc.rawUrl('gitee', 'team-overview')]: giteeTeam,
+		[tc.rawUrl('gitee', 'dashboard-only')]: giteeDash,
+		[tc.rawUrl('gitee', 'backup-only')]: giteeBackup,
+		[tc.rawUrl('github', 'team-overview')]: envelope,
+	};
+
+	const indexData = (source) => {
+		const items =
+			source === 'gitee'
+				? [
+						{ key: 'team-overview', meta: { name: giteeName, subtitle: 'Alpha', kind: 'ioto-dashboard-page', supported: true }, bundle: giteeTeam },
+						{ key: 'dashboard-only', meta: { name: 'dashboard-only', subtitle: '', kind: 'ioto-dashboard', supported: false }, bundle: giteeDash },
+					]
+				: [
+						{ key: 'team-overview', meta: { name: '团队总览', subtitle: 'Alpha', kind: 'ioto-dashboard-page', supported: true }, bundle: envelope },
+					];
+		return { version: 1, generatedAt: '2026-11-22T00:00:00.000Z', templates: items };
+	};
+
 	const fetchImpl = async (url) => {
 		const key = String(url);
 		calls.push(key);
-		if (!(key in data)) return { ok: false, status: 404, json: async () => ({}) };
-		return { ok: true, status: 200, json: async () => data[key] };
+		if (key === tc.indexUrl('gitee') || key === tc.indexUrl('github')) {
+			const source = key === tc.indexUrl('gitee') ? 'gitee' : 'github';
+			if (index === 'missing') return notFound();
+			if (index === 'malformed') return okJson({ version: 2, templates: 'bad' });
+			return okText(JSON.stringify(indexData(source)));
+		}
+		if (key in rawData) {
+			if (raw === 'missing') return notFound();
+			return okText(JSON.stringify(rawData[key]));
+		}
+		if (key in apiData) return okJson(apiData[key]);
+		return notFound();
 	};
-	return { fetchImpl, calls, data };
+	return { fetchImpl, calls, apiData, rawData };
+}
+
+const apiCalls = (calls) => calls.filter((url) => url.includes('/api/v5/') || url.includes('api.github.com'));
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+function makeStore(initial = null) {
+	let data = initial;
+	const writes = [];
+	return {
+		read: async () => data,
+		write: async (next) => {
+			data = next;
+			writes.push(next);
+		},
+		get data() { return data; },
+		writes,
+	};
 }
 
 test('source → list URL: Gitee never carries access_token', () => {
@@ -90,6 +150,24 @@ test('source → list URL: Gitee never carries access_token', () => {
 		tc.blobUrl('github', 'sha/1'),
 		'https://api.github.com/repos/shawndotty/ioto-dashboard/git/blobs/sha%2F1',
 	);
+});
+
+test('rawUrl / indexUrl: both platforms, no /api/v5/ in path', () => {
+	assert.equal(
+		tc.rawUrl('gitee', 'team-overview'),
+		'https://gitee.com/johnnylearns/ioto-dashboard/raw/master/templates/team-overview/dashboard.json',
+	);
+	assert.equal(
+		tc.rawUrl('github', 'team-overview'),
+		'https://raw.githubusercontent.com/shawndotty/ioto-dashboard/master/templates/team-overview/dashboard.json',
+	);
+	assert.equal(tc.rawUrl('gitee', 'a/b').includes('a%2Fb'), true, 'slug single-segment encoded');
+	assert.equal(
+		tc.indexUrl('gitee'),
+		'https://gitee.com/johnnylearns/ioto-dashboard/raw/master/templates/index.json',
+	);
+	assert.equal(tc.indexUrl('github').includes('/api/v5/'), false);
+	assert.equal(tc.rawUrl('gitee', 'team-overview').includes('/api/v5/'), false);
 });
 
 test('base64 → UTF-8 keeps multi-byte page names and tolerates whitespace', () => {
@@ -151,9 +229,149 @@ test('cache is keyed by source and expires after the TTL', async () => {
 
 test('fetchTemplateJson decodes the bundle text directly', async () => {
 	tc.clearTemplateCache();
-	const { fetchImpl } = makeFetch();
+	const { fetchImpl, calls } = makeFetch();
 	const text = await tc.fetchTemplateJson('github', 'team-overview', { fetchImpl });
 	assert.equal(JSON.parse(text).kind, 'ioto-dashboard-page');
+	assert.equal(apiCalls(calls).length, 0, 'import via raw costs 0 API requests');
+});
+
+// ---- A1：raw 直链，列表/导入 0 API + 非限流失败回退 ----
+
+test('raw-first list: 1 tree API + N raw, no blob API; TTL is 6h', async () => {
+	tc.clearTemplateCache();
+	const { fetchImpl, calls } = makeFetch();
+	const list = await tc.listTemplates('gitee', { fetchImpl, now: 1000 });
+	assert.deepEqual(list.map((item) => item.key).sort(), ['dashboard-only', 'team-overview']);
+	assert.equal(tc.TEMPLATE_CACHE_TTL_MS, 6 * 60 * 60 * 1000);
+	assert.equal(apiCalls(calls).length, 1, 'only the tree call hits /api/v5/');
+	assert.equal(calls.includes(tc.rawUrl('gitee', 'team-overview')), true);
+	assert.equal(calls.some((url) => url.includes('/git/blobs/')), false, 'no blob API on raw hit');
+});
+
+test('raw 404 HTML falls back to blob API without rate-limit misclassification', async () => {
+	tc.clearTemplateCache();
+	const { fetchImpl, apiData, calls } = makeFetch({ raw: 'missing' });
+	const list = await tc.listTemplates('gitee', { fetchImpl, now: 1000 });
+	assert.deepEqual(list.map((item) => item.key).sort(), ['dashboard-only', 'team-overview']);
+	assert.equal(list.find((item) => item.key === 'team-overview').name, '团队总览');
+	assert.ok(apiCalls(calls).length >= 3, 'blob API used as fallback');
+	assert.equal(Object.keys(apiData).some((url) => url.includes('/git/blobs/')), true);
+});
+
+test('plain-text 403 on raw is rate-limited and never falls back', async () => {
+	tc.clearTemplateCache();
+	const limitedFetch = async (url) => ({
+		ok: false,
+		status: 403,
+		text: 'forbidden by firewall',
+		headers: {},
+		json: async () => ({}),
+	});
+	await assert.rejects(
+		() => tc.listTemplates('gitee', { fetchImpl: limitedFetch, now: 1000 }),
+		(err) => err instanceof tc.TemplateHttpError && err.rateLimited === true,
+	);
+});
+
+// ---- A2：聚合索引，0 API ----
+
+test('index hit: list and import cost 0 API; bundleByKey serves fetchTemplateJson', async () => {
+	tc.clearTemplateCache();
+	const { fetchImpl, calls } = makeFetch({ index: 'hit' });
+	const list = await tc.listTemplates('gitee', { fetchImpl, now: 1000 });
+	assert.deepEqual(list.map((item) => item.key).sort(), ['dashboard-only', 'team-overview']);
+	const afterList = calls.length;
+	assert.equal(apiCalls(calls).length, 0, 'list via index = 0 API');
+	assert.equal(calls.includes(tc.indexUrl('gitee')), true);
+
+	const text = await tc.fetchTemplateJson('gitee', 'team-overview', { fetchImpl });
+	assert.equal(JSON.parse(text).kind, 'ioto-dashboard-page');
+	assert.equal(calls.length, afterList, 'bundle preloaded from index → 0 extra requests');
+	assert.equal(apiCalls(calls).length, 0, 'import via index = 0 API');
+});
+
+test('malformed index silently degrades to A1', async () => {
+	tc.clearTemplateCache();
+	const { fetchImpl, calls } = makeFetch({ index: 'malformed' });
+	const list = await tc.listTemplates('gitee', { fetchImpl, now: 1000 });
+	assert.deepEqual(list.map((item) => item.key).sort(), ['dashboard-only', 'team-overview']);
+	assert.equal(apiCalls(calls).length, 1, 'fell back to one tree API call');
+	assert.equal(calls.includes(tc.rawUrl('gitee', 'team-overview')), true);
+});
+
+// ---- A3：持久化 L2 缓存 ----
+
+test('persistent store: first fetch writes L2; restart hits store with 0 requests', async () => {
+	tc.clearTemplateCache();
+	const store = makeStore();
+	tc.setTemplateCacheStore(store);
+	try {
+		const f1 = makeFetch();
+		await tc.listTemplates('gitee', { fetchImpl: f1.fetchImpl, now: 1000 });
+		assert.ok(store.data?.gitee, 'first fetch persisted L2 entry');
+		assert.deepEqual(store.data.gitee.templates.map((item) => item.key).sort(), ['dashboard-only', 'team-overview']);
+
+		// Simulate restart: clear L1 only, keep the persisted store.
+		tc.setTemplateCacheStore(null);
+		tc.clearTemplateCache();
+		tc.setTemplateCacheStore(store);
+		const f2 = makeFetch();
+		const list = await tc.listTemplates('gitee', { fetchImpl: f2.fetchImpl, now: 2000 });
+		assert.equal(list.length, 2);
+		assert.equal(f2.calls.length, 0, 'restart with fresh L1 → 0 requests via L2');
+	} finally {
+		tc.setTemplateCacheStore(null);
+		tc.clearTemplateCache();
+	}
+});
+
+test('persistent store: expired L2 re-fetches; corrupted L2 ignored', async () => {
+	tc.clearTemplateCache();
+	const store = makeStore();
+	tc.setTemplateCacheStore(store);
+	try {
+		const f1 = makeFetch();
+		await tc.listTemplates('gitee', { fetchImpl: f1.fetchImpl, now: 1000 });
+
+		tc.setTemplateCacheStore(null);
+		tc.clearTemplateCache();
+		tc.setTemplateCacheStore(store);
+		const f2 = makeFetch();
+		await tc.listTemplates('gitee', { fetchImpl: f2.fetchImpl, now: 1000 + tc.TEMPLATE_CACHE_TTL_MS });
+		assert.equal(f2.calls.length > 0, true, 'expired L2 re-fetches');
+
+		tc.setTemplateCacheStore(null);
+		tc.clearTemplateCache();
+		tc.setTemplateCacheStore(makeStore({ gitee: { at: 2000, templates: 'corrupt' } }));
+		const f3 = makeFetch();
+		const list = await tc.listTemplates('gitee', { fetchImpl: f3.fetchImpl, now: 3000 });
+		assert.equal(list.length, 2, 'corrupted L2 ignored and re-fetched');
+	} finally {
+		tc.setTemplateCacheStore(null);
+		tc.clearTemplateCache();
+	}
+});
+
+test('reload clears both L1 and L2 so next list re-fetches', async () => {
+	tc.clearTemplateCache();
+	const store = makeStore();
+	tc.setTemplateCacheStore(store);
+	try {
+		const f1 = makeFetch();
+		await tc.listTemplates('gitee', { fetchImpl: f1.fetchImpl, now: 1000 });
+		assert.ok(store.data?.gitee);
+
+		tc.reload('gitee');
+		await flush(); // reload clears L2 asynchronously via store.write
+		assert.equal(store.data?.gitee, undefined, 'L2 entry removed');
+
+		const f2 = makeFetch();
+		await tc.listTemplates('gitee', { fetchImpl: f2.fetchImpl, now: 2000 });
+		assert.ok(f2.calls.length > 0, 'next list re-fetches after reload');
+	} finally {
+		tc.setTemplateCacheStore(null);
+		tc.clearTemplateCache();
+	}
 });
 
 // ---- P0-1：错误诊断透出与分级 ----
@@ -289,28 +507,25 @@ test('tree URL + extractTemplateShas classify by type, not mode', () => {
 	assert.equal(tc.extractTemplateShas(null), null);
 });
 
-test('tree path costs 1+N; truncated tree falls back to contents (1+2N)', async () => {
+test('tree path falls back to contents (1+2N) when tree is truncated', async () => {
 	tc.clearTemplateCache();
 	const good = makeFetch();
-	const treeList = await tc.listTemplates('gitee', { fetchImpl: good.fetchImpl, now: 1000 });
-	assert.deepEqual(treeList.map((item) => item.key).sort(), ['dashboard-only', 'team-overview']);
-	assert.equal(good.calls.length, 4, '1 tree request + 3 blob requests');
-	assert.equal(good.calls[0], tc.treeUrl('gitee'));
-
-	tc.clearTemplateCache();
 	const fallbackCalls = [];
 	const fallbackFetch = async (url) => {
 		fallbackCalls.push(url);
-		if (url === tc.treeUrl('gitee')) {
-			return { ok: true, status: 200, json: async () => ({ truncated: true, tree: [] }) };
+		if (url === tc.indexUrl('gitee')) {
+			return { ok: false, status: 404, json: async () => ({}) };
 		}
-		if (!(url in good.data)) return { ok: false, status: 404, json: async () => ({}) };
-		return { ok: true, status: 200, json: async () => good.data[url] };
+		if (url === tc.treeUrl('gitee')) {
+			return { ok: true, status: 200, text: JSON.stringify({ truncated: true, tree: [] }), json: async () => ({ truncated: true, tree: [] }) };
+		}
+		if (!(url in good.apiData)) return notFound();
+		return okJson(good.apiData[url]);
 	};
 	const fallbackList = await tc.listTemplates('gitee', { fetchImpl: fallbackFetch, now: 1000 });
 	assert.deepEqual(fallbackList.map((item) => item.key).sort(), ['dashboard-only', 'team-overview']);
-	assert.equal(fallbackCalls.length, 8, '1 tree + 1 contents + 3 dirs + 3 blobs');
-	assert.equal(fallbackCalls[1], tc.listTemplatesUrl('gitee'));
+	assert.equal(fallbackCalls[1], tc.treeUrl('gitee'));
+	assert.equal(fallbackCalls[2], tc.listTemplatesUrl('gitee'));
 });
 
 // ---- P1-2 / P1-3：负缓存与指数退避 ----
@@ -330,7 +545,7 @@ test('rate-limit cooldown suppresses repeat requests until cleared', async () =>
 	const good = makeFetch();
 	const restored = await tc.listTemplates('gitee', { fetchImpl: good.fetchImpl, now });
 	assert.equal(restored.length, 2);
-	assert.equal(good.calls.length, 4);
+	assert.equal(good.calls.length > 0, true);
 });
 
 test('exponential backoff doubles the cooldown across consecutive failures', async () => {

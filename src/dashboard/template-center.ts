@@ -1,9 +1,14 @@
 /**
  * Remote template browsing for the template center.
  *
- * Only reads the two public repository APIs; it never writes settings, never
- * reads local `templates/`, and never touches ioto-update. Gitee/GitHub share
- * the same API shape, so the source switch only changes the base URL.
+ * Reads the two public repository APIs plus their quota-free raw gateways;
+ * it never writes settings, never reads local `templates/`, and never touches
+ * ioto-update. Gitee/GitHub share the same API shape, so the source switch
+ * only changes the base URL. Three fetch paths, in priority order:
+ *   1. one raw GET of `templates/index.json` (0 API requests),
+ *   2. one tree API call + one raw GET per template (1 API request),
+ *   3. the original contents API walk (the legacy fallback).
+ * Success is cached in memory (L1) and, when injected, in `data.json` (L2).
  */
 
 import { requestUrl } from "obsidian";
@@ -65,11 +70,22 @@ const REPO_API: Record<TemplateSource, string> = {
 	github: "https://api.github.com/repos/shawndotty/ioto-dashboard",
 };
 
-export const TEMPLATE_CACHE_TTL_MS = 10 * 60 * 1000;
+/** Same repo/branch as REPO_API, but on the quota-free raw gateway. */
+const RAW_BASE: Record<TemplateSource, string> = {
+	gitee: "https://gitee.com/johnnylearns/ioto-dashboard/raw/master",
+	github: "https://raw.githubusercontent.com/shawndotty/ioto-dashboard/master",
+};
 
-interface CacheEntry {
+export const TEMPLATE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+export interface TemplateCacheEntry {
 	at: number;
 	templates: TemplateMeta[];
+}
+
+export interface TemplateCacheStore {
+	read(): Promise<Record<TemplateSource, TemplateCacheEntry> | null>;
+	write(data: Record<TemplateSource, TemplateCacheEntry>): Promise<void>;
 }
 
 interface ApiEntry {
@@ -78,7 +94,13 @@ interface ApiEntry {
 	sha?: string;
 }
 
-const cache = new Map<TemplateSource, CacheEntry>();
+const cache = new Map<TemplateSource, TemplateCacheEntry>();
+
+/** L2 store injected by `main.ts`; null in tests that don't need persistence. */
+let cacheStore: TemplateCacheStore | null = null;
+
+/** Bundles preloaded from the aggregate index, keyed by `source::slug`. */
+const bundleByKey = new Map<string, string>();
 
 /** Failure state is kept apart from the success cache so `reload()` cannot clear it. */
 const cooldowns = new Map<
@@ -165,6 +187,16 @@ export function templateDirUrl(source: TemplateSource, slug: string): string {
 
 export function blobUrl(source: TemplateSource, sha: string): string {
 	return `${apiBase(source)}/git/blobs/${encodeURIComponent(sha)}`;
+}
+
+/** Raw dashboard.json for one template — bypasses `/api/v5/` entirely. */
+export function rawUrl(source: TemplateSource, slug: string): string {
+	return `${RAW_BASE[source]}/templates/${encodeURIComponent(slug)}/dashboard.json`;
+}
+
+/** Raw aggregate index: all template metadata and bundles in one GET. */
+export function indexUrl(source: TemplateSource): string {
+	return `${RAW_BASE[source]}/templates/index.json`;
 }
 
 /** One recursive request lists every template blob on both platforms. */
@@ -290,6 +322,23 @@ async function readJson(response: TemplateResponse): Promise<unknown> {
 	return await response.json();
 }
 
+/**
+ * Reads a raw JSON document (dashboard.json / index.json). The raw gateway
+ * returns the file verbatim, so `looksLikeJson` classifies a 404 HTML page or
+ * a plain-text firewall reply as a NON-rate-limit failure — callers fall back
+ * to the API path instead of misreading it as a rate limit. A genuine 429/403
+ * still surfaces through `makeHttpError` and is never retried via API.
+ */
+async function readRawText(fetcher: TemplateFetcher, url: string): Promise<string> {
+	const response = await fetcher(url);
+	if (!response.ok) throw makeHttpError(response);
+	const text = response.text;
+	if (text === undefined || !looksLikeJson(text)) {
+		throw new Error("Template raw response is not JSON");
+	}
+	return text;
+}
+
 async function fetchBlobText(
 	source: TemplateSource,
 	sha: string,
@@ -363,7 +412,85 @@ function noteRateLimit(
 	cooldowns.set(source, { until: now + retrySec * 1000, error });
 }
 
-/** Primary path: one tree request + one blob request per template (1 + N). */
+/** Reads one template's dashboard.json as parsed JSON via the raw gateway. */
+async function readRawJson(
+	source: TemplateSource,
+	slug: string,
+	fetcher: TemplateFetcher,
+): Promise<unknown> {
+	return JSON.parse(await readRawText(fetcher, rawUrl(source, slug))) as unknown;
+}
+
+/** Validates the pre-extracted `meta` object stored in the aggregate index. */
+function metaFromIndex(raw: unknown, key: string): TemplateMeta | null {
+	if (!isRecord(raw) || typeof raw.name !== "string" || typeof raw.kind !== "string") {
+		return null;
+	}
+	return {
+		key,
+		name: raw.name,
+		subtitle: typeof raw.subtitle === "string" ? raw.subtitle : "",
+		kind: raw.kind,
+		supported: isSupportedKind(raw.kind),
+	};
+}
+
+/**
+ * Aggregated-index path: a single raw GET returns every template's metadata
+ * and full bundle. Returns null for a missing/malformed index so the caller
+ * silently degrades to A1; a genuine rate limit propagates (never deepen it).
+ */
+async function listViaIndex(
+	source: TemplateSource,
+	fetcher: TemplateFetcher,
+): Promise<TemplateMeta[] | null> {
+	let response: TemplateResponse;
+	try {
+		response = await fetcher(indexUrl(source));
+	} catch {
+		return null;
+	}
+	if (!response.ok) {
+		const error = makeHttpError(response);
+		if (error.rateLimited) throw error;
+		return null;
+	}
+	const raw = response.text;
+	if (raw === undefined || !looksLikeJson(raw)) return null;
+	let index: unknown;
+	try {
+		index = JSON.parse(raw) as unknown;
+	} catch {
+		return null;
+	}
+	if (
+		!isRecord(index) ||
+		index.version !== 1 ||
+		!isUnknownArray(index.templates)
+	) {
+		return null;
+	}
+
+	const metas: TemplateMeta[] = [];
+	for (const item of index.templates) {
+		if (!isRecord(item) || typeof item.key !== "string") continue;
+		const meta = metaFromIndex(item.meta, item.key);
+		if (!meta) continue;
+		metas.push(meta);
+		if (isRecord(item.bundle)) {
+			bundleByKey.set(
+				`${source}::${item.key}`,
+				JSON.stringify(item.bundle),
+			);
+		}
+	}
+	return metas.filter((meta) => isVisibleKind(meta.kind));
+}
+
+/**
+ * One tree API request + one raw GET per template (1 API + N raw). A raw
+ * failure that is not a rate limit falls back to that template's blob API.
+ */
 async function listViaTree(
 	source: TemplateSource,
 	fetcher: TemplateFetcher,
@@ -378,7 +505,14 @@ async function listViaTree(
 		3,
 		async ([slug, sha]) => {
 			try {
-				const text = await fetchBlobText(source, sha, fetcher);
+				let text: string;
+				try {
+					const data = await readRawJson(source, slug, fetcher);
+					text = JSON.stringify(data);
+				} catch (rawError) {
+					if (isRateLimitError(rawError)) throw rawError;
+					text = await fetchBlobText(source, sha, fetcher);
+				}
 				return extractTemplateMeta(JSON.parse(text) as unknown, slug);
 			} catch (error) {
 				// A rate limit mid-batch must abort the whole list, not yield a
@@ -423,7 +557,22 @@ async function listViaContents(
 	);
 }
 
-/** Lists visible templates, honouring the cooldown and the 10-minute cache. */
+/** Validates a persisted L2 entry before trusting it. */
+function isValidCacheEntry(value: unknown): value is TemplateCacheEntry {
+	if (!isRecord(value) || typeof value.at !== "number") return false;
+	if (!isUnknownArray(value.templates)) return false;
+	return value.templates.every(
+		(item) =>
+			isRecord(item) &&
+			typeof item.key === "string" &&
+			typeof item.kind === "string",
+	);
+}
+
+/**
+ * Lists visible templates. Order: cooldown → L1 cache → L2 persistent cache
+ * → aggregate index (1 raw, 0 API) → tree+raw (1 API + N raw) → contents.
+ */
 export async function listTemplates(
 	source: TemplateSource,
 	options: TemplateFetchOptions = {},
@@ -442,16 +591,35 @@ export async function listTemplates(
 		return cached.templates;
 	}
 
+	// L2: a fresh persisted entry is promoted to L1 and returned with 0 requests.
+	const store = cacheStore;
+	if (store) {
+		try {
+			const persisted = await store.read();
+			const entry = persisted?.[source];
+			if (
+				isValidCacheEntry(entry) &&
+				now - entry.at < TEMPLATE_CACHE_TTL_MS
+			) {
+				cache.set(source, entry);
+				return entry.templates;
+			}
+		} catch (error) {
+			console.warn("IOTO Dashboard: failed to read template cache", error);
+		}
+	}
+
 	let templates: TemplateMeta[];
 	try {
-		templates = await listViaTree(source, fetcher);
+		// Prefer one raw index GET; null means missing/malformed → A1 fallback.
+		templates = (await listViaIndex(source, fetcher)) ?? [];
+		if (templates.length === 0) templates = await listViaTree(source, fetcher);
 	} catch (error) {
 		if (isRateLimitError(error)) {
 			noteRateLimit(source, error, now);
 			throw error;
 		}
-		// Failing the tree normally (404 / truncated / parse error) falls back;
-		// a rate-limit failure never does, since more requests only deepen it.
+		// A non-rate-limit failure falls back to the legacy contents walk.
 		try {
 			templates = await listViaContents(source, fetcher);
 		} catch (fallbackError) {
@@ -464,16 +632,43 @@ export async function listTemplates(
 
 	noteSuccess(source);
 	cache.set(source, { at: now, templates });
+	// Persist to L2 best-effort: a write failure must never block the list.
+	if (store) {
+		try {
+			const persisted =
+				(await store.read()) ??
+				({} as Record<TemplateSource, TemplateCacheEntry>);
+			persisted[source] = { at: now, templates };
+			await store.write(persisted);
+		} catch (error) {
+			console.warn("IOTO Dashboard: failed to persist template cache", error);
+		}
+	}
 	return templates;
 }
 
-/** Fetches the raw bundle JSON for one template; bypasses the list cache. */
+/**
+ * Fetches the raw bundle JSON for one template. Prefers the index-preloaded
+ * bundle (0 requests), then the raw gateway (0 API), then the original two
+ * API calls. A rate limit on raw propagates; other failures fall back.
+ */
 export async function fetchTemplateJson(
 	source: TemplateSource,
 	slug: string,
 	options: TemplateFetchOptions = {},
 ): Promise<string> {
 	const fetcher = options.fetchImpl ?? defaultFetcher;
+	const key = `${source}::${slug}`;
+	const preloaded = bundleByKey.get(key);
+	if (preloaded !== undefined) return preloaded;
+
+	try {
+		return await readRawText(fetcher, rawUrl(source, slug));
+	} catch (rawError) {
+		if (isRateLimitError(rawError)) throw rawError;
+		// Non-rate-limit raw failure (404/malformed) → original API path.
+	}
+
 	const entries = asEntries(
 		await readJson(await fetcher(templateDirUrl(source, slug))),
 	);
@@ -489,20 +684,51 @@ export async function fetchTemplateJson(
 	return fetchBlobText(source, file.sha, fetcher);
 }
 
-/** Clears one source so the next list call re-fetches. */
+/** Clears one source so the next list call re-fetches (both cache levels). */
 export function reload(source: TemplateSource): void {
 	cache.delete(source);
+	for (const key of [...bundleByKey.keys()]) {
+		if (key.startsWith(`${source}::`)) bundleByKey.delete(key);
+	}
+	const store = cacheStore;
+	if (store) {
+		void store
+			.read()
+			.then((persisted) => {
+				if (!persisted || !persisted[source]) return;
+				const next = { ...persisted };
+				delete next[source];
+				return store.write(next);
+			})
+			.catch((error: unknown) => {
+				console.warn("IOTO Dashboard: failed to clear template cache", error);
+			});
+	}
 }
 
-/** Test helper: clears both sources, including failure state. */
+/** Test helper: clears both sources, including failure state and persistence. */
 export function clearTemplateCache(): void {
 	cache.clear();
 	cooldowns.clear();
 	failStreaks.clear();
+	bundleByKey.clear();
+	const store = cacheStore;
+	if (store) {
+		void store
+			.write({} as Record<TemplateSource, TemplateCacheEntry>)
+			.catch((error: unknown) => {
+				console.warn("IOTO Dashboard: failed to clear template cache", error);
+			});
+	}
 }
 
 /** Test helper: clears only cooldown/streak state, keeping success cache. */
 export function clearTemplateCooldown(): void {
 	cooldowns.clear();
 	failStreaks.clear();
+}
+
+/** Injects the persistent L2 store from `main.ts`; null disables persistence. */
+export function setTemplateCacheStore(store: TemplateCacheStore | null): void {
+	cacheStore = store;
 }

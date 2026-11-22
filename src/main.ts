@@ -30,6 +30,11 @@ import type {
 } from "./dashboard/types";
 import { DashboardPickerModal } from "./ui/dashboard-picker";
 import { TemplateCenterModal } from "./ui/template-center-modal";
+import {
+	setTemplateCacheStore,
+	type TemplateCacheEntry,
+	type TemplateSource,
+} from "./dashboard/template-center";
 import { DashboardInspectorService } from "./dashboard/inspector-service";
 import {
 	SnapshotStore,
@@ -68,6 +73,22 @@ export default class IotoDashboardPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+
+		// Persistent L2 cache for the template center, isolated from settings
+		// and the dashboard store under its own `templateCenterCache` key.
+		setTemplateCacheStore({
+			read: async () => {
+				const data = (await this.loadData()) as Record<string, unknown> | null;
+				return (data?.templateCenterCache as Record<
+					TemplateSource,
+					TemplateCacheEntry
+				>) ?? null;
+			},
+			write: (cache) =>
+				this.updateData((data) => {
+					data.templateCenterCache = cache;
+				}),
+		});
 
 		this.index = new VaultIndex(this.app, () => this.getIndexConfig());
 		this.index.attach();

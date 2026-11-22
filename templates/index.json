@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-22T11:00:37.240Z",
+  "templates": [
+    {
+      "key": "ioo-notes",
+      "meta": {
+        "name": "本周更新",
+        "subtitle": "My Dashboard",
+        "kind": "ioto-dashboard-page",
+        "supported": true
+      },
+      "bundle": {
+        "kind": "ioto-dashboard-page",
+        "formatVersion": 1,
+        "pluginVersion": "2.8.0",
+        "storeSchemaVersion": 7,
+        "exportedAt": "2026-11-22T03:08:59.423Z",
+        "source": {
+          "dashboardName": "My Dashboard",
+          "pageNames": [
+            "本周更新"
+          ],
+          "roots": {
+            "inputFolder": "1-输入",
+            "outputFolder": "2-输出",
+            "taskFolder": "3-任务",
+            "outcomeFolder": "4-成果"
+          }
+        },
+        "payload": {
+          "pages": [
+            {
+              "id": "page:1794624519539",
+              "name": "本周更新",
+              "components": [
+                {
+                  "id": "component:1794624536117",
+                  "type": "note-list",
+                  "queryId": "user:1794622649526",
+                  "limit": 20,
+                  "title": "输入",
+                  "view": "list",
+                  "w": 4,
+                  "h": 8
+                },
+                {
+                  "id": "component:1794624682690",
+                  "type": "note-list",
+                  "queryId": "user:1794624646534",
+                  "limit": 20,
+                  "title": "输出",
+                  "view": "list",
+                  "w": 4,
+                  "h": 8
+                },
+                {
+                  "id": "component:1794624734146",
+                  "type": "note-list",
+                  "queryId": "user:1794624703159",
+                  "limit": 20,
+                  "title": "成果",
+                  "view": "list",
+                  "w": 4,
+                  "h": 8
+                }
+              ]
+            }
+          ],
+          "queries": [
+            {
+              "id": "user:1794622649526",
+              "name": "本周输入笔记",
+              "target": "note",
+              "scope": {
+                "folders": [
+                  "1-输入"
+                ],
+                "includeSubfolders": true
+              },
+              "filters": {
+                "name": "",
+                "project": "",
+                "subject": "",
+                "dateType": "created",
+                "dateStart": "",
+                "dateEnd": "",
+                "status": "all",
+                "fileStatus": "",
+                "taskType": [],
+                "noteType": [],
+                "datePreset": "last7days",
+                "custom": {}
+              }
+            },
+            {
+              "id": "user:1794624646534",
+              "name": "本周输出笔记",
+              "target": "note",
+              "scope": {
+                "folders": [
+                  "2-输出"
+                ],
+                "includeSubfolders": true
+              },
+              "filters": {
+                "name": "",
+                "project": "",
+                "subject": "",
+                "dateType": "created",
+                "dateStart": "",
+                "dateEnd": "",
+                "status": "all",
+                "fileStatus": "",
+                "taskType": [],
+                "noteType": [],
+                "datePreset": "last7days",
+                "custom": {}
+              }
+            },
+            {
+              "id": "user:1794624703159",
+              "name": "本周成果笔记",
+              "target": "note",
+              "scope": {
+                "folders": [
+                  "4-成果"
+                ],
+                "includeSubfolders": true
+              },
+              "filters": {
+                "name": "",
+                "project": "",
+                "subject": "",
+                "dateType": "created",
+                "dateStart": "",
+                "dateEnd": "",
+                "status": "all",
+                "fileStatus": "",
+                "taskType": [],
+                "noteType": [],
+                "datePreset": "last7days",
+                "custom": {}
+              }
+            }
+          ],
+          "customFilters": []
+        },
+        "warnings": []
+      }
+    }
+  ]
+}
