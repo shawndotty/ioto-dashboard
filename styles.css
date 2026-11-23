@@ -4433,6 +4433,114 @@ button.ioto-heatmap-cell:hover {
     display: none;
 }
 
+/* Timeline note-type filter — shared shell, mirrors the arrange panel. */
+.ioto-timeline-type-filter-toggle {
+    position: relative;
+}
+
+.ioto-timeline-type-filter-toggle.has-filter::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--interactive-accent);
+}
+
+.ioto-timeline-type-filter-panel {
+    --ioto-timeline-type-filter-space-inline: 6px;
+    --ioto-timeline-type-filter-space-field: 8px;
+    position: absolute;
+    top: var(--ioto-timeline-type-filter-top, 4px);
+    right: 8px;
+    z-index: 5;
+    display: none;
+    width: min(304px, calc(100% - 16px));
+    max-height: calc(100% - var(--ioto-timeline-type-filter-top, 4px) - 8px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding: 12px;
+    container-type: inline-size;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m, 8px);
+    background: var(--background-primary);
+    box-shadow: var(--shadow-l);
+    color: var(--text-normal);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+}
+
+.ioto-timeline-type-filter-panel.is-open {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ioto-timeline-type-filter-space-field);
+}
+
+.ioto-timeline-type-filter-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ioto-timeline-type-filter-space-inline);
+}
+
+.ioto-timeline-type-filter-title {
+    font-weight: var(--font-semibold, 600);
+}
+
+.ioto-timeline-type-filter-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+}
+
+.ioto-timeline-type-filter-section {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ioto-timeline-type-filter-row {
+    display: flex;
+    align-items: center;
+    gap: var(--ioto-timeline-type-filter-space-inline);
+    min-height: 28px;
+    cursor: pointer;
+}
+
+.ioto-timeline-type-filter-row.is-all {
+    font-weight: var(--font-semibold, 600);
+}
+
+.ioto-timeline-type-filter-divider {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--background-modifier-border);
+}
+
+.ioto-timeline-type-filter-swatch {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--text-muted);
+}
+
+.ioto-timeline-type-filter-swatch[data-io-type="Input"] {
+    background: #015697;
+}
+.ioto-timeline-type-filter-swatch[data-io-type="Output"] {
+    background: #874b01;
+}
+.ioto-timeline-type-filter-swatch[data-io-type="Outcome"] {
+    background: #7c0389;
+}
+
 /* Group heads rendered by paged lists (note / task list). */
 .ioto-list-group-head {
     display: flex;

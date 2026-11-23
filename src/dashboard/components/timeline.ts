@@ -10,6 +10,12 @@ import {
 import type { TimelineSourceRef } from "../dataset/timeline";
 import type { ComponentDefinition, SettingOption } from "../registry";
 import { cardSearchText, mountCardSearch } from "../ui/card-search";
+import {
+	matchesTimelineTypes,
+	mountTimelineTypeFilter,
+	timelineTypeFilterActive,
+	timelineTypeFilterEnabled,
+} from "../ui/timeline-type-filter";
 
 export type TimelineCardSort = "created" | "modified" | "title";
 
@@ -197,6 +203,8 @@ export const timelineComponent: ComponentDefinition = {
 			return;
 		}
 		const keyword = cardSearchText(ctx.config);
+		const typeActive = timelineTypeFilterActive(ctx.config);
+		const enabledTypes = timelineTypeFilterEnabled(ctx.config);
 		const spec: PresentationSpec = ctx.arrange?.spec ?? { v: 1 };
 		const arranged = applyArrange(rows, spec, {
 			columns: ctx.dataset?.columns ?? [],
@@ -211,14 +219,18 @@ export const timelineComponent: ComponentDefinition = {
 		let visibleRows = 0;
 		for (const row of ordered) {
 			const allRefs = row.related ?? [];
-			const matchedRefs = keyword
-				? allRefs.filter((ref) => matchesTimelineRef(ref, keyword))
-				: allRefs;
-			if (keyword && matchedRefs.length === 0) continue; // 整行隐藏
+			// 类型过滤与搜索关键词并列串联（AND）。
+			const matchedRefs = allRefs.filter(
+				(ref) =>
+					matchesTimelineTypes(ref, enabledTypes) &&
+					(!keyword || matchesTimelineRef(ref, keyword)),
+			);
+			if ((keyword || typeActive) && matchedRefs.length === 0) continue; // 整行隐藏
 			visibleRows += 1;
 			const refs = sortTimelineRefs(matchedRefs, cardSort);
-			// 过滤态用命中数；无关键词时保留原始 relatedTotal（含 500 上限外的真实总数）。
-			const relatedTotal = keyword
+			// 过滤态用命中数；无过滤时保留原始 relatedTotal（含 500 上限外的真实总数）。
+			// 类型过滤生效时也必须取 refs.length，否则「更多 N」会把被过滤掉的卡片算进去。
+			const relatedTotal = keyword || typeActive
 				? refs.length
 				: (row.relatedTotal ?? allRefs.length);
 			const rowEl = el.createDiv({ cls: "ioto-timeline-row" });
@@ -283,6 +295,11 @@ export const timelineComponent: ComponentDefinition = {
 				cls: "ioto-timeline-empty",
 				text: t("TIMELINE_NO_MATCH", [keyword.trim()]),
 			});
+		} else if (visibleRows === 0 && typeActive) {
+			el.createDiv({
+				cls: "ioto-timeline-empty",
+				text: t("TIMELINE_TYPE_FILTER_EMPTY"),
+			});
 		}
 	},
 	renderHeaderActions: (header, ctx) => {
@@ -296,6 +313,20 @@ export const timelineComponent: ComponentDefinition = {
 				close: t("TIMELINE_SEARCH_CLOSE"),
 			},
 			// ctx.refreshBody 由 arrange 声明间接挂上；restore 时可能尚未挂载，故可选调用。
+			onChange: () => ctx.refreshBody?.(),
+		});
+		mountTimelineTypeFilter(header, {
+			config: ctx.config,
+			labels: {
+				toggle: t("TIMELINE_TYPE_FILTER_TOGGLE"),
+				title: t("TIMELINE_TYPE_FILTER_TITLE"),
+				close: t("TIMELINE_TYPE_FILTER_CLOSE"),
+				all: t("TIMELINE_TYPE_FILTER_ALL"),
+				input: t("NAV_INPUT"),
+				output: t("NAV_OUTPUT"),
+				task: t("NAV_TASKS"),
+				outcome: t("NAV_OUTCOME"),
+			},
 			onChange: () => ctx.refreshBody?.(),
 		});
 	},
