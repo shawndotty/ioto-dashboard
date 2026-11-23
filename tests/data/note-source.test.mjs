@@ -5,6 +5,7 @@ import { HEADINGS, fixture, load } from './helpers.mjs';
 const {
 	buildNoteRecord,
 	collectFacets,
+	firstAlias,
 	folderOf,
 	isInsideFolder,
 	normalizeFolder,
@@ -50,6 +51,16 @@ test('toText never produces [object Object]', () => {
 	assert.equal(toText(new Date('2026-01-02T00:00:00Z')), '2026-01-02');
 	assert.equal(toText(['a', 1, null, {}]), 'a, 1');
 	assert.equal(toText({ nested: true }), undefined);
+});
+
+test('firstAlias takes the first non-empty string in YAML order', () => {
+	assert.equal(firstAlias({ aliases: ['  ', 'A', 1, 'B'] }), 'A');
+	assert.equal(firstAlias({ aliases: [' C '] }), 'C');
+	assert.equal(firstAlias({ aliases: ' C ' }), 'C');
+	assert.equal(firstAlias(undefined), undefined);
+	assert.equal(firstAlias({}), undefined);
+	assert.equal(firstAlias({ aliases: [] }), undefined);
+	assert.equal(firstAlias({ aliases: ['', null] }), undefined);
 });
 
 test('buildNoteRecord counts file and section tasks separately', () => {

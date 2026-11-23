@@ -413,6 +413,30 @@ test('note timeline aggregates tasks and size per day', () => {
 	assert.equal(row.cells.size.sortValue, 3072);
 });
 
+test('note timeline uses first alias as label and falls back to basename', () => {
+	const snapshot = {
+		notes: [
+			note({
+				basename: '2026-11-09-a',
+				frontmatter: { aliases: ['语义别名A', '别名B'] },
+			}),
+			note({ basename: '2026-11-09-b', path: '3-任务/P1/b.md' }),
+		],
+		tasks: [],
+	};
+	const dataset = noteAdapter({
+		request: timelineRequest('note'),
+		query: query('note'),
+		snapshot,
+		dailySeries: () => [],
+		now: () => TIMELINE_NOW,
+	});
+	const row = dataset.rows[4];
+	assert.equal(row.related[0].label, '语义别名A');
+	assert.equal(row.related[0].path, '3-任务/P1/a.md');
+	assert.equal(row.related[1].label, '2026-11-09-b');
+});
+
 test('file timeline sums the file sizes inside the window', () => {
 	const snapshot = {
 		notes: [],

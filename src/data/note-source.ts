@@ -66,6 +66,21 @@ export function readFrontmatterValue(
 	return undefined;
 }
 
+/** First non-empty string alias in YAML order; falls back to `undefined`. */
+export function firstAlias(
+	frontmatter: Record<string, unknown> | undefined,
+): string | undefined {
+	const value = readFrontmatterValue(frontmatter, "aliases");
+	if (Array.isArray(value)) {
+		for (const item of value) {
+			if (typeof item === "string" && item.trim()) return item.trim();
+		}
+		return undefined;
+	}
+	if (typeof value === "string" && value.trim()) return value.trim();
+	return undefined;
+}
+
 /** Stringify only primitives; never fall back to `[object Object]`. */
 export function toText(value: unknown): string | undefined {
 	if (value === null || value === undefined) return undefined;

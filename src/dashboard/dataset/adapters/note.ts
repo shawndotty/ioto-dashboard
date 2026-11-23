@@ -1,3 +1,4 @@
+import { firstAlias } from "../../../data/note-source";
 import { resolveQuery } from "../../../query/resolve";
 import {
 	emptyDataset,
@@ -47,7 +48,7 @@ export const noteAdapter: DatasetAdapter = (input): Dataset => {
 			tasks: note.fileTaskCount,
 			completed: note.fileCompletedCount,
 			path: note.path,
-			text: note.basename,
+			text: firstAlias(note.frontmatter) ?? note.basename,
 			kind: "note",
 			ioType: note.ioType,
 		}));
