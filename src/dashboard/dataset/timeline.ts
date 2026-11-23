@@ -7,6 +7,7 @@ import {
 	type TimelineDateField,
 	type TimelineRange,
 } from "./types";
+import type { IoType } from "../../data/types";
 import { cell } from "./adapters/shared";
 
 const FILENAME_DATE = /(?:^|[^\d])(\d{4})-(\d{2})-(\d{2})(?:[^\d]|$)/;
@@ -26,6 +27,8 @@ export interface TimelineRecord {
 	text?: string;
 	kind?: TimelineSourceRef["kind"];
 	marker?: string;
+	/** IOTO semantic type, used by the timeline card colouring. */
+	ioType?: IoType;
 }
 
 /** One original record behind a timeline bucket. */
@@ -37,6 +40,11 @@ export interface TimelineSourceRef {
 	marker?: string;
 	/** Local day used to group month buckets. */
 	date?: string;
+	/** IOTO semantic type, used by the timeline card colouring. */
+	ioType?: IoType;
+	/** Creation / modification time, used by card sorting and meta labels. */
+	ctime?: number;
+	mtime?: number;
 }
 
 /** Hard cap per bucket so a month bucket cannot freeze the modal. */
@@ -202,6 +210,9 @@ export function buildTimelineRows(
 				kind: record.kind ?? "file",
 				marker: record.marker,
 				date: localDay(new Date(timestamp)),
+				ioType: record.ioType,
+				ctime: record.ctime,
+				mtime: record.mtime,
 			});
 			refsByBucket.set(key, refs);
 		}

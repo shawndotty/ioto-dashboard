@@ -99,6 +99,7 @@ export const STYLE_SETTINGS: ComponentSetting[] = [
 			config.type !== "treemap-chart" &&
 			config.type !== "task-list" &&
 			config.type !== "note-list" &&
+			config.type !== "timeline" &&
 			config.type !== "table",
 	},
 	{
@@ -117,6 +118,7 @@ export const STYLE_SETTINGS: ComponentSetting[] = [
 		hintKey: "SETTING_STYLE_COLOR_HINT",
 		target: "options",
 		when: (config) =>
+			config.type !== "timeline" &&
 			!(config.type === "markdown" && cardSurfaceOf(config.options) === "plain"),
 	},
 ];

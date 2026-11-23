@@ -3,6 +3,7 @@ import { projectProgressComponent } from "./project-progress";
 import { kpiComponent } from "./kpi";
 import { taskListComponent } from "./task-list";
 import { noteListComponent } from "./note-list";
+import { timelineComponent } from "./timeline";
 import { tableComponent } from "./table";
 import { lineChartComponent } from "./line-chart";
 import { heatmapComponent } from "./heatmap";
@@ -22,6 +23,7 @@ export function createComponentRegistry(): ComponentRegistry {
 	registry.register(projectProgressComponent);
 	registry.register(taskListComponent);
 	registry.register(noteListComponent);
+	registry.register(timelineComponent);
 	registry.register(tableComponent);
 	registry.register(lineChartComponent);
 	registry.register(heatmapComponent);

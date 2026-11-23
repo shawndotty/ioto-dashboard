@@ -2804,6 +2804,8 @@ export class CustomDashboardView extends ItemView {
 				);
 			}
 		};
+		// 搜索 onChange 复用同一函数：只重绘 body，保住 header 里的输入框焦点。
+		ctx.refreshBody = session.refreshBody;
 		session.refreshBadge = (active) => toggle.setActive(active);
 
 		if (session.open) {

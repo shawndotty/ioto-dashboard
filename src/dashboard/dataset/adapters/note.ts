@@ -49,6 +49,7 @@ export const noteAdapter: DatasetAdapter = (input): Dataset => {
 			path: note.path,
 			text: note.basename,
 			kind: "note",
+			ioType: note.ioType,
 		}));
 		const timeline = buildTimelineRows(
 			records,

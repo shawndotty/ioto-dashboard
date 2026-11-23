@@ -267,3 +267,36 @@ test('empty windows expose no bucket refs', () => {
 	);
 	assert.deepEqual(result.rows, []);
 });
+
+test('ioType, ctime and mtime pass through to bucket refs', () => {
+	const ctime = stamp(2026, 11, 9);
+	const mtime = stamp(2026, 11, 10);
+	const result = buildTimelineRows(
+		[
+			record({
+				basename: '2026-11-10-input',
+				path: '1-输入/input.md',
+				kind: 'note',
+				ioType: 'Input',
+				ctime,
+				mtime,
+			}),
+			record({
+				basename: '2026-11-10-output',
+				path: '2-输出/output.md',
+				kind: 'note',
+				ioType: 'Output',
+				ctime: stamp(2026, 11, 8),
+				mtime: stamp(2026, 11, 8),
+			}),
+		],
+		{ bucket: 'day', dateField: 'modified', range: 7, now: () => NOW },
+		TIMELINE_COLUMNS.note,
+	);
+	const row = result.rows.find((entry) => entry.id === '2026-11-10');
+	assert.equal(row.related.length, 1);
+	assert.equal(row.related[0].ioType, 'Input');
+	assert.equal(row.related[0].ctime, ctime);
+	assert.equal(row.related[0].mtime, mtime);
+	assert.equal(row.relatedTotal, 1);
+});

@@ -248,6 +248,8 @@ export interface ComponentRenderContext {
 		spec: PresentationSpec;
 		clearFilters(): void;
 	};
+	/** Re-renders only the card body (keeps header search input focused). */
+	refreshBody?(): void;
 }
 
 export interface SizeBounds {
