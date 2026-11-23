@@ -1689,6 +1689,7 @@
 }
 
 .ioto-custom-dashboard-view .ioto-timeline-empty {
+    grid-column: 1 / -1;   /* 横跨日期列+轴线列+卡片列，独占第一行居中 */
     padding: 12px;
     font-size: var(--font-ui-small);
     color: var(--text-faint);
