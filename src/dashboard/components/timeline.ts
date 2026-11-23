@@ -4,7 +4,6 @@ import {
 	type PresentationSpec,
 } from "../dataset/presentation";
 import {
-	formatDate,
 	type TimelineDateField,
 	type TimelineRange,
 } from "../dataset/types";
@@ -209,7 +208,6 @@ export const timelineComponent: ComponentDefinition = {
 		const options = ctx.config.options ?? {};
 		const cardSort = cardSortOf(options.cardSort);
 		const maxPerDay = maxPerDayOf(options.maxPerDay);
-		const dateField = dateFieldOf(options.dateField);
 		let visibleRows = 0;
 		for (const row of ordered) {
 			const allRefs = row.related ?? [];
@@ -252,12 +250,6 @@ export const timelineComponent: ComponentDefinition = {
 				const cardEl = cardsEl.createDiv({ cls: "ioto-timeline-card" });
 				cardEl.setAttr("data-io-type", ref.ioType ?? "Unknown");
 				cardEl.createDiv({ cls: "ioto-timeline-card-title", text: ref.label });
-				const stamp =
-					dateField === "modified" ? ref.mtime : ref.ctime ?? ref.mtime ?? 0;
-				cardEl.createDiv({
-					cls: "ioto-timeline-card-meta",
-					text: formatDate(stamp ?? 0),
-				});
 				cardEl.addEventListener("click", (event) => {
 					if (ctx.editMode) return;
 					event.stopPropagation();

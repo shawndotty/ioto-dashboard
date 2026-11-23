@@ -1664,17 +1664,13 @@
     font-size: var(--font-ui-small);
     line-height: 1.4;
     color: inherit;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
     overflow: hidden;
-}
-
-.ioto-custom-dashboard-view .ioto-timeline-card-meta {
-    font-size: var(--font-ui-smaller);
-    line-height: 1.3;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    opacity: 0.75;
+    text-overflow: clip;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow-wrap: anywhere;
 }
 
 .ioto-custom-dashboard-view .ioto-timeline-more {
