@@ -8,6 +8,7 @@ import {
 } from "../../../services/ai-runs-source";
 import type { ComponentDefinition } from "../../registry";
 import { renderResponsiveChart } from "../../dataset/charts/chart-host";
+import type { ChartInteractions } from "../../dataset/charts/svg";
 import {
 	buildAgentDonutSpec,
 	formatCompactNumber,
@@ -19,6 +20,9 @@ import {
 	renderNoData,
 	renderScope,
 } from "./shared";
+
+/** 仅 hover 显示数值，不接下钻：agent 名不是文件路径（Research-20261124-194657 §5.6）。 */
+const HOVER_ONLY: ChartInteractions = Object.freeze({});
 
 export const aiRunsAgentsComponent: ComponentDefinition = {
 	type: "ai-runs-agents",
@@ -103,7 +107,7 @@ export const aiRunsAgentsComponent: ComponentDefinition = {
 				cell,
 				(size) => buildAgentDonutSpec(agents, metric, size, getColor, totalText),
 				60,
-				undefined,
+				HOVER_ONLY,
 				{ hasRows: true },
 			);
 		}

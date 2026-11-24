@@ -29,6 +29,17 @@ export function formatCompactNumber(value: number): string {
 	return String(Math.round(value));
 }
 
+/** hover tooltip 的数值口径：slice.value 存绝对值而非 0~1 占比（arcRatio 等比，几何不变）。 */
+const METRIC_VALUE: Record<AgentMetric, {
+	field: "runs" | "inputTokens" | "outputTokens" | "totalTokens";
+	format: (n: number) => string;
+}> = {
+	share:       { field: "runs",         format: formatCount },
+	inputShare:  { field: "inputTokens",  format: formatCompactNumber },
+	outputShare: { field: "outputTokens", format: formatCompactNumber },
+	totalShare:  { field: "totalTokens",  format: formatCompactNumber },
+};
+
 /**
  * 单个指标的环形 spec；totalText 为已格式化的环心总量；无可画分片返回 null 让 host 显示占位。
  * 颜色索引取 agent 在传入数组中的稳定位置（四图共用），不取环内分片位置。
@@ -42,7 +53,7 @@ export function buildAgentDonutSpec(
 ): PieChartSpec | null {
 	if (Math.min(size.w, size.h) < 60) return null;
 	const raw = agents
-		.map((a) => ({ agent: a.agent, value: a[metric] }))
+		.map((a) => ({ agent: a.agent, value: a[METRIC_VALUE[metric].field] }))
 		.filter((x): x is { agent: string; value: number } =>
 			typeof x.value === "number" && x.value > 0);
 	if (raw.length === 0) return null;
@@ -98,9 +109,9 @@ export function buildAgentDonutSpec(
 		kind: "donut", width: size.w, height: size.h,
 		ariaKey: "CHART_ARIA_DONUT",
 		showLegend: false, valueList: null, hiddenCount: 0, extrasHeight: 0,
-		interactive: false,
+		interactive: true,
 		center, radius, innerRadius, slices,
-		labelMode: "none", formatValue: formatCount,
+		labelMode: "none", formatValue: METRIC_VALUE[metric].format,
 		valueLabelKey: "SETTING_PIE_TOTAL",
 		totalText, totalLabelKey: "SETTING_PIE_TOTAL",
 		centerFontSize, centerCaptionFontSize,

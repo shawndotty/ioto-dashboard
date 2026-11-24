@@ -5921,6 +5921,8 @@ body.is-mobile .ioto-pages-handle {
 .ioto-custom-dashboard-view .ioto-ai-donut-cell .ioto-chart-host {
     flex: 1 1 auto;
     min-height: 0;
+    /* hover tooltip 是本宿主的子节点，需溢出格子；仅此组件覆盖，不动通用 .ioto-chart-host。 */
+    overflow: visible;
 }
 .ioto-custom-dashboard-view .ioto-ai-donut-caption {
     font-size: 0.85em;
