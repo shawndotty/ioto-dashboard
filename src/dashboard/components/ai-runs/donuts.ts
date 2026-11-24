@@ -58,6 +58,13 @@ export function buildAgentDonutSpec(
 	const center = { x: size.w / 2, y: size.h / 2 };
 	const radius = Math.max(1, Math.min(size.w, size.h) / 2 - 8);
 	const innerRadius = radius * 0.6;
+	// 环心字号随内圈直径与字符数自适应；真机量测最宽 "266M" 约 0.685em/字符，留余量取 0.72。
+	const innerDiameter = innerRadius * 2;
+	const chars = Math.max(1, Array.from(totalText).length);
+	const maxByWidth = innerDiameter / (chars * 0.72);
+	const maxByHeight = innerDiameter * 0.40; // 两行总高 ≤ 内圈直径 80%
+	const centerFontSize = Math.max(9, Math.min(26, Math.min(maxByWidth, maxByHeight)));
+	const centerCaptionFontSize = Math.max(8, Math.min(13, centerFontSize * 0.6));
 	const ints = allocatePercents(shown.map((x) => x.value));
 	let cursor = 0;
 	const slices: PieSliceSpec[] = shown.map((entry, i) => {
@@ -96,6 +103,7 @@ export function buildAgentDonutSpec(
 		labelMode: "none", formatValue: formatCount,
 		valueLabelKey: "SETTING_PIE_TOTAL",
 		totalText, totalLabelKey: "SETTING_PIE_TOTAL",
+		centerFontSize, centerCaptionFontSize,
 	};
 }
 

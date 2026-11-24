@@ -5889,6 +5889,11 @@ body.is-mobile .ioto-pages-handle {
     overflow: auto;
 }
 
+/* 卡片正文作为查询容器：宽度跟随卡片 w 与侧栏，而不是视口。 */
+.ioto-custom-dashboard-view .ioto-ai-agents {
+    container-type: inline-size;
+}
+
 /* 2×2 环形图网格：grid/flex 收缩陷阱——minmax(0,1fr) 与 min-width:0 不能漏。 */
 .ioto-custom-dashboard-view .ioto-ai-donut-grid {
     display: grid;
@@ -5897,6 +5902,15 @@ body.is-mobile .ioto-pages-handle {
     flex: 1 1 auto;
     gap: 8px;
     min-height: 0;
+}
+/* 宽卡：正文内容宽 ≥660px 时切成 4 列 1 排；阈值以下维持 2×2。 */
+@container (min-width: 660px) {
+    .ioto-custom-dashboard-view .ioto-ai-agents .ioto-ai-donut-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-rows: minmax(68px, 220px);
+        flex: 0 0 auto;
+        align-content: center;
+    }
 }
 .ioto-custom-dashboard-view .ioto-ai-donut-cell {
     min-width: 0;
@@ -5913,7 +5927,8 @@ body.is-mobile .ioto-pages-handle {
     color: var(--text-muted);
     text-align: center;
 }
-/* h=4 卡片内每环宿主仅约 60px 高，环心内圈直径约 26px；默认 15px 会让 253M 溢出压到色环。 */
+/* h=4 卡片内每环宿主仅约 60px 高，环心内圈直径约 26px；默认 15px 会让 253M 溢出压到色环。
+   注意：AI 四环已由 buildAgentDonutSpec 按内圈动态算字号并内联 style；此处仅作 spec 未提供字号时的 fallback。 */
 .ioto-custom-dashboard-view .ioto-ai-donut-cell .ioto-chart-donut-center {
     font-size: 0.55em;
 }

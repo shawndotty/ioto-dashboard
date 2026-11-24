@@ -166,20 +166,25 @@ export function renderPieChart(
 	});
 
 	if (spec.kind === "donut") {
+		const fTotal = spec.centerFontSize;
+		const fCaption = spec.centerCaptionFontSize;
+		const sum = fTotal === undefined ? 0 : fTotal + (fCaption ?? fTotal);
 		const total = svgEl(doc, "text", {
 			x: spec.center.x,
-			y: spec.center.y - 2,
+			y: fTotal === undefined ? spec.center.y - 2 : spec.center.y - sum * 0.25,
 			dy: "0.32em",
 			class: "ioto-chart-donut-center is-total",
 		});
+		if (fTotal !== undefined) total.style.fontSize = `${fTotal}px`;
 		total.textContent = spec.totalText;
 		svg.appendChild(total);
 		const caption = svgEl(doc, "text", {
 			x: spec.center.x,
-			y: spec.center.y + 14,
+			y: fTotal === undefined ? spec.center.y + 14 : spec.center.y + sum * 0.55,
 			dy: "0.32em",
 			class: "ioto-chart-donut-center is-caption",
 		});
+		if (fCaption !== undefined) caption.style.fontSize = `${fCaption}px`;
 		caption.textContent = label(spec.totalLabelKey);
 		svg.appendChild(caption);
 	}

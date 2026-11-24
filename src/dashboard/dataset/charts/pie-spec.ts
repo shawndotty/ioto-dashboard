@@ -49,6 +49,10 @@ export interface PieChartSpec extends RenderableSpecBase {
 	/** Formatted total, shown inside a donut. */
 	totalText: string;
 	totalLabelKey: "SETTING_PIE_TOTAL";
+	/** total 环心字号(px)；AI 四环传入，其余 donut 省略时走 CSS。 */
+	centerFontSize?: number;
+	/** caption 环心字号(px)。 */
+	centerCaptionFontSize?: number;
 }
 
 const PIE_DEFAULT_FIELDS: Record<
