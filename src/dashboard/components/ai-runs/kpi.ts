@@ -1,0 +1,75 @@
+import { t } from "../../../lang/helpers";
+import {
+	formatCount,
+	formatDuration,
+	toKpis,
+} from "../../../services/ai-runs-source";
+import type { ComponentDefinition } from "../../registry";
+import { renderGeneratedAt, renderMetricRow, renderNoData } from "./shared";
+
+export const aiRunsKpiComponent: ComponentDefinition = {
+	type: "ai-runs-kpi",
+	labelKey: "COMPONENT_AI_RUNS_KPI_NAME",
+	descriptionKey: "COMPONENT_AI_RUNS_KPI_DESC",
+	icon: "activity",
+	category: "overview",
+	queryless: true,
+	defaultQueryId: "",
+	createConfig: () => ({ queryId: "", w: 6, h: 4 }),
+	size: { minW: 3, minH: 2, maxH: 12 },
+	isEmpty: () => false,
+	settings: [{ key: "title", kind: "text", group: "display" }],
+	render: (el, ctx) => {
+		const snapshot = ctx.aiRuns;
+		if (!snapshot) {
+			renderNoData(el);
+			return;
+		}
+		const kpi = toKpis(snapshot);
+		el.addClass("ioto-ai-metrics", "ioto-ai-kpi");
+		const headline = el.createDiv({ cls: "ioto-ai-kpi-headline" });
+		headline.createSpan({
+			cls: "ioto-ai-kpi-value",
+			text: formatCount(kpi.runs),
+		});
+		headline.createSpan({
+			cls: "ioto-ai-kpi-caption",
+			text: t("AI_METRICS_RUNS_TOTAL"),
+		});
+		if (kpi.underestimated) {
+			headline.createSpan({
+				cls: "ioto-ai-badge",
+				text: t("AI_METRICS_UNDERESTIMATED"),
+			});
+		}
+
+		renderMetricRow(
+			el,
+			t("AI_METRICS_SUCCEEDED"),
+			formatCount(kpi.succeeded),
+		);
+		renderMetricRow(el, t("AI_METRICS_FAILED"), formatCount(kpi.failed));
+		// 「输出 token」与「总 token」分列，旧桥文件无 inputTokens 时后者整行隐藏。
+		renderMetricRow(
+			el,
+			t("AI_METRICS_OUTPUT_TOKENS"),
+			formatCount(kpi.outputTokens),
+		);
+		renderMetricRow(
+			el,
+			t("AI_METRICS_TOTAL_TOKENS"),
+			kpi.totalTokens === undefined ? undefined : formatCount(kpi.totalTokens),
+		);
+		renderMetricRow(
+			el,
+			t("AI_METRICS_AVG_DURATION"),
+			formatDuration(kpi.avgDurationMs),
+		);
+		renderMetricRow(
+			el,
+			t("AI_METRICS_MEDIAN_DURATION"),
+			formatDuration(kpi.medianDurationMs),
+		);
+		renderGeneratedAt(el, snapshot);
+	},
+};

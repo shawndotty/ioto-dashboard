@@ -5805,3 +5805,142 @@ body.is-mobile .ioto-pages-handle {
 .ioto-dashboard-modal--template-center .ioto-template-center__import {
     flex: 0 0 auto;
 }
+
+/* ===== AI Runs Metrics（queryless 组件） ===== */
+.ioto-custom-dashboard-view .ioto-ai-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+    overflow: hidden;
+    font-size: var(--font-ui-small);
+}
+
+.ioto-custom-dashboard-view .ioto-ai-empty {
+    color: var(--text-muted);
+}
+
+.ioto-custom-dashboard-view .ioto-ai-generated-at {
+    margin-top: auto;
+    padding-top: 4px;
+    color: var(--text-faint);
+    font-size: 0.85em;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-kpi-headline {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-kpi-value {
+    font-size: 1.9em;
+    font-weight: 600;
+    line-height: 1.1;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-kpi-caption {
+    color: var(--text-muted);
+}
+
+.ioto-custom-dashboard-view .ioto-ai-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: var(--radius-s);
+    background: var(--background-modifier-hover);
+    color: var(--text-muted);
+    font-size: 0.78em;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-metric-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-metric-label {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-metric-value {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-agent-list,
+.ioto-custom-dashboard-view .ioto-ai-recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+    overflow: auto;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-agent-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-agent-name {
+    font-weight: 600;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-agent-count {
+    color: var(--text-normal);
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-agent-duration {
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-schedule-summary {
+    font-size: 1.2em;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-schedule-planned {
+    color: var(--text-muted);
+}
+
+.ioto-custom-dashboard-view .ioto-ai-recent-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ioto-custom-dashboard-view .ioto-ai-recent-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    color: var(--text-muted);
+    font-size: 0.9em;
+    font-variant-numeric: tabular-nums;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-recent-ok {
+    color: var(--text-success);
+}
+
+.ioto-custom-dashboard-view .ioto-ai-recent-fail {
+    color: var(--text-error);
+}
+
+/* wikilink 只作纯文本渲染：不解析 markdown，不变成可点链接 */
+.ioto-custom-dashboard-view .ioto-ai-recent-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-normal);
+}

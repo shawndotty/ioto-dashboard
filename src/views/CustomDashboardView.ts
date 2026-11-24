@@ -317,6 +317,16 @@ export class CustomDashboardView extends ItemView {
 				this.handleStoreChange(store),
 			),
 		);
+		// 进入视图强制读一次，覆盖「先开视图、桥文件后生成」；数据变化才重渲染。
+		const aiSource = this.plugin.aiRunsSource;
+		if (aiSource) {
+			void aiSource.read();
+			this.unsubscribers.push(
+				aiSource.subscribe(() => {
+					if (this.containerEl.isShown()) this.requestRender();
+				}),
+			);
+		}
 		this.registerEvent(
 			this.app.workspace.on("layout-change", () => this.updateVisibility()),
 		);
@@ -366,6 +376,7 @@ export class CustomDashboardView extends ItemView {
 	private updateVisibility(): void {
 		const visible = this.containerEl.isShown();
 		this.hub?.setVisible(visible);
+		if (visible) void this.plugin.aiRunsSource?.read();
 		if (visible || this.visibilityTimer !== null) return;
 		// Layout events can fire before the element is attached; recheck once.
 		this.visibilityTimer = window.setTimeout(() => {
@@ -1783,7 +1794,10 @@ export class CustomDashboardView extends ItemView {
 			item
 				.setTitle(t("DASHBOARD_REFRESH_ALL"))
 				.setIcon("refresh-cw")
-				.onClick(() => this.hub?.refreshNow()),
+				.onClick(() => {
+					this.hub?.refreshNow();
+					void this.plugin.aiRunsSource?.tick();
+				}),
 		);
 		menu.addItem((item) =>
 			item
@@ -2024,8 +2038,14 @@ export class CustomDashboardView extends ItemView {
 		const childSignature = (config.children ?? [])
 			.map((child) => `${child.id}:${this.cardSignature(child)}`)
 			.join(",");
+		// AI Metrics 是 queryless，但数据来自桥文件而非 DataHub；把 generatedAt
+		// 放进签名，数据源广播时卡片才会重建（其它 queryless 卡不受影响）。
+		const aiRunsVersion = config.type.startsWith("ai-runs-")
+			? String(this.plugin.aiRunsSource?.snapshotNow()?.generatedAt ?? "none")
+			: "";
 		return [
 			config.type,
+			aiRunsVersion,
 			queryless ? "" : config.queryId,
 			config.basis ?? "",
 			config.view ?? "",
@@ -2207,6 +2227,7 @@ export class CustomDashboardView extends ItemView {
 			patchComponent: (patch) => void this.updateComponent(config.id, patch),
 			mountBaseEmbed: (body, path, view, hideToolbar) =>
 				this.mountBaseEmbed(config.id, body, path, view, hideToolbar),
+			aiRuns: this.plugin.aiRunsSource?.snapshotNow() ?? null,
 			arrange: arrange
 				? {
 						get spec() {
@@ -2355,7 +2376,10 @@ export class CustomDashboardView extends ItemView {
 			cls: "ioto-error-retry",
 			text: t("DASHBOARD_RETRY"),
 		});
-		retry.addEventListener("click", () => this.hub?.refreshNow());
+		retry.addEventListener("click", () => {
+			this.hub?.refreshNow();
+			void this.plugin.aiRunsSource?.tick();
+		});
 	}
 
 	private renderCardFallback(

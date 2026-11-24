@@ -6,6 +6,8 @@ export const DASHBOARD_SCHEMA_VERSION = 7;
 export const DASHBOARD_STORE_KEY = "dashboardStore";
 export const DEFAULT_DASHBOARD_ID = "dashboard:default";
 export const DEFAULT_PAGE_ID = "page:default";
+/** A1 内置页：AI 运行指标；ID 固定，注入以它为幂等判据。 */
+export const AI_METRICS_PAGE_ID = "page:ai-metrics";
 
 export interface DashboardComponentConfig {
 	id: string;
@@ -86,6 +88,44 @@ export function createDefaultStore(defaultName = "Dashboard 1"): DashboardStoreD
 		],
 		activeDashboardId: DEFAULT_DASHBOARD_ID,
 		queries: [],
+	};
+}
+
+/** 预置页的组件类型/布局写死在代码里；不新增 schema 字段，不升级版本号。 */
+export function createAiMetricsPage(name = "AI Metrics"): DashboardPage {
+	return {
+		id: AI_METRICS_PAGE_ID,
+		name,
+		components: [
+			{
+				id: "ai-runs-kpi",
+				type: "ai-runs-kpi",
+				queryId: "",
+				w: 6,
+				h: 4,
+			},
+			{
+				id: "ai-runs-agents",
+				type: "ai-runs-agents",
+				queryId: "",
+				w: 6,
+				h: 4,
+			},
+			{
+				id: "ai-runs-schedule",
+				type: "ai-runs-schedule",
+				queryId: "",
+				w: 4,
+				h: 3,
+			},
+			{
+				id: "ai-runs-recent",
+				type: "ai-runs-recent",
+				queryId: "",
+				w: 8,
+				h: 6,
+			},
+		],
 	};
 }
 

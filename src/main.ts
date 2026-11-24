@@ -19,14 +19,17 @@ import {
 } from "./settings";
 
 import { IotoSettingsService } from "./services/ioto-settings-services";
+import { AiRunsSource } from "./services/ai-runs-source";
 import { restoreMacWindowButtons } from "./ui/macos-window-buttons";
 import { VaultIndex } from "./data/vault-index";
 import type { IndexConfig, SectionHeadings } from "./data/types";
 import { DashboardRepository } from "./dashboard/repository";
 import { dashboardCommandId } from "./dashboard/command-ids";
 import { DashboardTransfer } from "./dashboard/transfer";
-import type {
-	DashboardStoreData,
+import {
+	AI_METRICS_PAGE_ID,
+	createAiMetricsPage,
+	type DashboardStoreData,
 } from "./dashboard/types";
 import { DashboardPickerModal } from "./ui/dashboard-picker";
 import { TemplateCenterModal } from "./ui/template-center-modal";
@@ -58,6 +61,7 @@ export default class IotoDashboardPlugin extends Plugin {
 	snapshotStore: SnapshotStore;
 	transfer!: DashboardTransfer;
 	readonly inspectorService = new DashboardInspectorService();
+	aiRunsSource: AiRunsSource;
 	private indexRebuildTimer: number | null = null;
 	private snapshotTimer: number | null = null;
 	private lastSnapshotDate = "";
@@ -112,6 +116,26 @@ export default class IotoDashboardPlugin extends Plugin {
 				this.dashboardStore = store;
 				this.scheduleDashboardCommandSync();
 			}),
+		);
+
+		// 步骤 3（A1）：首次加载注入 AI Metrics 预置页，走真实写入 + onChange 广播。
+		await this.ensureAiMetricsPage();
+
+		// 步骤 1：AI 运行桥文件的唯一数据源；刷新三件套中的事件与轮询在此注册，
+		// 进入视图强制读由 CustomDashboardView 负责。
+		this.aiRunsSource = new AiRunsSource({
+			app: this.app,
+			getSettings: () => new IotoSettingsService(this.app).getSettings(),
+		});
+		this.registerEvent(
+			this.app.vault.on("modify", (file) => {
+				if (this.aiRunsSource.matchesPath(file.path)) {
+					void this.aiRunsSource.read();
+				}
+			}),
+		);
+		this.registerInterval(
+			window.setInterval(() => void this.aiRunsSource.tick(), 45_000),
 		);
 		this.snapshotStore = new SnapshotStore({
 			adapter: this.app.vault.adapter,
@@ -372,6 +396,40 @@ export default class IotoDashboardPlugin extends Plugin {
 		window.activeDocument
 			.querySelectorAll(".ioto-dashboard-modal.is-frame-buttons-hidden")
 			.forEach((el) => el.classList.remove("is-frame-buttons-hidden"));
+	}
+
+	/** A1 内置页：只注入一次；用户之后可自由编辑/删除，重复加载不再塞回。 */
+	private async ensureAiMetricsPage(): Promise<void> {
+		const store = this.dashboardStore;
+		if (!store) return;
+		if (
+			store.dashboards.some((dashboard) =>
+				dashboard.pages.some((page) => page.id === AI_METRICS_PAGE_ID),
+			)
+		) {
+			return;
+		}
+		const target =
+			store.dashboards.find(
+				(dashboard) => dashboard.id === store.activeDashboardId,
+			) ?? store.dashboards[0];
+		if (!target) return;
+		const next: DashboardStoreData = {
+			...store,
+			dashboards: store.dashboards.map((dashboard) =>
+				dashboard.id === target.id
+					? {
+							...dashboard,
+							pages: [
+								...dashboard.pages,
+								createAiMetricsPage(t("AI_METRICS_PAGE_NAME")),
+							],
+						}
+					: dashboard,
+			),
+		};
+		// save() 会经 notify() 广播，onChange 监听器同步刷新内存 store。
+		await this.dashboardRepository.save(next);
 	}
 
 	getDashboardStore(): DashboardStoreData | null {

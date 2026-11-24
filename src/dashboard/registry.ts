@@ -19,6 +19,7 @@ import { columnsForObject } from "./dataset/columns";
 import type { FieldAxis } from "./dataset/field-roles";
 import type { TimelineSourceRef } from "./dataset/timeline";
 import type { DashboardComponentConfig } from "./types";
+import type { AiRunsSnapshot } from "../services/ai-runs-source";
 
 export type ComponentStatus = "loading" | "ready" | "empty" | "error";
 
@@ -250,6 +251,8 @@ export interface ComponentRenderContext {
 	};
 	/** Re-renders only the card body (keeps header search input focused). */
 	refreshBody?(): void;
+	/** AI 运行桥文件快照；仅 AI Metrics queryless 组件读取，可能为 null。 */
+	aiRuns?: AiRunsSnapshot | null;
 }
 
 export interface SizeBounds {

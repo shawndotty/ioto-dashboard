@@ -14,6 +14,7 @@ import { treemapChartComponent } from "./treemap-chart";
 import { markdownComponent } from "./markdown";
 import { buttonComponent } from "./button";
 import { baseComponent } from "./base";
+import { aiMetricsComponents } from "./ai-runs";
 import { ComponentRegistry } from "../registry";
 
 export function createComponentRegistry(): ComponentRegistry {
@@ -35,5 +36,6 @@ export function createComponentRegistry(): ComponentRegistry {
 	registry.register(markdownComponent);
 	registry.register(buttonComponent);
 	registry.register(baseComponent);
+	for (const definition of aiMetricsComponents) registry.register(definition);
 	return registry;
 }
