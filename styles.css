@@ -5911,6 +5911,11 @@ body.is-mobile .ioto-pages-handle {
     font-size: 0.9em;
 }
 
+.ioto-custom-dashboard-view .ioto-ai-agent-token-shares {
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
 .ioto-custom-dashboard-view .ioto-ai-schedule-summary {
     font-size: 1.2em;
     font-weight: 600;

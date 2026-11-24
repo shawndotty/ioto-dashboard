@@ -1072,6 +1072,7 @@ export default {
 	AI_METRICS_SUCCEEDED: "Succeeded",
 	AI_METRICS_FAILED: "Failed",
 	AI_METRICS_OUTPUT_TOKENS: "Output tokens",
+	AI_METRICS_INPUT_TOKENS: "Input tokens",
 	AI_METRICS_TOTAL_TOKENS: "Total tokens",
 	AI_METRICS_AVG_DURATION: "Average duration",
 	AI_METRICS_AVG_DURATION_HINT: "includes occasional long runs",

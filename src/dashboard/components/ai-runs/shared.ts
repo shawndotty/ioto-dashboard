@@ -1,6 +1,8 @@
 import { t } from "../../../lang/helpers";
 import {
 	formatGeneratedAt,
+	localDayKey,
+	type AiMetricsRange,
 	type AiRunsSnapshot,
 } from "../../../services/ai-runs-source";
 
@@ -24,6 +26,22 @@ export function renderGeneratedAt(el: HTMLElement, snapshot: AiRunsSnapshot): vo
 		cls: "ioto-ai-generated-at",
 		text: t("AI_METRICS_GENERATED_AT", [stamp]),
 	});
+}
+
+/** 统计范围标识：today 用快照日键、all 用窗口天数（windowDays 非 number 回退文案）。
+ *  KPI 卡与 Agent 卡共用，文案与类名保持一致。 */
+export function renderScope(
+	el: HTMLElement,
+	snapshot: AiRunsSnapshot,
+	range: AiMetricsRange,
+): void {
+	const scope =
+		range === "today"
+			? t("AI_METRICS_SCOPE_TODAY", [localDayKey(snapshot.generatedAt)])
+			: typeof snapshot.windowDays === "number"
+				? t("AI_METRICS_SCOPE_ALL", [String(snapshot.windowDays)])
+				: t("AI_METRICS_RANGE_ALL");
+	el.createDiv({ cls: "ioto-ai-metric-scope", text: scope });
 }
 
 /** 数值行：value 为 undefined 时整行不渲染（旧桥文件缺字段时自动隐藏）。

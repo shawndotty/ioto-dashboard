@@ -70,6 +70,14 @@ export interface AgentProjection {
 	share: number;
 	avgDurationMs?: number;
 	medianDurationMs?: number;
+	/** 绝对 token 数；仅当快照任一日 totals.inputTokens 有值时整组产出。 */
+	inputTokens?: number;
+	outputTokens?: number;
+	totalTokens?: number;
+	/** 0~1 占比；分母为 0 / 旧桥文件缺字段时不产出该键。 */
+	inputShare?: number;
+	outputShare?: number;
+	totalShare?: number;
 }
 
 export interface DailyProjection {
@@ -215,9 +223,25 @@ export function toAgentSeries(snapshot: AiRunsSnapshot): AgentProjection[] {
 		string,
 		{ weighted: number; runsWithDuration: number; dailyMedians: number[] }
 	>();
+	// token 累加器同样只作中间态；分母按 Q5 取 days[].totals，不取 byAgent 求和，
+	// 避免把未归属运行归一化掉。hasInput 决定输入/总三项是否产出（同 toKpis 口径）。
+	const inAcc = new Map<string, number>();
+	const outAcc = new Map<string, number>();
+	let totalInput = 0;
+	let totalOutput = 0;
+	let hasInput = false;
 	for (const day of snapshot.days) {
+		const totals = day?.totals ?? {};
+		const input = num(totals.inputTokens);
+		if (input !== undefined) {
+			hasInput = true;
+			totalInput += input;
+		}
+		totalOutput += num(totals.outputTokens) ?? 0;
 		for (const [agent, raw] of Object.entries(day?.byAgent ?? {})) {
 			const runs = num(raw?.runs) ?? 0;
+			inAcc.set(agent, (inAcc.get(agent) ?? 0) + (num(raw?.inputTokens) ?? 0));
+			outAcc.set(agent, (outAcc.get(agent) ?? 0) + (num(raw?.outputTokens) ?? 0));
 			const existing =
 				rows.get(agent) ??
 				({
@@ -250,8 +274,21 @@ export function toAgentSeries(snapshot: AiRunsSnapshot): AgentProjection[] {
 		}
 	}
 	const result = [...rows.values()].sort((a, b) => b.runs - a.runs);
+	const ratio = (part: number, whole: number): number | undefined =>
+		whole > 0 ? part / whole : undefined;
 	for (const row of result) {
 		row.share = total > 0 ? row.runs / total : 0;
+		row.outputTokens = outAcc.get(row.agent) ?? 0;
+		const outputShare = ratio(row.outputTokens, totalOutput);
+		if (outputShare !== undefined) row.outputShare = outputShare;
+		if (hasInput) {
+			row.inputTokens = inAcc.get(row.agent) ?? 0;
+			row.totalTokens = row.inputTokens + row.outputTokens;
+			const inputShare = ratio(row.inputTokens, totalInput);
+			if (inputShare !== undefined) row.inputShare = inputShare;
+			const totalShare = ratio(row.totalTokens, totalInput + totalOutput);
+			if (totalShare !== undefined) row.totalShare = totalShare;
+		}
 		const acc = durationAcc.get(row.agent);
 		if (!acc) continue;
 		if (acc.runsWithDuration > 0) {

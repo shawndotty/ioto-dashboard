@@ -3,12 +3,16 @@ import {
 	daysForRange,
 	formatCount,
 	formatDuration,
-	localDayKey,
 	toKpis,
 	type AiMetricsRange,
 } from "../../../services/ai-runs-source";
 import type { ComponentDefinition } from "../../registry";
-import { renderGeneratedAt, renderMetricRow, renderNoData } from "./shared";
+import {
+	renderGeneratedAt,
+	renderMetricRow,
+	renderNoData,
+	renderScope,
+} from "./shared";
 
 export const aiRunsKpiComponent: ComponentDefinition = {
 	type: "ai-runs-kpi",
@@ -73,11 +77,16 @@ export const aiRunsKpiComponent: ComponentDefinition = {
 			formatCount(kpi.succeeded),
 		);
 		renderMetricRow(el, t("AI_METRICS_FAILED"), formatCount(kpi.failed));
-		// 「输出 token」与「总 token」分列，旧桥文件无 inputTokens 时后者整行隐藏。
+		// 「输出 / 输入 / 总」三行分列，旧桥文件无 inputTokens 时后两行整行隐藏。
 		renderMetricRow(
 			el,
 			t("AI_METRICS_OUTPUT_TOKENS"),
 			formatCount(kpi.outputTokens),
+		);
+		renderMetricRow(
+			el,
+			t("AI_METRICS_INPUT_TOKENS"),
+			kpi.inputTokens === undefined ? undefined : formatCount(kpi.inputTokens),
 		);
 		renderMetricRow(
 			el,
@@ -96,13 +105,7 @@ export const aiRunsKpiComponent: ComponentDefinition = {
 			`${t("AI_METRICS_AVG_DURATION")} · ${t("AI_METRICS_AVG_DURATION_HINT")}`,
 			formatDuration(kpi.avgDurationMs),
 		);
-		const scope =
-			range === "today"
-				? t("AI_METRICS_SCOPE_TODAY", [localDayKey(snapshot.generatedAt)])
-				: typeof snapshot.windowDays === "number"
-					? t("AI_METRICS_SCOPE_ALL", [String(snapshot.windowDays)])
-					: t("AI_METRICS_RANGE_ALL");
-		el.createDiv({ cls: "ioto-ai-metric-scope", text: scope });
+		renderScope(el, snapshot, range);
 		renderGeneratedAt(el, snapshot);
 	},
 };

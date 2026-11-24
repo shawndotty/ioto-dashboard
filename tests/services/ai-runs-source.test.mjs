@@ -57,6 +57,26 @@ function snapshot(over = {}) {
 	};
 }
 
+/** 双 agent 且 token 不同，供占比分母/numerator 用可区分数值验证。 */
+function tokenSnapshot(over = {}) {
+	return {
+		schemaVersion: 1,
+		generatedAt: 1795506036196, // localDayKey → 2026-11-24
+		windowDays: 7,
+		days: [
+			{
+				date: '2026-11-24',
+				totals: { runs: 10, succeeded: 10, failed: 0, inputTokens: 1000, outputTokens: 400 },
+				byAgent: {
+					codebuddy: { runs: 7, succeeded: 7, failed: 0, inputTokens: 700, outputTokens: 300 },
+					qoder: { runs: 3, succeeded: 3, failed: 0, inputTokens: 300, outputTokens: 100 },
+				},
+			},
+		],
+		...over,
+	};
+}
+
 /** 旧桥文件：totals 5 字段、byAgent 4 字段，没有新投影字段。 */
 function oldSnapshot() {
 	return {
@@ -141,6 +161,33 @@ test('toAgentSeries aggregates counts, computes share and keeps optional duratio
 	assert.equal(rows[1].runs, 0);
 	assert.ok(Math.abs(rows[0].share + rows[1].share - 1) < 1e-9);
 	assert.equal(rows[0].avgDurationMs, 1000);
+	// Q5 分母取 days[].totals：totalInput=1000、totalOutput=200；
+	// 各 agent 的 input/output 累加自 byAgent，输出占比 = 200/200 = 1。
+	assert.equal(rows[0].inputTokens, 1000);
+	assert.equal(rows[0].outputTokens, 200);
+	assert.equal(rows[0].totalTokens, 1200);
+	assert.equal(rows[0].inputShare, 1);
+	assert.equal(rows[0].outputShare, 1);
+	assert.equal(rows[0].totalShare, 1);
+	assert.equal(rows[1].runs, 0);
+	assert.equal(rows[1].avgDurationMs, undefined);
+});
+
+test('toAgentSeries token shares use totals as denominator, not byAgent sum', () => {
+	const rows = toAgentSeries(tokenSnapshot());
+	const cb = rows.find((row) => row.agent === 'codebuddy');
+	const qd = rows.find((row) => row.agent === 'qoder');
+	// totals: input=1000, output=400 → total=1400（不是 byAgent 求和）。
+	assert.equal(cb.inputTokens, 700);
+	assert.equal(cb.outputTokens, 300);
+	assert.equal(cb.totalTokens, 1000);
+	assert.ok(Math.abs(cb.inputShare - 0.7) < 1e-9);
+	assert.ok(Math.abs(cb.outputShare - 0.75) < 1e-9);
+	assert.ok(Math.abs(cb.totalShare - 1000 / 1400) < 1e-9);
+	assert.ok(Math.abs(qd.inputShare - 0.3) < 1e-9);
+	assert.ok(Math.abs(qd.outputShare - 0.25) < 1e-9);
+	// 次数占比 share 与 token 占比彼此独立，互不影响。
+	assert.ok(Math.abs(cb.share - 0.7) < 1e-9);
 });
 
 // 对齐真实桥文件 qodercn：11-18 runs=7 avg=1,368,305 median=489,553；
@@ -180,6 +227,73 @@ test('toAgentSeries on legacy bridge has no duration fields', () => {
 	assert.equal(rows[0].runs, 6);
 	assert.equal('avgDurationMs' in rows[0], false);
 	assert.equal('medianDurationMs' in rows[0], false);
+});
+
+test('toAgentSeries legacy bridge emits only outputShare, hides input/total shares', () => {
+	const rows = toAgentSeries(oldSnapshot());
+	// 旧桥文件 totals 无 inputTokens：hasInput=false → 输入/总三项整组不产出。
+	assert.equal(rows[0].outputTokens, 204002);
+	assert.equal(rows[0].outputShare, 1);
+	assert.equal('inputTokens' in rows[0], false);
+	assert.equal('totalTokens' in rows[0], false);
+	assert.equal('inputShare' in rows[0], false);
+	assert.equal('totalShare' in rows[0], false);
+	for (const value of Object.values(rows[0])) {
+		assert.notEqual(value, undefined);
+		assert.equal(Number.isNaN(value), false);
+	}
+});
+
+test('toAgentSeries with zero denominator emits no share keys (no NaN/0%)', () => {
+	const zero = tokenSnapshot({
+		days: [
+			{
+				date: '2026-11-24',
+				totals: { runs: 2, succeeded: 2, failed: 0, inputTokens: 0, outputTokens: 0 },
+				byAgent: {
+					codebuddy: { runs: 2, succeeded: 2, failed: 0, inputTokens: 0, outputTokens: 0 },
+				},
+			},
+		],
+	});
+	const rows = toAgentSeries(zero);
+	assert.equal(rows[0].outputTokens, 0);
+	assert.equal(rows[0].inputTokens, 0);
+	assert.equal('outputShare' in rows[0], false);
+	assert.equal('inputShare' in rows[0], false);
+	assert.equal('totalShare' in rows[0], false);
+	for (const value of Object.values(rows[0])) {
+		assert.equal(Number.isNaN(value), false);
+	}
+});
+
+test('toAgentSeries on daysForRange(today) counts only the snapshot day', () => {
+	const snap = tokenSnapshot({
+		days: [
+			{
+				date: '2026-11-23',
+				totals: { runs: 5, succeeded: 5, failed: 0, inputTokens: 5000, outputTokens: 5000 },
+				byAgent: {
+					codebuddy: { runs: 5, succeeded: 5, failed: 0, inputTokens: 5000, outputTokens: 5000 },
+				},
+			},
+			{
+				date: '2026-11-24',
+				totals: { runs: 2, succeeded: 2, failed: 0, inputTokens: 200, outputTokens: 80 },
+				byAgent: {
+					qoder: { runs: 2, succeeded: 2, failed: 0, inputTokens: 200, outputTokens: 80 },
+				},
+			},
+		],
+	});
+	const scoped = { ...snap, days: daysForRange(snap, 'today') };
+	const rows = toAgentSeries(scoped);
+	assert.equal(rows.length, 1);
+	assert.equal(rows[0].agent, 'qoder');
+	assert.equal(rows[0].runs, 2);
+	assert.equal(rows[0].inputTokens, 200);
+	assert.equal(rows[0].outputTokens, 80);
+	assert.ok(Math.abs(rows[0].share - 1) < 1e-9);
 });
 
 test('toDailySeries and toScheduleRows cover trend and the 0/0 case', () => {
