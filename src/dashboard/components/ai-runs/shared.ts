@@ -4,11 +4,14 @@ import {
 	type AiRunsSnapshot,
 } from "../../../services/ai-runs-source";
 
-export function renderNoData(el: HTMLElement): void {
+export function renderNoData(
+	el: HTMLElement,
+	textKey: Parameters<typeof t>[0] = "AI_METRICS_NO_DATA",
+): void {
 	el.addClass("ioto-ai-metrics");
 	el.createDiv({
 		cls: "ioto-ai-empty",
-		text: t("AI_METRICS_NO_DATA"),
+		text: t(textKey),
 	});
 }
 

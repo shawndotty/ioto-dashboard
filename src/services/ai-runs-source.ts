@@ -190,6 +190,18 @@ export function toKpis(snapshot: AiRunsSnapshot): KpiProjection {
 	};
 }
 
+export type AiMetricsRange = "all" | "today";
+
+/** 按范围筛出待聚合的 days；today 以快照生成日的本地日键为准。 */
+export function daysForRange(
+	snapshot: AiRunsSnapshot,
+	range: AiMetricsRange,
+): AiRunDay[] {
+	if (range === "all") return snapshot.days;
+	const key = localDayKey(snapshot.generatedAt);
+	return snapshot.days.filter((day) => day?.date === key);
+}
+
 /** 按 agent 汇总调用次数/占比；耗时与 toKpis 同口径——整窗 runs 加权 + 各日中位数的中位数。 */
 export function toAgentSeries(snapshot: AiRunsSnapshot): AgentProjection[] {
 	const total = snapshot.days.reduce(

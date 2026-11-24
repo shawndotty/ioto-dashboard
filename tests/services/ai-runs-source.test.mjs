@@ -5,6 +5,7 @@ import { load } from '../data/helpers.mjs';
 const {
 	isAiRunsSnapshot,
 	toKpis,
+	daysForRange,
 	toAgentSeries,
 	toDailySeries,
 	toScheduleRows,
@@ -217,6 +218,51 @@ test('sanitizeChecklistText handles bearer/api-key patterns', () => {
 test('localDayKey uses local calendar fields', () => {
 	const d = new Date(2026, 10, 24, 23, 30);
 	assert.equal(localDayKey(d.getTime()), '2026-11-24');
+});
+
+test('daysForRange: all returns the original days array unchanged', () => {
+	const snap = snapshot();
+	assert.deepEqual(daysForRange(snap, 'all'), snap.days);
+});
+
+test('daysForRange: today keeps only the snapshot generation day', () => {
+	const today = localDayKey(snapshot().generatedAt);
+	const snap = snapshot({
+		days: [
+			{ date: '2026-11-22', totals: NEW_BUCKET({ runs: 2 }), byAgent: {} },
+			{ date: today, totals: NEW_BUCKET({ runs: 7 }), byAgent: {} },
+			{ date: '2026-11-23', totals: NEW_BUCKET({ runs: 5 }), byAgent: {} },
+		],
+	});
+	const scoped = daysForRange(snap, 'today');
+	assert.equal(scoped.length, 1);
+	assert.equal(scoped[0].date, today);
+	assert.equal(toKpis({ ...snap, days: scoped }).runs, 7);
+});
+
+test('daysForRange: today with no matching day returns empty and KPI runs=0', () => {
+	// fixture 的 days 只有 2026-11-23，generatedAt 是 2026-11-24。
+	const snap = snapshot();
+	const scoped = daysForRange(snap, 'today');
+	assert.deepEqual(scoped, []);
+	assert.equal(toKpis({ ...snap, days: scoped }).runs, 0);
+});
+
+test('daysForRange: today zero-run placeholder day yields runs=0 (not a row of zeros)', () => {
+	const today = localDayKey(snapshot().generatedAt);
+	const snap = snapshot({
+		days: [
+			{ date: '2026-11-22', totals: NEW_BUCKET({ runs: 9 }), byAgent: {} },
+			{
+				date: today,
+				totals: { runs: 0, outputTokens: 0, avgDurationMs: 0, medianDurationMs: 0 },
+				byAgent: {},
+			},
+		],
+	});
+	const scoped = daysForRange(snap, 'today');
+	assert.equal(scoped.length, 1);
+	assert.equal(toKpis({ ...snap, days: scoped }).runs, 0);
 });
 
 test('formatters produce readable, finite strings', () => {

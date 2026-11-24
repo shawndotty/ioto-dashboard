@@ -1,8 +1,11 @@
 import { t } from "../../../lang/helpers";
 import {
+	daysForRange,
 	formatCount,
 	formatDuration,
+	localDayKey,
 	toKpis,
+	type AiMetricsRange,
 } from "../../../services/ai-runs-source";
 import type { ComponentDefinition } from "../../registry";
 import { renderGeneratedAt, renderMetricRow, renderNoData } from "./shared";
@@ -15,17 +18,38 @@ export const aiRunsKpiComponent: ComponentDefinition = {
 	category: "overview",
 	queryless: true,
 	defaultQueryId: "",
-	createConfig: () => ({ queryId: "", w: 6, h: 4 }),
+	createConfig: () => ({ queryId: "", options: { range: "all" }, w: 6, h: 4 }),
 	size: { minW: 3, minH: 2, maxH: 12 },
 	isEmpty: () => false,
-	settings: [{ key: "title", kind: "text", group: "display" }],
+	settings: [
+		{
+			key: "range",
+			kind: "select",
+			group: "data",
+			labelKey: "SETTING_AI_METRICS_RANGE",
+			options: [
+				{ value: "all", labelKey: "AI_METRICS_RANGE_ALL" },
+				{ value: "today", labelKey: "AI_METRICS_RANGE_TODAY" },
+			],
+			fallback: "all",
+			target: "options",
+		},
+		{ key: "title", kind: "text", group: "display" },
+	],
 	render: (el, ctx) => {
 		const snapshot = ctx.aiRuns;
 		if (!snapshot) {
 			renderNoData(el);
 			return;
 		}
-		const kpi = toKpis(snapshot);
+		const range: AiMetricsRange =
+			ctx.config.options?.range === "today" ? "today" : "all";
+		const scoped = { ...snapshot, days: daysForRange(snapshot, range) };
+		const kpi = toKpis(scoped);
+		if (range === "today" && kpi.runs === 0) {
+			renderNoData(el, "AI_METRICS_TODAY_EMPTY");
+			return;
+		}
 		el.addClass("ioto-ai-metrics", "ioto-ai-kpi");
 		const headline = el.createDiv({ cls: "ioto-ai-kpi-headline" });
 		headline.createSpan({
@@ -72,6 +96,13 @@ export const aiRunsKpiComponent: ComponentDefinition = {
 			`${t("AI_METRICS_AVG_DURATION")} · ${t("AI_METRICS_AVG_DURATION_HINT")}`,
 			formatDuration(kpi.avgDurationMs),
 		);
+		const scope =
+			range === "today"
+				? t("AI_METRICS_SCOPE_TODAY", [localDayKey(snapshot.generatedAt)])
+				: typeof snapshot.windowDays === "number"
+					? t("AI_METRICS_SCOPE_ALL", [String(snapshot.windowDays)])
+					: t("AI_METRICS_RANGE_ALL");
+		el.createDiv({ cls: "ioto-ai-metric-scope", text: scope });
 		renderGeneratedAt(el, snapshot);
 	},
 };
