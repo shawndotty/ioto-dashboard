@@ -104,8 +104,10 @@ export const aiRunsKpiComponent: ComponentDefinition = {
 			el,
 			`${t("AI_METRICS_AVG_DURATION")} · ${t("AI_METRICS_AVG_DURATION_HINT")}`,
 			formatDuration(kpi.avgDurationMs),
+			"ioto-ai-metric-last", // 末行打标：CSS 去底边线（meta-row 加入后 :last-child 失效）
 		);
-		renderScope(el, snapshot, range);
-		renderGeneratedAt(el, snapshot);
+		const meta = el.createDiv({ cls: "ioto-ai-meta-row" }); // 底部一行容器（两端对齐）
+		renderScope(meta, snapshot, range); // el → meta
+		renderGeneratedAt(meta, snapshot); // el → meta
 	},
 };

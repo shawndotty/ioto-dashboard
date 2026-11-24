@@ -5902,6 +5902,17 @@ body.is-mobile .ioto-pages-handle {
     color: var(--text-normal);
 }
 
+/* KPI 卡指标行：表格化视觉（统一行高 + 行分隔线），风格对齐 Agent 图例。
+   仅作用于 .ioto-ai-kpi，避免污染共用同一根类的其余 AI 卡。 */
+.ioto-custom-dashboard-view .ioto-ai-kpi .ioto-ai-metric-row {
+    padding: 2px 2px;
+    align-items: center;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+.ioto-custom-dashboard-view .ioto-ai-kpi .ioto-ai-metric-last {
+    border-bottom: none;   /* 卡片底部不画多余线 */
+}
+
 .ioto-custom-dashboard-view .ioto-ai-recent-list {
     display: flex;
     flex-direction: column;
