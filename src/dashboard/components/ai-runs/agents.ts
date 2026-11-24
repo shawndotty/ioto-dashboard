@@ -112,7 +112,8 @@ export const aiRunsAgentsComponent: ComponentDefinition = {
 			);
 		}
 		renderAgentLegend(el, agents, getColor);
-		renderScope(el, snapshot, range);
-		renderGeneratedAt(el, snapshot);
+		const meta = el.createDiv({ cls: "ioto-ai-meta-row" });
+		renderScope(meta, snapshot, range);
+		renderGeneratedAt(meta, snapshot);
 	},
 };
