@@ -56,6 +56,8 @@ export interface KpiProjection {
 	outputTokens: number;
 	inputTokens?: number;
 	totalTokens?: number;
+	/** 范围内总耗时：优先累加各日 totals.durationMs，缺字段时回退 avg × runs。 */
+	totalDurationMs?: number;
 	avgDurationMs?: number;
 	medianDurationMs?: number;
 	underestimated: boolean;
@@ -163,16 +165,30 @@ export function toKpis(snapshot: AiRunsSnapshot): KpiProjection {
 	// 中位耗时没有可精确合并的口径，取各日中位数的中位数，与「总 token」同为整窗口径。
 	let durationWeighted = 0;
 	let runsWithDuration = 0;
+	let totalDuration = 0;
+	let hasTotalDuration = false;
 	const dailyMedians: number[] = [];
 	for (const day of snapshot.days) {
 		const totals = day?.totals ?? {};
 		const avg = num(totals.avgDurationMs);
+		const median = num(totals.medianDurationMs);
 		const dayRuns = num(totals.runs) ?? 0;
 		if (avg !== undefined && dayRuns > 0) {
 			durationWeighted += avg * dayRuns;
 			runsWithDuration += dayRuns;
 		}
-		const median = num(totals.medianDurationMs);
+		// 耗时三项同属「新桥文件」字段组：旧桥文件只有 durationMs 时整组隐藏，
+		// 避免只显示总耗时、均/中位缺失的割裂呈现。
+		if (dayRuns > 0 && (avg !== undefined || median !== undefined)) {
+			const dayTotal = num(totals.durationMs);
+			// 优先累加每日汇总；缺字段时回退 avg × runs；两者都无值则不产出该字段。
+			const contribution =
+				dayTotal ?? (avg !== undefined ? avg * dayRuns : undefined);
+			if (contribution !== undefined) {
+				totalDuration += contribution;
+				hasTotalDuration = true;
+			}
+		}
 		// 0 次运行的占位日 median=0，不能拉低整窗中位数。
 		if (median !== undefined && dayRuns > 0) dailyMedians.push(median);
 	}
@@ -188,6 +204,7 @@ export function toKpis(snapshot: AiRunsSnapshot): KpiProjection {
 		...(hasInput
 			? { inputTokens, totalTokens: inputTokens + outputTokens }
 			: {}),
+		...(hasTotalDuration ? { totalDurationMs: totalDuration } : {}),
 		...(runsWithDuration > 0
 			? { avgDurationMs: durationWeighted / runsWithDuration }
 			: {}),

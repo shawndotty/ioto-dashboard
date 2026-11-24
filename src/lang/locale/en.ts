@@ -1077,6 +1077,8 @@ export default {
 	AI_METRICS_AVG_DURATION: "Average duration",
 	AI_METRICS_AVG_DURATION_HINT: "includes occasional long runs",
 	AI_METRICS_MEDIAN_DURATION: "Median duration",
+	AI_METRICS_TOTAL_DURATION: "Total duration",
+	AI_METRICS_SMALL_SAMPLE_HINT: "Few samples, for reference only",
 	AI_METRICS_AGENT_AVG_DURATION: "Avg by agent",
 	AI_METRICS_AGENTS_EMPTY: "No agent call data",
 	AI_METRICS_SCHEDULE_NONE: "No scheduled task data",

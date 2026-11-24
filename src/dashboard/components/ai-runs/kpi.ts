@@ -94,10 +94,20 @@ export const aiRunsKpiComponent: ComponentDefinition = {
 			t("AI_METRICS_TOTAL_TOKENS"),
 			kpi.totalTokens === undefined ? undefined : formatCount(kpi.totalTokens),
 		);
-		// 中位耗时为主指标（抗离群），均耗时降为辅助并标注「含个别长任务，仅供参考」。
+		// 三行耗时分列：总耗时 → 中位耗时（主指标）→ 均耗时（辅助）；缺字段的行自动隐藏。
 		renderMetricRow(
 			el,
-			t("AI_METRICS_MEDIAN_DURATION"),
+			t("AI_METRICS_TOTAL_DURATION"),
+			formatDuration(kpi.totalDurationMs),
+		);
+		// runs < 3 时中位数退化为两数平均，抗离群失效，给主指标挂小样本提示。
+		const medianLabel =
+			kpi.runs < 3
+				? `${t("AI_METRICS_MEDIAN_DURATION")} · ${t("AI_METRICS_SMALL_SAMPLE_HINT")}`
+				: t("AI_METRICS_MEDIAN_DURATION");
+		renderMetricRow(
+			el,
+			medianLabel,
 			formatDuration(kpi.medianDurationMs),
 			"ioto-ai-metric-primary",
 		);

@@ -117,6 +117,7 @@ test('toKpis reads new fields and keeps output/total tokens distinct', () => {
 	assert.equal(result.outputTokens, 200);
 	assert.equal(result.inputTokens, 1000);
 	assert.equal(result.totalTokens, 1200);
+	assert.equal(result.totalDurationMs, 4000);
 	assert.equal(result.avgDurationMs, 1000);
 	assert.equal(result.medianDurationMs, 900);
 	assert.equal(result.underestimated, true);
@@ -137,8 +138,23 @@ test('toKpis ignores zero-run placeholder days when aggregating durations', () =
 			},
 		],
 	}));
+	assert.equal(result.totalDurationMs, 4000, '零运行占位日不参与总耗时累加');
 	assert.equal(result.avgDurationMs, 1000);
 	assert.equal(result.medianDurationMs, 900);
+});
+
+test('toKpis falls back to avg × runs when durationMs is absent', () => {
+	const result = toKpis(snapshot({
+		days: [
+			{
+				date: '2026-11-23',
+				totals: { runs: 3, avgDurationMs: 2000, medianDurationMs: 1500 },
+				byAgent: {},
+			},
+		],
+	}));
+	assert.equal(result.totalDurationMs, 6000);
+	assert.equal(result.avgDurationMs, 2000);
 });
 
 test('toKpis hides new fields on the 5/4 legacy bridge without undefined/NaN', () => {
@@ -146,6 +162,7 @@ test('toKpis hides new fields on the 5/4 legacy bridge without undefined/NaN', (
 	assert.equal(result.runs, 6);
 	assert.equal(result.outputTokens, 204002);
 	assert.equal('totalTokens' in result, false);
+	assert.equal('totalDurationMs' in result, false);
 	assert.equal('avgDurationMs' in result, false);
 	assert.equal('medianDurationMs' in result, false);
 	for (const value of Object.values(result)) {
