@@ -5881,7 +5881,6 @@ body.is-mobile .ioto-pages-handle {
     color: var(--text-normal);
 }
 
-.ioto-custom-dashboard-view .ioto-ai-agent-list,
 .ioto-custom-dashboard-view .ioto-ai-recent-list {
     display: flex;
     flex-direction: column;
@@ -5890,30 +5889,69 @@ body.is-mobile .ioto-pages-handle {
     overflow: auto;
 }
 
-.ioto-custom-dashboard-view .ioto-ai-agent-row {
+/* 2×2 环形图网格：grid/flex 收缩陷阱——minmax(0,1fr) 与 min-width:0 不能漏。 */
+.ioto-custom-dashboard-view .ioto-ai-donut-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(68px, 1fr));
+    flex: 1 1 auto;
+    gap: 8px;
+    min-height: 0;
+}
+.ioto-custom-dashboard-view .ioto-ai-donut-cell {
+    min-width: 0;
+    min-height: 68px;
     display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 10px;
+    flex-direction: column;
 }
-
-.ioto-custom-dashboard-view .ioto-ai-agent-name {
-    font-weight: 600;
+.ioto-custom-dashboard-view .ioto-ai-donut-cell .ioto-chart-host {
+    flex: 1 1 auto;
+    min-height: 0;
 }
-
-.ioto-custom-dashboard-view .ioto-ai-agent-count {
-    color: var(--text-normal);
+.ioto-custom-dashboard-view .ioto-ai-donut-caption {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    text-align: center;
+}
+/* h=4 卡片内每环宿主仅约 60px 高，环心内圈直径约 26px；默认 15px 会让 253M 溢出压到色环。 */
+.ioto-custom-dashboard-view .ioto-ai-donut-cell .ioto-chart-donut-center {
+    font-size: 0.55em;
+}
+/* 共享图例：行头色块+名称，后接四列整数占比 + 行尾均耗时；agent 多只加行不加列。 */
+.ioto-custom-dashboard-view .ioto-ai-donut-legend {
+    margin-top: 6px;
+    font-size: 0.82em;
+    color: var(--text-muted);
+}
+.ioto-custom-dashboard-view .ioto-ai-donut-legend-row {
+    display: grid;
+    grid-template-columns: minmax(64px, 1.4fr) repeat(4, minmax(34px, 1fr)) minmax(44px, 0.9fr);
+    align-items: center;
+    gap: 4px;
+}
+.ioto-custom-dashboard-view .ioto-ai-donut-legend-row.is-header {
+    font-size: 0.92em;
+}
+.ioto-custom-dashboard-view .ioto-ai-donut-legend-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.ioto-custom-dashboard-view .ioto-ai-donut-legend-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ioto-custom-dashboard-view .ioto-ai-donut-legend-value {
+    text-align: center;
     font-variant-numeric: tabular-nums;
 }
-
-.ioto-custom-dashboard-view .ioto-ai-agent-duration {
-    color: var(--text-muted);
-    font-size: 0.9em;
-}
-
-.ioto-custom-dashboard-view .ioto-ai-agent-token-shares {
-    color: var(--text-muted);
-    font-size: 0.9em;
+.ioto-custom-dashboard-view .ioto-ai-donut-legend-duration {
+    text-align: end;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .ioto-custom-dashboard-view .ioto-ai-schedule-summary {
