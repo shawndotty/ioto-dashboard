@@ -142,6 +142,37 @@ test('toAgentSeries aggregates counts, computes share and keeps optional duratio
 	assert.equal(rows[0].avgDurationMs, 1000);
 });
 
+// 对齐真实桥文件 qodercn：11-18 runs=7 avg=1,368,305 median=489,553；
+// 11-19 runs=5 avg=1,819,506 median=467,666。旧实现取「最后一天单日值」会得到 1,819,506。
+const TWO_DAY_QODERCN = {
+	days: [
+		{
+			date: '2026-11-18',
+			totals: NEW_BUCKET(),
+			byAgent: { qodercn: NEW_BUCKET({ runs: 7, avgDurationMs: 1_368_305, medianDurationMs: 489_553 }) },
+		},
+		{
+			date: '2026-11-19',
+			totals: NEW_BUCKET(),
+			byAgent: { qodercn: NEW_BUCKET({ runs: 5, avgDurationMs: 1_819_506, medianDurationMs: 467_666 }) },
+		},
+	],
+};
+
+test('toAgentSeries weights avg across days', () => {
+	const rows = toAgentSeries(snapshot(TWO_DAY_QODERCN));
+	const q = rows.find((row) => row.agent === 'qodercn');
+	// (1,368,305*7 + 1,819,506*5) / 12 ≈ 1,556,305.42，与 toKpis 整窗加权同口径。
+	assert.ok(Math.abs(q.avgDurationMs - 1_556_305.42) < 1, `avg=${q.avgDurationMs}`);
+});
+
+test('toAgentSeries takes median of daily medians', () => {
+	const rows = toAgentSeries(snapshot(TWO_DAY_QODERCN));
+	const q = rows.find((row) => row.agent === 'qodercn');
+	// 各日中位数的中位数：467,666 / 489,553 → floor(2/2)=1 → 489,553。
+	assert.equal(q.medianDurationMs, 489_553);
+});
+
 test('toAgentSeries on legacy bridge has no duration fields', () => {
 	const rows = toAgentSeries(oldSnapshot());
 	assert.equal(rows.length, 1);
@@ -196,6 +227,11 @@ test('formatters produce readable, finite strings', () => {
 	assert.equal(formatDuration(65_000), '1m 5s');
 	assert.equal(formatDuration(3_600_000), '1h 0m');
 	assert.equal(formatDuration(undefined), '');
+});
+
+test('formatDuration carries instead of emitting 60s / 60m', () => {
+	assert.equal(formatDuration(359_932), '6m 0s', '秒余数进位，不能出现 60s');
+	assert.equal(formatDuration(59_999_000), '16h 39m', '小时分支同样按秒取整，不能出现 60m');
 });
 
 function makeSource(raw, framework = '0-辅助/IOTO') {

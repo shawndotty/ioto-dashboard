@@ -60,15 +60,17 @@ export const aiRunsKpiComponent: ComponentDefinition = {
 			t("AI_METRICS_TOTAL_TOKENS"),
 			kpi.totalTokens === undefined ? undefined : formatCount(kpi.totalTokens),
 		);
-		renderMetricRow(
-			el,
-			t("AI_METRICS_AVG_DURATION"),
-			formatDuration(kpi.avgDurationMs),
-		);
+		// 中位耗时为主指标（抗离群），均耗时降为辅助并标注「含个别长任务，仅供参考」。
 		renderMetricRow(
 			el,
 			t("AI_METRICS_MEDIAN_DURATION"),
 			formatDuration(kpi.medianDurationMs),
+			"ioto-ai-metric-primary",
+		);
+		renderMetricRow(
+			el,
+			`${t("AI_METRICS_AVG_DURATION")} · ${t("AI_METRICS_AVG_DURATION_HINT")}`,
+			formatDuration(kpi.avgDurationMs),
 		);
 		renderGeneratedAt(el, snapshot);
 	},

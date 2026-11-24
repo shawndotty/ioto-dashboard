@@ -5872,6 +5872,15 @@ body.is-mobile .ioto-pages-handle {
     white-space: nowrap;
 }
 
+.ioto-custom-dashboard-view .ioto-ai-metric-primary .ioto-ai-metric-value {
+    font-size: 1.25em;
+    font-weight: 600;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-metric-primary .ioto-ai-metric-label {
+    color: var(--text-normal);
+}
+
 .ioto-custom-dashboard-view .ioto-ai-agent-list,
 .ioto-custom-dashboard-view .ioto-ai-recent-list {
     display: flex;

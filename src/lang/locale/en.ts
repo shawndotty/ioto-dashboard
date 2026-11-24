@@ -1068,6 +1068,7 @@ export default {
 	AI_METRICS_OUTPUT_TOKENS: "Output tokens",
 	AI_METRICS_TOTAL_TOKENS: "Total tokens",
 	AI_METRICS_AVG_DURATION: "Average duration",
+	AI_METRICS_AVG_DURATION_HINT: "includes occasional long runs",
 	AI_METRICS_MEDIAN_DURATION: "Median duration",
 	AI_METRICS_AGENT_AVG_DURATION: "Avg by agent",
 	AI_METRICS_AGENTS_EMPTY: "No agent call data",

@@ -190,13 +190,19 @@ export function toKpis(snapshot: AiRunsSnapshot): KpiProjection {
 	};
 }
 
-/** 按 agent 汇总调用次数/占比；耗时取该 agent 最近一天的值（不能平均平均值）。 */
+/** 按 agent 汇总调用次数/占比；耗时与 toKpis 同口径——整窗 runs 加权 + 各日中位数的中位数。 */
 export function toAgentSeries(snapshot: AiRunsSnapshot): AgentProjection[] {
 	const total = snapshot.days.reduce(
 		(sum, day) => sum + (num(day?.totals?.runs) ?? 0),
 		0,
 	);
 	const rows = new Map<string, AgentProjection>();
+	// 累加器只作局部中间态，不进入 AgentProjection：avg 按 runs 加权还原整窗总耗时，
+	// median 取各日中位数的中位数，均与 toKpis 完全一致，避免两卡口径再出分歧。
+	const durationAcc = new Map<
+		string,
+		{ weighted: number; runsWithDuration: number; dailyMedians: number[] }
+	>();
 	for (const day of snapshot.days) {
 		for (const [agent, raw] of Object.entries(day?.byAgent ?? {})) {
 			const runs = num(raw?.runs) ?? 0;
@@ -212,15 +218,39 @@ export function toAgentSeries(snapshot: AiRunsSnapshot): AgentProjection[] {
 			existing.runs += runs;
 			existing.succeeded += num(raw?.succeeded) ?? 0;
 			existing.failed += num(raw?.failed) ?? 0;
+			const acc =
+				durationAcc.get(agent) ??
+				({ weighted: 0, runsWithDuration: 0, dailyMedians: [] } as {
+					weighted: number;
+					runsWithDuration: number;
+					dailyMedians: number[];
+				});
 			const avg = num(raw?.avgDurationMs);
 			const median = num(raw?.medianDurationMs);
-			if (avg !== undefined) existing.avgDurationMs = avg;
-			if (median !== undefined) existing.medianDurationMs = median;
+			if (avg !== undefined && runs > 0) {
+				acc.weighted += avg * runs;
+				acc.runsWithDuration += runs;
+			}
+			// 0 次运行的占位日 median=0，不能拉低整窗中位数。
+			if (median !== undefined && runs > 0) acc.dailyMedians.push(median);
+			durationAcc.set(agent, acc);
 			rows.set(agent, existing);
 		}
 	}
 	const result = [...rows.values()].sort((a, b) => b.runs - a.runs);
-	for (const row of result) row.share = total > 0 ? row.runs / total : 0;
+	for (const row of result) {
+		row.share = total > 0 ? row.runs / total : 0;
+		const acc = durationAcc.get(row.agent);
+		if (!acc) continue;
+		if (acc.runsWithDuration > 0) {
+			row.avgDurationMs = acc.weighted / acc.runsWithDuration;
+		}
+		if (acc.dailyMedians.length > 0) {
+			acc.dailyMedians.sort((a, b) => a - b);
+			row.medianDurationMs =
+				acc.dailyMedians[Math.floor(acc.dailyMedians.length / 2)];
+		}
+	}
 	return result;
 }
 
@@ -280,10 +310,10 @@ export function formatDuration(ms?: number): string {
 	if (value === undefined) return "";
 	if (value < 1000) return `${Math.round(value)}ms`;
 	if (value < 60_000) return `${(value / 1000).toFixed(1)}s`;
-	if (value < 3_600_000) {
-		return `${Math.floor(value / 60_000)}m ${Math.round((value % 60_000) / 1000)}s`;
-	}
-	return `${Math.floor(value / 3_600_000)}h ${Math.round((value % 3_600_000) / 60_000)}m`;
+	// 先按秒取整再分解，避免 Math.round(秒余数)=60 造成「5m 60s」这类进位错误。
+	const totalSec = Math.round(value / 1000);
+	if (totalSec < 3600) return `${Math.floor(totalSec / 60)}m ${totalSec % 60}s`;
+	return `${Math.floor(totalSec / 3600)}h ${Math.floor((totalSec % 3600) / 60)}m`;
 }
 
 export interface AiRunsSourceOptions {

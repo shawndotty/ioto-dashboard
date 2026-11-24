@@ -1030,6 +1030,7 @@ export default {
 	AI_METRICS_OUTPUT_TOKENS: "輸出 token",
 	AI_METRICS_TOTAL_TOKENS: "總 token",
 	AI_METRICS_AVG_DURATION: "平均耗時",
+	AI_METRICS_AVG_DURATION_HINT: "含個別長任務，僅供參考",
 	AI_METRICS_MEDIAN_DURATION: "中位耗時",
 	AI_METRICS_AGENT_AVG_DURATION: "按 agent 平均耗時",
 	AI_METRICS_AGENTS_EMPTY: "暫無 agent 呼叫資料",
