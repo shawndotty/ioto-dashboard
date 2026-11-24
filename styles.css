@@ -5848,6 +5848,18 @@ body.is-mobile .ioto-pages-handle {
     padding-top: 0;  /* 原 4px 会让右项相对基线再低一截 */
 }
 
+/* 空态：文案在卡片主体区域水平＋垂直居中，时间行独占底栏靠右（与 Agent 卡统一）。 */
+.ioto-custom-dashboard-view .ioto-ai-metrics > .ioto-ai-empty {
+    flex: 1;                 /* 吸收剩余空间，把下方时间行顶到卡底 */
+    display: flex;
+    align-items: center;     /* 垂直居中（flex-direction 默认 row） */
+    justify-content: center; /* 水平居中 */
+}
+.ioto-custom-dashboard-view .ioto-ai-metrics > .ioto-ai-generated-at {
+    margin-top: 0;   /* 覆盖 :5824 的 auto：剩余空间已由 flex:1 的文案区吸收 */
+    text-align: right;
+}
+
 .ioto-custom-dashboard-view .ioto-ai-kpi-headline {
     display: flex;
     align-items: baseline;

@@ -50,11 +50,12 @@ export const aiRunsKpiComponent: ComponentDefinition = {
 			ctx.config.options?.range === "today" ? "today" : "all";
 		const scoped = { ...snapshot, days: daysForRange(snapshot, range) };
 		const kpi = toKpis(scoped);
+		el.addClass("ioto-ai-metrics", "ioto-ai-kpi"); // 由 :57 上移：今日空态也带 ioto-ai-kpi 类
 		if (range === "today" && kpi.runs === 0) {
 			renderNoData(el, "AI_METRICS_TODAY_EMPTY");
+			renderGeneratedAt(el, snapshot); // 新增：与 agents.ts:69 对称
 			return;
 		}
-		el.addClass("ioto-ai-metrics", "ioto-ai-kpi");
 		const headline = el.createDiv({ cls: "ioto-ai-kpi-headline" });
 		headline.createSpan({
 			cls: "ioto-ai-kpi-value",
