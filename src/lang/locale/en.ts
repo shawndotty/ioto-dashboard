@@ -1068,6 +1068,7 @@ export default {
 	AI_METRICS_NO_DATA: "No data yet",
 	AI_METRICS_GENERATED_AT: "Data as of {0}",
 	AI_METRICS_UNDERESTIMATED: "Underestimated",
+	AI_METRICS_UNDERESTIMATED_HINT_NO_COUNT: "Some runs have no usage data: counted in runs, tokens as 0, so token totals are understated",
 	AI_METRICS_RUNS_TOTAL: "runs",
 	AI_METRICS_SUCCEEDED: "Succeeded",
 	AI_METRICS_FAILED: "Failed",

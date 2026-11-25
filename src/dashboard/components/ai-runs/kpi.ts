@@ -1,3 +1,4 @@
+import { setTooltip } from "obsidian";
 import { t } from "../../../lang/helpers";
 import {
 	daysForRange,
@@ -66,9 +67,12 @@ export const aiRunsKpiComponent: ComponentDefinition = {
 			text: t("AI_METRICS_RUNS_TOTAL"),
 		});
 		if (kpi.underestimated) {
-			headline.createSpan({
+			const badge = headline.createSpan({
 				cls: "ioto-ai-badge",
 				text: t("AI_METRICS_UNDERESTIMATED"),
+			});
+			setTooltip(badge, t("AI_METRICS_UNDERESTIMATED_HINT_NO_COUNT"), {
+				placement: "top",
 			});
 		}
 

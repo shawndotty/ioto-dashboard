@@ -53,6 +53,7 @@ test('all locale keys used by AI Metrics components exist in en', () => {
 		'AI_METRICS_NO_DATA',
 		'AI_METRICS_GENERATED_AT',
 		'AI_METRICS_UNDERESTIMATED',
+		'AI_METRICS_UNDERESTIMATED_HINT_NO_COUNT',
 		'AI_METRICS_RUNS_TOTAL',
 		'AI_METRICS_SUCCEEDED',
 		'AI_METRICS_FAILED',

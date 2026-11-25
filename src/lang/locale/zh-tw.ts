@@ -1030,6 +1030,7 @@ export default {
 	AI_METRICS_NO_DATA: "暫無資料",
 	AI_METRICS_GENERATED_AT: "資料截至 {0}",
 	AI_METRICS_UNDERESTIMATED: "低估",
+	AI_METRICS_UNDERESTIMATED_HINT_NO_COUNT: "部分執行未記錄用量：次數照常計入，token 以 0 計，故 token 偏低",
 	AI_METRICS_RUNS_TOTAL: "次執行",
 	AI_METRICS_SUCCEEDED: "成功",
 	AI_METRICS_FAILED: "失敗",
