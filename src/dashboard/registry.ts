@@ -20,6 +20,7 @@ import type { FieldAxis } from "./dataset/field-roles";
 import type { TimelineSourceRef } from "./dataset/timeline";
 import type { DashboardComponentConfig } from "./types";
 import type { AiRunsSnapshot } from "../services/ai-runs-source";
+import type { ScheduleBoard } from "../services/ai-schedule-source";
 
 export type ComponentStatus = "loading" | "ready" | "empty" | "error";
 
@@ -253,6 +254,8 @@ export interface ComponentRenderContext {
 	refreshBody?(): void;
 	/** AI 运行桥文件快照；仅 AI Metrics queryless 组件读取，可能为 null。 */
 	aiRuns?: AiRunsSnapshot | null;
+	/** 定时任务看板桥文件；`ai-runs-schedule` 读取，旧上游或未配置路径时为 null。 */
+	aiSchedule?: ScheduleBoard | null;
 	/** 解析 wikilink 目标为可打开的 vault 路径；null＝解析不到（渲染为纯文本）。 */
 	resolveLink?(linktext: string): string | null;
 	/** 读取笔记行数组，供展开取原文／行号漂移校验；失败返回 null。 */

@@ -6162,3 +6162,138 @@ body.is-mobile .ioto-pages-handle {
     color: var(--text-muted);
     font-size: 0.85em;
 }
+
+/* ===== AI Schedule Board（V284：当日已运行 / 即将运行） ===== */
+.ioto-custom-dashboard-view .ioto-ai-schedule-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-head > * {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-stamp {
+    color: var(--text-faint);
+    font-size: 0.85em;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-banner {
+    padding: 4px 8px;
+    border-radius: var(--radius-s);
+    background: var(--background-modifier-error);
+    color: var(--text-error);
+    font-size: 0.85em;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-banner.is-warn {
+    background: var(--background-modifier-warning);
+    color: var(--text-warning);
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-section {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-height: 0;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-section.is-blocked {
+    margin-top: 2px;
+    padding-top: 6px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-count {
+    color: var(--text-faint);
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
+    padding: 6px 9px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-primary-alt);
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-main {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-time {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-title {
+    color: var(--text-normal);
+    font-weight: 500;
+    text-decoration: none;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-title:hover {
+    color: var(--text-accent);
+    text-decoration: underline;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    color: var(--text-faint);
+    font-size: 0.85em;
+    min-width: 0;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-badge.is-ok {
+    color: var(--text-success);
+    background: var(--background-modifier-success);
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-badge.is-warn {
+    color: var(--text-warning);
+    background: var(--background-modifier-warning);
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-badge.is-bad {
+    color: var(--text-error);
+    background: var(--background-modifier-error);
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-badge.is-muted {
+    color: var(--text-muted);
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-more,
+.ioto-custom-dashboard-view .ioto-ai-schedule-done {
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+.ioto-custom-dashboard-view .ioto-ai-schedule-done {
+    text-align: center;
+    padding-top: 2px;
+}

@@ -20,6 +20,7 @@ import {
 
 import { IotoSettingsService } from "./services/ioto-settings-services";
 import { AiRunsSource } from "./services/ai-runs-source";
+import { AiScheduleSource } from "./services/ai-schedule-source";
 import { restoreMacWindowButtons } from "./ui/macos-window-buttons";
 import { VaultIndex } from "./data/vault-index";
 import type { IndexConfig, SectionHeadings } from "./data/types";
@@ -62,6 +63,7 @@ export default class IotoDashboardPlugin extends Plugin {
 	transfer!: DashboardTransfer;
 	readonly inspectorService = new DashboardInspectorService();
 	aiRunsSource: AiRunsSource;
+	aiScheduleSource: AiScheduleSource;
 	private indexRebuildTimer: number | null = null;
 	private snapshotTimer: number | null = null;
 	private lastSnapshotDate = "";
@@ -127,15 +129,26 @@ export default class IotoDashboardPlugin extends Plugin {
 			app: this.app,
 			getSettings: () => new IotoSettingsService(this.app).getSettings(),
 		});
+		// 定时任务看板与指标快照分属两个桥文件：各自 matchesPath，互不覆盖。
+		this.aiScheduleSource = new AiScheduleSource({
+			app: this.app,
+			getSettings: () => new IotoSettingsService(this.app).getSettings(),
+		});
 		this.registerEvent(
 			this.app.vault.on("modify", (file) => {
 				if (this.aiRunsSource.matchesPath(file.path)) {
 					void this.aiRunsSource.read();
 				}
+				if (this.aiScheduleSource.matchesPath(file.path)) {
+					void this.aiScheduleSource.read();
+				}
 			}),
 		);
 		this.registerInterval(
-			window.setInterval(() => void this.aiRunsSource.tick(), 45_000),
+			window.setInterval(() => {
+				void this.aiRunsSource.tick();
+				void this.aiScheduleSource.tick();
+			}, 45_000),
 		);
 		this.snapshotStore = new SnapshotStore({
 			adapter: this.app.vault.adapter,

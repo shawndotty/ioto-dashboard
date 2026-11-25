@@ -115,8 +115,8 @@ export function createAiMetricsPage(name = "AI Metrics"): DashboardPage {
 				id: "ai-runs-schedule",
 				type: "ai-runs-schedule",
 				queryId: "",
-				w: 4,
-				h: 3,
+				w: 6,
+				h: 6,
 			},
 			{
 				id: "ai-runs-recent",

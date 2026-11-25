@@ -327,6 +327,15 @@ export class CustomDashboardView extends ItemView {
 				}),
 			);
 		}
+		const scheduleSource = this.plugin.aiScheduleSource;
+		if (scheduleSource) {
+			void scheduleSource.read();
+			this.unsubscribers.push(
+				scheduleSource.subscribe(() => {
+					if (this.containerEl.isShown()) this.requestRender();
+				}),
+			);
+		}
 		this.registerEvent(
 			this.app.workspace.on("layout-change", () => this.updateVisibility()),
 		);
@@ -376,7 +385,10 @@ export class CustomDashboardView extends ItemView {
 	private updateVisibility(): void {
 		const visible = this.containerEl.isShown();
 		this.hub?.setVisible(visible);
-		if (visible) void this.plugin.aiRunsSource?.read();
+		if (visible) {
+			void this.plugin.aiRunsSource?.read();
+			void this.plugin.aiScheduleSource?.read();
+		}
 		if (visible || this.visibilityTimer !== null) return;
 		// Layout events can fire before the element is attached; recheck once.
 		this.visibilityTimer = window.setTimeout(() => {
@@ -1797,6 +1809,7 @@ export class CustomDashboardView extends ItemView {
 				.onClick(() => {
 					this.hub?.refreshNow();
 					void this.plugin.aiRunsSource?.tick();
+					void this.plugin.aiScheduleSource?.tick();
 				}),
 		);
 		menu.addItem((item) =>
@@ -2043,9 +2056,15 @@ export class CustomDashboardView extends ItemView {
 		const aiRunsVersion = config.type.startsWith("ai-runs-")
 			? String(this.plugin.aiRunsSource?.snapshotNow()?.generatedAt ?? "none")
 			: "";
+		// 定时任务看板的「现在」由分钟桶推进，必须单独进签名，否则过去/未来不会重排。
+		const aiScheduleVersion =
+			config.type === "ai-runs-schedule"
+				? String(this.plugin.aiScheduleSource?.version() ?? "none")
+				: "";
 		return [
 			config.type,
 			aiRunsVersion,
+			aiScheduleVersion,
 			queryless ? "" : config.queryId,
 			config.basis ?? "",
 			config.view ?? "",
@@ -2228,6 +2247,7 @@ export class CustomDashboardView extends ItemView {
 			mountBaseEmbed: (body, path, view, hideToolbar) =>
 				this.mountBaseEmbed(config.id, body, path, view, hideToolbar),
 			aiRuns: this.plugin.aiRunsSource?.snapshotNow() ?? null,
+			aiSchedule: this.plugin.aiScheduleSource?.boardNow() ?? null,
 			resolveLink: (linktext) =>
 				this.app.metadataCache.getFirstLinkpathDest(linktext, "")?.path ?? null,
 			readNoteLines: async (path) => {
@@ -2386,6 +2406,7 @@ export class CustomDashboardView extends ItemView {
 		retry.addEventListener("click", () => {
 			this.hub?.refreshNow();
 			void this.plugin.aiRunsSource?.tick();
+			void this.plugin.aiScheduleSource?.tick();
 		});
 	}
 
