@@ -40,6 +40,14 @@ export interface AiRunRecent {
 	durationMs: number;
 	/** true＝隔夜/长空闲导致开始时刻不可还原，durationMs=0 不代表真 0；旧桥文件缺此字段。 */
 	durationUnknown?: boolean;
+	/** 任务文件 vault 相对路径；上游 v281 新增，旧桥文件无。 */
+	sourcePath?: string;
+	/** checklist 行号，1-based（打开/读行须 −1）；上游 v281 新增。 */
+	line?: number;
+	/** 完整 checklist 原文（仅脱敏不截断）；上游 v281 新增。 */
+	checklistTextFull?: string;
+	/** true＝该条生成时无全文字段，checklistTextFull 实为摘要；上游 v281 新增。 */
+	fullTextTruncated?: boolean;
 }
 
 export interface AiRunsSnapshot {
@@ -102,6 +110,8 @@ export interface ScheduleProjection {
 export interface RecentProjection extends AiRunRecent {
 	/** 已脱敏、仅作纯文本渲染的条目摘要。 */
 	text: string;
+	/** 展开候选全文：上游全文字段（脱敏后）或摘要；真实全文仍需按来源回读任务文件。 */
+	textFull: string;
 }
 
 const CREDENTIAL_PATTERNS: RegExp[] = [
@@ -355,7 +365,83 @@ export function toRecentRuns(snapshot: AiRunsSnapshot): RecentProjection[] {
 	return (snapshot.recentRuns ?? []).map((run) => ({
 		...run,
 		text: sanitizeChecklistText(String(run?.checklistText ?? "")),
+		textFull: sanitizeChecklistText(
+			String(run?.checklistTextFull ?? run?.checklistText ?? ""),
+		),
 	}));
+}
+
+/** wikilink 拆分结果：target 缺席表示普通文本片段。 */
+export interface TextFragment {
+	text: string;
+	target?: string;
+}
+
+/**
+ * 把脱敏后的任务文本拆成「普通片段 + [[wikilink]] 片段」。
+ * 只识别 `[[...]]`；`[[redacted]]` 与空目标降级为普通文本，绝不制造死链。
+ */
+export function splitWikilinks(text: string): TextFragment[] {
+	const fragments: TextFragment[] = [];
+	const pattern = /\[\[([^\]]+)\]\]/g;
+	let cursor = 0;
+	for (const match of text.matchAll(pattern)) {
+		const index = match.index ?? 0;
+		if (index > cursor) fragments.push({ text: text.slice(cursor, index) });
+		const inner = (match[1] ?? "").trim();
+		const pipe = inner.indexOf("|");
+		const target = (pipe >= 0 ? inner.slice(0, pipe) : inner).trim();
+		const display = (pipe >= 0 ? inner.slice(pipe + 1) : inner).trim();
+		if (!target || target === "redacted" || !display) {
+			fragments.push({ text: match[0] });
+		} else {
+			fragments.push({ text: display, target });
+		}
+		cursor = index + match[0].length;
+	}
+	if (cursor < text.length) fragments.push({ text: text.slice(cursor) });
+	return fragments;
+}
+
+/**
+ * 在任务文件行数组里定位 checklist 原文行。
+ * `line1` 为上游 1-based 行号，返回 **0-based** 行号；probe（摘要前缀）用于校验行漂移。
+ * 本行不中时在 ±3 邻域按距离由近及远找同前缀行；都不中返回 −1（打开文件但不定位）。
+ */
+export function locateChecklistLine(
+	lines: string[],
+	line1: number,
+	probe: string,
+): number {
+	if (!probe || !Number.isFinite(line1)) return -1;
+	const base = Math.trunc(line1) - 1;
+	const offsets = [0, -1, 1, -2, 2, -3, 3];
+	for (const offset of offsets) {
+		const index = base + offset;
+		if (index < 0 || index >= lines.length) continue;
+		if (lines[index]?.includes(probe)) return index;
+	}
+	return -1;
+}
+
+/** 展开态正文：去 checklist 前缀、把字面 `<br>` 还原为换行，保持纯文本。 */
+export function checklistDisplay(full: string): string {
+	return full
+		.replace(/^\s*-\s*\[[ xX]\]\s+/, "")
+		.replace(/<br\s*\/?>/gi, "\n");
+}
+
+/**
+ * 决定展开态先显示什么：新数据走上游全文字段；`fullTextTruncated` 或字段缺失
+ * 则回退摘要并标注 summaryOnly，由渲染层按 sourcePath/line 异步回读任务文件覆盖。
+ */
+export function chooseExpanded(
+	run: RecentProjection,
+): { text: string; summaryOnly: boolean } {
+	if (run.fullTextTruncated !== true && run.checklistTextFull) {
+		return { text: run.textFull, summaryOnly: false };
+	}
+	return { text: run.textFull, summaryOnly: true };
 }
 
 /** 本地时间的可读文案，供「数据截至 …」使用。 */

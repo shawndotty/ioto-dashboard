@@ -1094,4 +1094,8 @@ export default {
 	AI_METRICS_AGO_MINUTES: "{0}m ago",
 	AI_METRICS_AGO_HOURS: "{0}h ago",
 	AI_METRICS_AGO_DAYS: "{0}d ago",
+	AI_METRICS_RECENT_EXPAND: "Expand full text",
+	AI_METRICS_RECENT_COLLAPSE: "Collapse",
+	AI_METRICS_RECENT_OPEN_SOURCE: "Open source task",
+	AI_METRICS_RECENT_SUMMARY_ONLY: "Summary only",
 };

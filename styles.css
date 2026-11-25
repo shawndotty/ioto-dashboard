@@ -6053,6 +6053,7 @@ body.is-mobile .ioto-pages-handle {
 
 .ioto-custom-dashboard-view .ioto-ai-recent-meta {
     display: flex;
+    align-items: center;   /* 取消 flex 默认 stretch：徽章不再被最高项（回跳按钮）拉高，各子项按自然高度垂直居中 */
     flex-wrap: nowrap;
     gap: 8px;
     min-width: 0;
@@ -6107,4 +6108,57 @@ body.is-mobile .ioto-pages-handle {
     .ioto-custom-dashboard-view .ioto-ai-recent-text {
         -webkit-line-clamp: 1;
     }
+}
+
+/* 运行明细三项交互：正文可点展开、解析成功的 wikilink 可点、回跳原任务按钮。
+   展开态放在 @container 之后，靠同优先级后声明覆盖窄卡的 1 行 clamp。 */
+.ioto-custom-dashboard-view .ioto-ai-recent-text {
+    cursor: pointer;
+}
+.ioto-custom-dashboard-view .ioto-ai-recent-text.is-expanded {
+    display: block;
+    -webkit-line-clamp: unset;
+    white-space: pre-wrap;
+    overflow: visible;
+    overflow-wrap: anywhere;
+}
+.ioto-custom-dashboard-view .ioto-ai-recent-link {
+    color: var(--text-accent);
+    cursor: pointer;
+}
+.ioto-custom-dashboard-view .ioto-ai-recent-open-source {
+    flex: 0 0 auto;
+    margin-left: 0;          /* 去掉 auto：图标回到耗时后，间距 = meta 的 gap(8px) */
+    position: relative;      /* 为 ::before 命中区扩展定位 */
+    width: 14px;             /* 与徽章 13.18px、同行文字 14.36px 齐平 */
+    height: 14px;
+    padding: 1px;
+    cursor: pointer;
+    opacity: 1;              /* 触屏 / 无 hover 设备常显（基线） */
+    transition: opacity .15s ease;
+}
+.ioto-custom-dashboard-view .ioto-ai-recent-open-source svg {
+    width: 12px;             /* 14 - 2×padding(1) = 12，恰好填满内容区，保持不变 */
+    height: 12px;
+}
+.ioto-custom-dashboard-view .ioto-ai-recent-open-source::before {
+    content: "";
+    position: absolute;
+    inset: -2px;             /* 视觉仍 14px，可点区补回 18px */
+}
+/* 仅鼠标设备：默认隐，hover 卡片或键盘聚焦时显形；触屏由上方 opacity:1 基线保持常显 */
+@media (hover: hover) {
+    .ioto-custom-dashboard-view .ioto-ai-recent-open-source {
+        opacity: 0;
+        pointer-events: none;   /* 避免「看不见却能点」的幽灵点击 */
+    }
+    .ioto-custom-dashboard-view .ioto-ai-recent-row:hover .ioto-ai-recent-open-source,
+    .ioto-custom-dashboard-view .ioto-ai-recent-row:focus-within .ioto-ai-recent-open-source {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+.ioto-custom-dashboard-view .ioto-ai-recent-summary-only {
+    color: var(--text-muted);
+    font-size: 0.85em;
 }

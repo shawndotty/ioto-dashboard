@@ -253,6 +253,10 @@ export interface ComponentRenderContext {
 	refreshBody?(): void;
 	/** AI 运行桥文件快照；仅 AI Metrics queryless 组件读取，可能为 null。 */
 	aiRuns?: AiRunsSnapshot | null;
+	/** 解析 wikilink 目标为可打开的 vault 路径；null＝解析不到（渲染为纯文本）。 */
+	resolveLink?(linktext: string): string | null;
+	/** 读取笔记行数组，供展开取原文／行号漂移校验；失败返回 null。 */
+	readNoteLines?(path: string): Promise<string[] | null>;
 }
 
 export interface SizeBounds {

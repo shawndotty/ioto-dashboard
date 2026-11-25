@@ -17,6 +17,10 @@ const {
 	formatDuration,
 	formatRelativeTime,
 	AiRunsSource,
+	splitWikilinks,
+	locateChecklistLine,
+	checklistDisplay,
+	chooseExpanded,
 } = await load('../../src/services/ai-runs-source.ts');
 
 const NEW_BUCKET = (over = {}) => ({
@@ -497,4 +501,72 @@ test('AiRunsSource reads the legacy 5/4 shape without throwing', async () => {
 	const result = await source.read();
 	assert.equal(result.generatedAt, 1795505542777);
 	assert.equal(toKpis(result).inputTokens, undefined);
+});
+
+test('splitWikilinks splits plain text, aliases and multiple links; redacted stays literal', () => {
+	assert.deepEqual(splitWikilinks('plain text'), [{ text: 'plain text' }]);
+	assert.deepEqual(splitWikilinks('见 [[Plan-A]] 与 [[Plan-B|显示名]]'), [
+		{ text: '见 ' },
+		{ text: 'Plan-A', target: 'Plan-A' },
+		{ text: ' 与 ' },
+		{ text: '显示名', target: 'Plan-B' },
+	]);
+	const mixed = splitWikilinks('第一行<br>第二行 [[redacted]] [[Plan-C]]');
+	assert.equal(mixed[0].text, '第一行<br>第二行 ');
+	assert.ok(mixed.some((f) => f.text === '[[redacted]]' && !f.target));
+	assert.ok(mixed.some((f) => f.target === 'Plan-C'));
+	assert.deepEqual(splitWikilinks('[[]]'), [{ text: '[[]]' }]);
+});
+
+test('locateChecklistLine converts 1-based to 0-based and tolerates ±3 drift', () => {
+	const lines = Array.from({ length: 20 }, (_, i) => `- [x] 第 ${i + 1} 行内容`);
+	assert.equal(locateChecklistLine(lines, 1, '第 1 行'), 0);
+	assert.equal(locateChecklistLine(lines, 10, '第 10 行'), 9);
+	// 任务文件在前面插了两行：上游 line=10 的真实内容漂到 0-based 11。
+	assert.equal(locateChecklistLine(lines, 10, '第 12 行'), 11);
+	assert.equal(locateChecklistLine(lines, 10, '第 13 行'), 12);
+	assert.equal(locateChecklistLine(lines, 10, '不存在的行'), -1);
+	assert.equal(locateChecklistLine(lines, 10, ''), -1);
+	assert.equal(locateChecklistLine(lines, 50, '第 2 行'), -1, '超出 ±3 邻域不误命中');
+});
+
+test('checklistDisplay strips checklist prefix and turns literal <br> into newlines', () => {
+	assert.equal(checklistDisplay('- [x] 根据[[Plan-A]]去落地'), '根据[[Plan-A]]去落地');
+	assert.equal(checklistDisplay('- [ ] 待办'), '待办');
+	assert.equal(checklistDisplay('第一行<br>第二行<br/>第三行'), '第一行\n第二行\n第三行');
+	assert.equal(checklistDisplay('无前缀原文'), '无前缀原文');
+});
+
+test('chooseExpanded uses upstream full text only when not truncated', () => {
+	// textFull 由 toRecentRuns 从 checklistTextFull 派生，fixture 须与之一致。
+	const fresh = { text: '摘要', textFull: '全文', checklistTextFull: '全文', fullTextTruncated: false };
+	assert.deepEqual(chooseExpanded(fresh), { text: '全文', summaryOnly: false });
+	const truncated = { text: '摘要', textFull: '摘要', checklistTextFull: '摘要', fullTextTruncated: true };
+	assert.deepEqual(chooseExpanded(truncated), { text: '摘要', summaryOnly: true });
+	assert.deepEqual(chooseExpanded({ text: '摘要', textFull: '摘要' }), { text: '摘要', summaryOnly: true });
+	assert.deepEqual(chooseExpanded({ text: '摘要', textFull: '摘要', checklistTextFull: '', fullTextTruncated: false }), { text: '摘要', summaryOnly: true });
+});
+
+test('toRecentRuns forwards upstream source fields and sanitizes textFull', () => {
+	const rows = toRecentRuns(snapshot({
+		recentRuns: [{
+			timestamp: 1,
+			agent: 'codebuddy',
+			checklistText: '摘要 token=1234567890123456789012345',
+			exitCode: 0,
+			durationMs: 1,
+			sourcePath: '3-任务/X.md',
+			line: 78,
+			checklistTextFull: '全文 token=1234567890123456789012345',
+			fullTextTruncated: true,
+		}],
+	}));
+	assert.equal(rows[0].sourcePath, '3-任务/X.md');
+	assert.equal(rows[0].line, 78);
+	assert.equal(rows[0].fullTextTruncated, true);
+	assert.equal(rows[0].textFull.includes('1234567890123456789012345'), false);
+	assert.ok(rows[0].textFull.includes('[redacted]'));
+	const legacy = toRecentRuns(snapshot());
+	assert.equal('sourcePath' in legacy[0], false);
+	assert.equal(legacy[0].textFull, legacy[0].text);
 });

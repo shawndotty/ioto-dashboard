@@ -2228,6 +2228,13 @@ export class CustomDashboardView extends ItemView {
 			mountBaseEmbed: (body, path, view, hideToolbar) =>
 				this.mountBaseEmbed(config.id, body, path, view, hideToolbar),
 			aiRuns: this.plugin.aiRunsSource?.snapshotNow() ?? null,
+			resolveLink: (linktext) =>
+				this.app.metadataCache.getFirstLinkpathDest(linktext, "")?.path ?? null,
+			readNoteLines: async (path) => {
+				const file = this.app.vault.getAbstractFileByPath(path);
+				if (!(file instanceof TFile)) return null;
+				return (await this.app.vault.cachedRead(file)).split("\n");
+			},
 			arrange: arrange
 				? {
 						get spec() {
