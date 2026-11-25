@@ -38,6 +38,8 @@ export interface AiRunRecent {
 	checklistText: string;
 	exitCode: number | null;
 	durationMs: number;
+	/** true＝隔夜/长空闲导致开始时刻不可还原，durationMs=0 不代表真 0；旧桥文件缺此字段。 */
+	durationUnknown?: boolean;
 }
 
 export interface AiRunsSnapshot {
@@ -380,6 +382,40 @@ export function formatDuration(ms?: number): string {
 	const totalSec = Math.round(value / 1000);
 	if (totalSec < 3600) return `${Math.floor(totalSec / 60)}m ${totalSec % 60}s`;
 	return `${Math.floor(totalSec / 3600)}h ${Math.floor((totalSec % 3600) / 60)}m`;
+}
+
+/** 相对时间的四档文案；由渲染层注入 t()，默认中文便于纯函数单测直接断言。 */
+export interface RelativeTimeLabels {
+	justNow: string;
+	minutes: string; // 含 {0}
+	hours: string; // 含 {0}
+	days: string; // 含 {0}
+}
+
+const DEFAULT_RELATIVE_LABELS: RelativeTimeLabels = {
+	justNow: "刚刚",
+	minutes: "{0}分钟前",
+	hours: "{0}小时前",
+	days: "{0}天前",
+};
+
+/**
+ * 以快照 generatedAt 为基准的相对时间（绝不用 Date.now()，与 daysForRange 同口径）。
+ * ts/baseTs 无效或 ts > baseTs 返回空串，渲染层据此省略该片段。
+ */
+export function formatRelativeTime(
+	ts: number,
+	baseTs: number,
+	labels: RelativeTimeLabels = DEFAULT_RELATIVE_LABELS,
+): string {
+	if (!Number.isFinite(ts) || !Number.isFinite(baseTs) || ts > baseTs) return "";
+	const diff = baseTs - ts;
+	if (diff < 60_000) return labels.justNow;
+	const fill = (template: string, value: number): string =>
+		template.replace("{0}", String(value));
+	if (diff < 3_600_000) return fill(labels.minutes, Math.floor(diff / 60_000));
+	if (diff < 86_400_000) return fill(labels.hours, Math.floor(diff / 3_600_000));
+	return fill(labels.days, Math.floor(diff / 86_400_000));
 }
 
 export interface AiRunsSourceOptions {

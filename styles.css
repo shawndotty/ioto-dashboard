@@ -5928,9 +5928,10 @@ body.is-mobile .ioto-pages-handle {
 .ioto-custom-dashboard-view .ioto-ai-recent-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     min-height: 0;
     overflow: auto;
+    container-type: inline-size;   /* 窄卡降级的查询容器 */
 }
 
 /* 卡片正文作为查询容器：宽度跟随卡片 w 与侧栏，而不是视口。 */
@@ -6033,20 +6034,39 @@ body.is-mobile .ioto-pages-handle {
 }
 
 .ioto-custom-dashboard-view .ioto-ai-recent-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;  /* minmax(0,…) 不能漏：否则正文会把状态列挤出卡片 */
+    align-items: start;
+    gap: 8px;
+    padding: 7px 9px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-primary-alt);
+}
+
+.ioto-custom-dashboard-view .ioto-ai-recent-body {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--background-modifier-border);
+    gap: 3px;
+    min-width: 0;   /* 省略号在网格项内生效的前提 */
 }
 
 .ioto-custom-dashboard-view .ioto-ai-recent-meta {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px 10px;
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-width: 0;
     color: var(--text-muted);
-    font-size: 0.9em;
+    font-size: 0.85em;
     font-variant-numeric: tabular-nums;
+}
+.ioto-custom-dashboard-view .ioto-ai-recent-time,
+.ioto-custom-dashboard-view .ioto-ai-recent-duration { white-space: nowrap; }
+.ioto-custom-dashboard-view .ioto-ai-recent-agent {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .ioto-custom-dashboard-view .ioto-ai-recent-ok {
@@ -6057,10 +6077,34 @@ body.is-mobile .ioto-pages-handle {
     color: var(--text-error);
 }
 
+.ioto-custom-dashboard-view .ioto-ai-recent-status {
+    align-self: center;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-recent-summary {
+    margin-bottom: 2px;
+    color: var(--text-muted);
+    font-size: 0.85em;
+    font-variant-numeric: tabular-nums;
+}
+
 /* wikilink 只作纯文本渲染：不解析 markdown，不变成可点链接 */
 .ioto-custom-dashboard-view .ioto-ai-recent-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
     color: var(--text-normal);
+}
+
+/* 窄卡（w=3~4）：元信息允许换行、正文降为一行，避免 nowrap 把列表撑出横向滚动。 */
+@container (max-width: 260px) {
+    .ioto-custom-dashboard-view .ioto-ai-recent-meta {
+        flex-wrap: wrap;
+        gap: 4px 8px;
+    }
+    .ioto-custom-dashboard-view .ioto-ai-recent-text {
+        -webkit-line-clamp: 1;
+    }
 }

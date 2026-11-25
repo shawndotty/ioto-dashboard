@@ -1088,4 +1088,10 @@ export default {
 	AI_METRICS_RECENT_EMPTY: "No runs today",
 	AI_METRICS_EXIT_OK: "OK",
 	AI_METRICS_EXIT_FAILED: "Failed",
+	AI_METRICS_RECENT_SUMMARY: "Today {0} runs · {1} succeeded · {2} failed · {3} output",
+	AI_METRICS_DURATION_UNKNOWN: "duration unknown",
+	AI_METRICS_AGO_JUST_NOW: "just now",
+	AI_METRICS_AGO_MINUTES: "{0}m ago",
+	AI_METRICS_AGO_HOURS: "{0}h ago",
+	AI_METRICS_AGO_DAYS: "{0}d ago",
 };

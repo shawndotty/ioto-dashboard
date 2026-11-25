@@ -1050,4 +1050,10 @@ export default {
 	AI_METRICS_RECENT_EMPTY: "今日暂无运行",
 	AI_METRICS_EXIT_OK: "成功",
 	AI_METRICS_EXIT_FAILED: "失败",
+	AI_METRICS_RECENT_SUMMARY: "今日 {0} 次 · 成功 {1} · 失败 {2} · 输出 {3}",
+	AI_METRICS_DURATION_UNKNOWN: "耗时未知",
+	AI_METRICS_AGO_JUST_NOW: "刚刚",
+	AI_METRICS_AGO_MINUTES: "{0}分钟前",
+	AI_METRICS_AGO_HOURS: "{0}小时前",
+	AI_METRICS_AGO_DAYS: "{0}天前",
 };

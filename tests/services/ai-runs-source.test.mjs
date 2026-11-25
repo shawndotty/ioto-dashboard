@@ -15,6 +15,7 @@ const {
 	formatCount,
 	formatPercent,
 	formatDuration,
+	formatRelativeTime,
 	AiRunsSource,
 } = await load('../../src/services/ai-runs-source.ts');
 
@@ -340,6 +341,17 @@ test('toRecentRuns sanitizes credentials and long digits but keeps wikilinks lit
 	assert.equal(rows[0].agent, 'codebuddy');
 });
 
+test('toRecentRuns passes durationUnknown through without inventing it on legacy rows', () => {
+	const rows = toRecentRuns(snapshot({
+		recentRuns: [
+			{ timestamp: 1795506036126, agent: 'codebuddy', checklistText: 'A', exitCode: 0, durationMs: 0, durationUnknown: true },
+			{ timestamp: 1795506036226, agent: 'qoder', checklistText: 'B', exitCode: 1, durationMs: 0 },
+		],
+	}));
+	assert.equal(rows[0].durationUnknown, true, '新桥文件字段透传');
+	assert.equal(rows[1].durationUnknown, undefined, '旧桥文件缺字段时不伪造');
+});
+
 test('sanitizeChecklistText handles bearer/api-key patterns', () => {
 	const text = sanitizeChecklistText('Bearer abcdefghij1234567890 api_key: sk-abcdefghijklmnopqrst');
 	assert.ok(!text.includes('abcdefghij1234567890'));
@@ -409,6 +421,26 @@ test('formatters produce readable, finite strings', () => {
 test('formatDuration carries instead of emitting 60s / 60m', () => {
 	assert.equal(formatDuration(359_932), '6m 0s', '秒余数进位，不能出现 60s');
 	assert.equal(formatDuration(59_999_000), '16h 39m', '小时分支同样按秒取整，不能出现 60m');
+});
+
+test('formatRelativeTime bins off the given base, never Date.now()', () => {
+	const base = 1_800_000_000_000;
+	assert.equal(formatRelativeTime(base, base), '刚刚');
+	assert.equal(formatRelativeTime(base - 59_000, base), '刚刚');
+	assert.equal(formatRelativeTime(base - 60_000, base), '1分钟前');
+	assert.equal(formatRelativeTime(base - 3_599_000, base), '59分钟前');
+	assert.equal(formatRelativeTime(base - 3_600_000, base), '1小时前');
+	assert.equal(formatRelativeTime(base - 86_399_000, base), '23小时前');
+	assert.equal(formatRelativeTime(base - 86_400_000, base), '1天前');
+	assert.equal(formatRelativeTime(base - 172_800_000, base), '2天前');
+	assert.equal(formatRelativeTime(base + 1, base), '', '未来时刻不产出');
+	assert.equal(formatRelativeTime(Number.NaN, base), '');
+	assert.equal(formatRelativeTime(base, Number.POSITIVE_INFINITY), '');
+	// 渲染层注入 t() 后文案随语言切换，纯函数不写死中文。
+	assert.equal(
+		formatRelativeTime(base - 120_000, base, { justNow: 'now', minutes: '{0}m', hours: '{0}h', days: '{0}d' }),
+		'2m',
+	);
 });
 
 function makeSource(raw, framework = '0-辅助/IOTO') {
