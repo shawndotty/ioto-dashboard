@@ -9,6 +9,7 @@ const en = (await load('../../src/lang/locale/en.ts')).default;
 const EXPECTED = [
 	'ai-runs-kpi',
 	'ai-runs-agents',
+	'ai-runs-frequency',
 	'ai-runs-schedule',
 	'ai-runs-recent',
 ];
@@ -46,6 +47,12 @@ test('all locale keys used by AI Metrics components exist in en', () => {
 		'COMPONENT_AI_RUNS_KPI_DESC',
 		'COMPONENT_AI_RUNS_AGENTS_NAME',
 		'COMPONENT_AI_RUNS_AGENTS_DESC',
+		'COMPONENT_AI_RUNS_FREQUENCY_NAME',
+		'COMPONENT_AI_RUNS_FREQUENCY_DESC',
+		'AI_FREQUENCY_AGENT_LINE',
+		'AI_FREQUENCY_DAY_TOTAL',
+		'AI_FREQUENCY_TOKEN_NA',
+		'AI_FREQUENCY_AXIS_MAX',
 		'COMPONENT_AI_RUNS_SCHEDULE_NAME',
 		'COMPONENT_AI_RUNS_SCHEDULE_DESC',
 		'COMPONENT_AI_RUNS_RECENT_NAME',

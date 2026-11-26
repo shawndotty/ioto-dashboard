@@ -343,6 +343,83 @@ export function toDailySeries(snapshot: AiRunsSnapshot): DailyProjection[] {
 	}));
 }
 
+/**
+ * 「AI 使用频度」卡的逐日投影：daysForRange → totals；runs=0 的占位日不产出。
+ * 产出按日期倒序排列（最新一天在最上面）；上游 daysForRange 的原序不受影响。
+ * inputTokens/totalTokens 用整组 hasInput 开关（同 toKpis），避免「输入列有值、总列空一半」。
+ * segments/unattributed 供渲染层画 100% 堆叠条：分母统一用 totals.runs（同 toAgentRunCounts / 顶部徽章），
+ * 未归属差额用灰段补足；颜色身份不在数据层计算，仍由渲染层按全局降序位置取。
+ */
+export interface FrequencySegment {
+	agent: string;
+	runs: number;
+}
+
+export interface FrequencyDayProjection {
+	date: string;
+	runs: number;
+	segments: FrequencySegment[]; // day.byAgent 逐日分段，按 runs 降序
+	unattributed: number; // runs - Σsegments，>0 时渲染灰段
+	inputTokens?: number;
+	outputTokens: number;
+	totalTokens?: number;
+}
+
+export function toFrequencyDays(
+	snapshot: AiRunsSnapshot,
+	range: AiMetricsRange,
+): FrequencyDayProjection[] {
+	const days = daysForRange(snapshot, range);
+	const hasInput = days.some(
+		(day) => num(day?.totals?.inputTokens) !== undefined,
+	);
+	const rows: FrequencyDayProjection[] = [];
+	for (const day of days) {
+		const runs = num(day?.totals?.runs) ?? 0;
+		if (runs === 0) continue;
+		const outputTokens = num(day?.totals?.outputTokens) ?? 0;
+		const input = num(day?.totals?.inputTokens) ?? 0;
+		const segments = Object.entries(day?.byAgent ?? {})
+			.map(([agent, raw]) => ({ agent, runs: num(raw?.runs) ?? 0 }))
+			.filter((seg) => seg.runs > 0)
+			.sort((a, b) => b.runs - a.runs);
+		const attributed = segments.reduce((sum, seg) => sum + seg.runs, 0);
+		rows.push({
+			date: String(day?.date ?? ""),
+			runs,
+			segments,
+			unattributed: Math.max(0, runs - attributed),
+			outputTokens,
+			...(hasInput
+				? { inputTokens: input, totalTokens: input + outputTokens }
+				: {}),
+		});
+	}
+	// 展示序＝最近一天在最上面：date 是零填充的 YYYY-MM-DD，字典序即时间序，
+	// 因此直接倒序即可；不用 localeCompare（排序规则随 locale 变，对 '-' 不保证稳定）。
+	// 必须排序新建的 rows：daysForRange('all') 返回的是 snapshot.days 本体，原地 reverse 会污染其它组件。
+	return rows.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+/**
+ * Agent 绝对次数：仅累加 byAgent[].runs，按次数降序。
+ * 不归属运行不计入（与 toAgentSeries 的分母口径一致），agent 之和可能小于逐日总次数。
+ */
+export function toAgentRunCounts(
+	snapshot: AiRunsSnapshot,
+	range: AiMetricsRange,
+): Array<{ agent: string; runs: number }> {
+	const counts = new Map<string, number>();
+	for (const day of daysForRange(snapshot, range)) {
+		for (const [agent, raw] of Object.entries(day?.byAgent ?? {})) {
+			counts.set(agent, (counts.get(agent) ?? 0) + (num(raw?.runs) ?? 0));
+		}
+	}
+	return [...counts.entries()]
+		.map(([agent, runs]) => ({ agent, runs }))
+		.sort((a, b) => b.runs - a.runs);
+}
+
 export function toScheduleRows(snapshot: AiRunsSnapshot): ScheduleProjection {
 	let planned = 0;
 	let fired = 0;

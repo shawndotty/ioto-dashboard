@@ -112,6 +112,13 @@ export function createAiMetricsPage(name = "AI Metrics"): DashboardPage {
 				h: 4,
 			},
 			{
+				id: "ai-runs-frequency",
+				type: "ai-runs-frequency",
+				queryId: "",
+				w: 8,
+				h: 6,
+			},
+			{
 				id: "ai-runs-schedule",
 				type: "ai-runs-schedule",
 				queryId: "",

@@ -6057,6 +6057,101 @@ body.is-mobile .ioto-pages-handle {
     white-space: nowrap;
 }
 
+/* AI 使用频度卡：顶部 agent 次数行 + 逐日 mini bar 列表 + 复用底部 meta 行。 */
+.ioto-custom-dashboard-view .ioto-ai-frequency {
+    container-type: inline-size;   /* 窄卡降级的查询容器，同 .ioto-ai-agents */
+}
+
+.ioto-custom-dashboard-view .ioto-ai-frequency-agents {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    min-width: 0;
+}
+.ioto-custom-dashboard-view .ioto-ai-frequency-agents-label {
+    color: var(--text-muted);
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+/* ioto-chart-cat-N 只提供 --ioto-series-color：徽章与色条须在此显式落地，否则只显灰底。
+   只挑带 cat 类的徽章，让「低估」徽章保持 .ioto-ai-badge 默认灰底（与 KPI 卡一致）。 */
+.ioto-custom-dashboard-view .ioto-ai-frequency-agents .ioto-ai-badge[class*="ioto-chart-cat"] {
+    color: var(--ioto-series-color, var(--text-muted));
+    background: color-mix(in srgb, var(--ioto-series-color, var(--interactive-accent)) 14%, transparent);
+}
+
+.ioto-custom-dashboard-view .ioto-ai-frequency-days {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    display: grid;              /* 6 列只在这里定义一次，所有行共享同一组轨道 */
+    grid-template-columns: max-content minmax(0, 1fr) max-content max-content max-content max-content;
+    align-content: start;       /* 必须：grid 默认 stretch，行少时会把行拉高铺满卡片 */
+    column-gap: 8px;            /* subgrid 的 gutters 继承父网格；行内再写 gap 无效（原型实测） */
+    padding-inline: 4px;
+}
+.ioto-custom-dashboard-view .ioto-ai-frequency-day {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;   /* 关键：列宽与父网格逐列对齐 */
+    align-items: center;
+    min-width: 0;
+    min-height: 28px;
+    padding: 8px 0;                   /* 横向 4px 已由 .days 的 padding-inline 提供；纵向不变 → 行高仍 34px */
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+.ioto-custom-dashboard-view .ioto-ai-frequency-day:last-child {
+    border-bottom: none;
+}
+.ioto-custom-dashboard-view .ioto-ai-frequency-date {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+/* bar 的数值标签列（右对齐、muted、tabular-nums，样式不变）。 */
+.ioto-custom-dashboard-view .ioto-ai-frequency-count {
+    min-width: 0;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+}
+.ioto-custom-dashboard-view .ioto-ai-frequency-bar-track {
+    display: flex;               /* 多段横向堆叠，缺了会竖着排列 */
+    height: 10px;
+    min-width: 0;
+    border-radius: var(--radius-s);
+    background: transparent;     /* 不再画满格底槽：短的天右侧直接是卡片底色 */
+    overflow: hidden;
+}
+.ioto-custom-dashboard-view .ioto-ai-frequency-bar-seg {
+    height: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+    background: var(--ioto-series-color, var(--interactive-accent));
+}
+.ioto-custom-dashboard-view .ioto-ai-frequency-token {
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* 窄卡：隐藏三列 token，只留日期 + bar + 当日次数（次数不能隐藏，否则失去频度感知）。 */
+@container (max-width: 300px) {
+    /* 改父网格的列数，行靠 subgrid 自动跟随；不能再改行的 grid-template-columns */
+    .ioto-custom-dashboard-view .ioto-ai-frequency-days {
+        grid-template-columns: max-content minmax(0, 1fr) max-content;
+    }
+    .ioto-custom-dashboard-view .ioto-ai-frequency-day .is-input,
+    .ioto-custom-dashboard-view .ioto-ai-frequency-day .is-output,
+    .ioto-custom-dashboard-view .ioto-ai-frequency-day .is-total {
+        display: none;
+    }
+}
+
 .ioto-custom-dashboard-view .ioto-ai-schedule-summary {
     font-size: 1.2em;
     font-weight: 600;

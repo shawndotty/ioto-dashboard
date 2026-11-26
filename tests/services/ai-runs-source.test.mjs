@@ -8,6 +8,8 @@ const {
 	daysForRange,
 	toAgentSeries,
 	toDailySeries,
+	toFrequencyDays,
+	toAgentRunCounts,
 	toScheduleRows,
 	toRecentRuns,
 	sanitizeChecklistText,
@@ -569,4 +571,154 @@ test('toRecentRuns forwards upstream source fields and sanitizes textFull', () =
 	const legacy = toRecentRuns(snapshot());
 	assert.equal('sourcePath' in legacy[0], false);
 	assert.equal(legacy[0].textFull, legacy[0].text);
+});
+
+test('toFrequencyDays projects totals and hides zero-run placeholder days', () => {
+	const rows = toFrequencyDays(snapshot({
+		days: [
+			{ date: '2026-11-21', totals: { runs: 0, inputTokens: 0, outputTokens: 0 }, byAgent: {} },
+			{ date: '2026-11-22', totals: NEW_BUCKET({ runs: 7, inputTokens: 300, outputTokens: 50 }), byAgent: {} },
+			{ date: '2026-11-23', totals: NEW_BUCKET({ runs: 3, inputTokens: 100, outputTokens: 20 }), byAgent: {} },
+		],
+	}), 'all');
+	assert.deepEqual(rows.map((row) => row.date), ['2026-11-23', '2026-11-22']);
+	assert.deepEqual(rows.map((row) => row.runs), [3, 7]);
+	assert.deepEqual(rows.map((row) => row.segments), [[], []]);
+	assert.deepEqual(rows.map((row) => row.unattributed), [3, 7]);
+	assert.equal(rows[0].inputTokens, 100);
+	assert.equal(rows[0].outputTokens, 20);
+	assert.equal(rows[0].totalTokens, 120);
+});
+
+test('toFrequencyDays honors range=today using the snapshot generation day', () => {
+	// generatedAt → 本地日键 2026-11-24。
+	const snap = snapshot({
+		days: [
+			{ date: '2026-11-23', totals: NEW_BUCKET({ runs: 9 }), byAgent: {} },
+			{ date: '2026-11-24', totals: NEW_BUCKET({ runs: 2, inputTokens: 40, outputTokens: 10 }), byAgent: {} },
+		],
+	});
+	assert.equal(toFrequencyDays(snap, 'all').length, 2);
+	const today = toFrequencyDays(snap, 'today');
+	assert.equal(today.length, 1);
+	assert.equal(today[0].date, '2026-11-24');
+	assert.equal(today[0].runs, 2);
+	assert.deepEqual(today[0].segments, []);
+	assert.equal(today[0].unattributed, 2);
+	assert.equal(today[0].totalTokens, 50);
+});
+
+test('toFrequencyDays hides input/total tokens as a whole on the legacy bridge', () => {
+	const rows = toFrequencyDays(oldSnapshot(), 'all');
+	assert.equal(rows.length, 1);
+	assert.equal(rows[0].runs, 6);
+	assert.equal(rows[0].outputTokens, 204002);
+	assert.deepEqual(rows[0].segments, [{ agent: 'qodercn', runs: 6 }]);
+	assert.equal(rows[0].unattributed, 0);
+	assert.equal('inputTokens' in rows[0], false);
+	assert.equal('totalTokens' in rows[0], false);
+	for (const value of Object.values(rows[0])) {
+		assert.equal(Number.isNaN(value), false);
+	}
+});
+
+test('toFrequencyDays uses one hasInput switch across the whole range', () => {
+	const rows = toFrequencyDays(snapshot({
+		days: [
+			{ date: '2026-11-22', totals: { runs: 2, inputTokens: 100, outputTokens: 10 }, byAgent: {} },
+			{ date: '2026-11-23', totals: { runs: 3, outputTokens: 20 }, byAgent: {} },
+		],
+	}), 'all');
+	assert.deepEqual(rows.map((row) => row.inputTokens), [0, 100]);
+	assert.deepEqual(rows.map((row) => row.totalTokens), [20, 110]);
+	assert.deepEqual(rows.map((row) => row.unattributed), [3, 2]);
+});
+
+test('toFrequencyDays returns days newest-first regardless of snapshot order', () => {
+	const rows = toFrequencyDays(snapshot({
+		days: [
+			{ date: '2026-11-23', totals: NEW_BUCKET({ runs: 3 }), byAgent: {} },
+			{ date: '2026-11-21', totals: NEW_BUCKET({ runs: 9 }), byAgent: {} },
+			{ date: '2026-11-22', totals: NEW_BUCKET({ runs: 7 }), byAgent: {} },
+		],
+	}), 'all');
+	assert.deepEqual(rows.map((row) => row.date), ['2026-11-23', '2026-11-22', '2026-11-21']);
+	assert.deepEqual(rows.map((row) => row.runs), [3, 7, 9]);
+});
+
+test('toFrequencyDays exposes per-day agent segments sorted by runs descending', () => {
+	const rows = toFrequencyDays(snapshot({
+		days: [
+			{ date: '2026-11-25', totals: NEW_BUCKET({ runs: 55 }), byAgent: {
+				qoder: { runs: 11 }, codebuddy: { runs: 44 }, zero: { runs: 0 },
+			} },
+		],
+	}), 'all');
+	assert.deepEqual(rows[0].segments, [
+		{ agent: 'codebuddy', runs: 44 },
+		{ agent: 'qoder', runs: 11 },
+	]);
+	assert.equal(rows[0].unattributed, 0);
+});
+
+test('toFrequencyDays fills unattributed runs when totals exceeds byAgent sum', () => {
+	const rows = toFrequencyDays(snapshot({
+		days: [
+			{ date: '2026-11-25', totals: NEW_BUCKET({ runs: 55 }), byAgent: {
+				codebuddy: { runs: 44 }, qoder: { runs: 5 },
+			} },
+		],
+	}), 'all');
+	assert.deepEqual(rows[0].segments, [
+		{ agent: 'codebuddy', runs: 44 },
+		{ agent: 'qoder', runs: 5 },
+	]);
+	assert.equal(rows[0].unattributed, 6);
+});
+
+test('toFrequencyDays segments under range=today only read the generation day', () => {
+	const snap = snapshot({
+		days: [
+			{ date: '2026-11-23', totals: NEW_BUCKET({ runs: 9 }), byAgent: { codebuddy: { runs: 9 } } },
+			{ date: '2026-11-24', totals: NEW_BUCKET({ runs: 4 }), byAgent: { qoder: { runs: 4 } } },
+		],
+	});
+	assert.deepEqual(toFrequencyDays(snap, 'today')[0].segments, [
+		{ agent: 'qoder', runs: 4 },
+	]);
+});
+
+test('toAgentRunCounts accumulates byAgent runs and sorts descending', () => {
+	const rows = toAgentRunCounts(snapshot({
+		days: [
+			{ date: '2026-11-22', totals: NEW_BUCKET(), byAgent: { codebuddy: { runs: 4 }, qoder: { runs: 2 } } },
+			{ date: '2026-11-23', totals: NEW_BUCKET(), byAgent: { codebuddy: { runs: 3 }, qoder: { runs: 1 } } },
+		],
+	}), 'all');
+	assert.deepEqual(rows, [
+		{ agent: 'codebuddy', runs: 7 },
+		{ agent: 'qoder', runs: 3 },
+	]);
+});
+
+test('toAgentRunCounts honors range=today and excludes unattributed runs', () => {
+	const snap = snapshot({
+		days: [
+			{ date: '2026-11-23', totals: { runs: 10 }, byAgent: { codebuddy: { runs: 5 } } },
+			{ date: '2026-11-24', totals: { runs: 4 }, byAgent: { qoder: { runs: 3 } } },
+		],
+	});
+	// 5+3=8 < 逐日总次数 14：未归属运行不计入，属预期口径。
+	assert.equal(toAgentRunCounts(snap, 'all').reduce((sum, row) => sum + row.runs, 0), 8);
+	assert.deepEqual(toAgentRunCounts(snap, 'today'), [{ agent: 'qoder', runs: 3 }]);
+});
+
+test('toAgentRunCounts handles a placeholder day whose byAgent is empty', () => {
+	const rows = toAgentRunCounts(snapshot({
+		days: [
+			{ date: '2026-11-21', totals: { runs: 0 }, byAgent: {} },
+			{ date: '2026-11-22', totals: NEW_BUCKET(), byAgent: {} },
+		],
+	}), 'all');
+	assert.deepEqual(rows, []);
 });
