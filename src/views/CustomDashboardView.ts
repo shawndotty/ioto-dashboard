@@ -19,6 +19,18 @@ import {
 import { CUSTOM_DASHBOARD_VIEW_TYPE } from "../models/constants";
 import type IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
+import {
+	buildExportFileName,
+	captureDashboardPageCanvas,
+	clampExportScale,
+	composePageHeader,
+	copyCanvasToClipboard,
+	copyCanvasViaElectron,
+	DEFAULT_EXPORT_SCALE,
+	readableTextColor,
+	resolveExportBackground,
+	saveCanvasToVault,
+} from "../export";
 import { createComponentRegistry } from "../dashboard/components";
 import { DataHub } from "../dashboard/data-hub";
 import {
@@ -215,6 +227,8 @@ export class CustomDashboardView extends ItemView {
 	private hub: DataHub | null = null;
 	private registry = createComponentRegistry();
 	private editMode = false;
+	/** 导出重入锁：期间拒绝再次触发，避免离屏宿主叠加。 */
+	isExporting = false;
 	private isZenMode = false;
 	private damaged = false;
 	private unsubscribers: Array<() => void> = [];
@@ -468,6 +482,16 @@ export class CustomDashboardView extends ItemView {
 			? dashboard.pages.find((page) => page.id === this.leafPageId)
 			: undefined;
 		return leafPage ?? activePageOf(dashboard);
+	}
+
+	/** 命令层用的查看态门控：编辑态下命令不可用，避开选中框 / 缩放手柄 / 拖放提示入图。 */
+	get isEditMode(): boolean {
+		return this.editMode;
+	}
+
+	/** 当前页在页签上显示的名字（不是工具栏 h2 的 dashboard 名）。 */
+	get currentPageName(): string | undefined {
+		return this.activePage?.name;
 	}
 
 	/**
@@ -903,6 +927,35 @@ export class CustomDashboardView extends ItemView {
 			this.applyPageLayout(this.gridEl);
 			this.gridEl.addEventListener("click", (event) => {
 				if (event.target === this.gridEl) this.clearSelection();
+			});
+			// 查看态 + 桌面 only：右键页面空白区弹整页出图菜单（与卡片菜单互斥）。
+			this.gridEl.addEventListener("contextmenu", (event) => {
+				if (Platform.isMobile) return; // 手机沿用命令面板整页命令
+				if (!this.canExportPageImage()) return; // 查看态 + activePage + gridEl + 有内容
+				if (this.cardOwnerOf(event)) return; // 命中任意卡片/嵌套子卡 → 交给组件菜单
+				const target = event.target as HTMLElement | null;
+				if (
+					target?.closest(
+						"a, button, input, select, textarea, [contenteditable='true']",
+					)
+				) {
+					return; // 让核心链接 / 控件菜单正常工作
+				}
+				event.preventDefault();
+				const menu = new Menu();
+				menu.addItem((item) =>
+					item
+						.setTitle(t("COMMAND_EXPORT_CANVAS_PAGE_IMAGE"))
+						.setIcon("image")
+						.onClick(() => void this.exportPageAsImage()),
+				);
+				menu.addItem((item) =>
+					item
+						.setTitle(t("COMMAND_COPY_CANVAS_PAGE_IMAGE"))
+						.setIcon("clipboard")
+						.onClick(() => void this.copyPageImageToClipboard()),
+				);
+				menu.showAtMouseEvent(event);
 			});
 		}
 		return this.gridEl;
@@ -1605,6 +1658,189 @@ export class CustomDashboardView extends ItemView {
 		};
 	}
 
+	/** 图片命令门控：仅查看态、须有当前页与可见内容。 */
+	canExportPageImage(): boolean {
+		return (
+			!this.isEditMode &&
+			!!this.activePage &&
+			!!this.gridEl &&
+			this.gridEl.scrollHeight > 0
+		);
+	}
+
+	/** 命令入口：把当前页导出为 PNG 附件（写库内附件目录）。 */
+	async exportPageAsImage(): Promise<void> {
+		const captured = await this.captureForPageImage();
+		if (!captured) return;
+		try {
+			const path = await saveCanvasToVault(
+				this.app,
+				captured.canvas,
+				buildExportFileName(captured.name, new Date()),
+				{},
+			);
+			new Notice(t("NOTICE_EXPORT_DASHBOARD_IMAGE_SAVED", [path]));
+		} catch (error) {
+			console.error("[ioto-dashboard] save exported image failed", error);
+			new Notice(t("NOTICE_EXPORT_DASHBOARD_IMAGE_FAILED"));
+		}
+	}
+
+	/** 命令入口：把当前页复制到系统剪贴板（恒 PNG），桌面失败回退 Electron 原生剪贴板。 */
+	async copyPageImageToClipboard(): Promise<void> {
+		const captured = await this.captureForPageImage();
+		if (!captured) return;
+		try {
+			await copyCanvasToClipboard(captured.canvas);
+			new Notice(t("NOTICE_EXPORT_DASHBOARD_IMAGE_COPIED"));
+			return;
+		} catch {
+			// 落到 Electron 回退（桌面）；移动端同样会失败，最终给 Notice（不静默）。
+		}
+		if (await copyCanvasViaElectron(captured.canvas)) {
+			new Notice(t("NOTICE_EXPORT_DASHBOARD_IMAGE_COPIED"));
+			return;
+		}
+		new Notice(t("NOTICE_EXPORT_DASHBOARD_IMAGE_COPY_FAILED"));
+	}
+
+	/** 右键菜单入口：把单张卡片导出为 PNG 附件（写库内附件目录）。 */
+	async exportComponentAsImage(
+		config: DashboardComponentConfig,
+		cardEl: HTMLElement,
+	): Promise<void> {
+		const captured = await this.captureForImage({
+			targetEl: cardEl,
+			title: this.titleOf(config, this.registry.get(config.type)),
+			withHeader: false,
+			generatingNotice: "NOTICE_EXPORT_COMPONENT_IMAGE_GENERATING",
+			failNotice: "NOTICE_EXPORT_COMPONENT_IMAGE_FAILED",
+		});
+		if (!captured) return;
+		try {
+			const path = await saveCanvasToVault(
+				this.app,
+				captured.canvas,
+				buildExportFileName(captured.name, new Date()),
+				{},
+			);
+			new Notice(t("NOTICE_EXPORT_COMPONENT_IMAGE_SAVED", [path]));
+		} catch (error) {
+			console.error("[ioto-dashboard] save component image failed", error);
+			new Notice(t("NOTICE_EXPORT_COMPONENT_IMAGE_FAILED"));
+		}
+	}
+
+	/** 右键菜单入口：把单张卡片复制到系统剪贴板，桌面失败回退 Electron 原生剪贴板。 */
+	async copyComponentImageToClipboard(
+		config: DashboardComponentConfig,
+		cardEl: HTMLElement,
+	): Promise<void> {
+		const captured = await this.captureForImage({
+			targetEl: cardEl,
+			title: this.titleOf(config, this.registry.get(config.type)),
+			withHeader: false,
+			generatingNotice: "NOTICE_EXPORT_COMPONENT_IMAGE_GENERATING",
+			failNotice: "NOTICE_EXPORT_COMPONENT_IMAGE_FAILED",
+		});
+		if (!captured) return;
+		try {
+			await copyCanvasToClipboard(captured.canvas);
+			new Notice(t("NOTICE_EXPORT_COMPONENT_IMAGE_COPIED"));
+			return;
+		} catch {
+			// 落到 Electron 回退（桌面）。
+		}
+		if (await copyCanvasViaElectron(captured.canvas)) {
+			new Notice(t("NOTICE_EXPORT_COMPONENT_IMAGE_COPIED"));
+			return;
+		}
+		new Notice(t("NOTICE_EXPORT_COMPONENT_IMAGE_FAILED"));
+	}
+
+	/**
+	 * 导出共用链：重入锁 → 生成中 Notice → 宽度 / 底色 / 倍率 → 光栅化 → 可选页眉标题带 →
+	 * 逐条提示。完全不改实时 DOM：光栅化拍的是重建后的离屏克隆（含 `is-exporting` 瞬时态）。
+	 * 页面链传 gridEl + withHeader:true；组件链传 cardEl + withHeader:false（不合成页眉，避免双标题）。
+	 */
+	private async captureForImage(opts: {
+		targetEl: HTMLElement;
+		title: string;
+		withHeader: boolean;
+		generatingNotice: Parameters<typeof t>[0];
+		failNotice: Parameters<typeof t>[0];
+	}): Promise<{
+		canvas: HTMLCanvasElement;
+		name: string;
+	} | null> {
+		if (this.isExporting) return null;
+		this.isExporting = true;
+		new Notice(t(opts.generatingNotice));
+		try {
+			const width = Math.max(
+				1,
+				Math.round(opts.targetEl.getBoundingClientRect().width),
+			);
+			const backgroundColor = resolveExportBackground(this.contentEl);
+			const desiredScale = clampExportScale(DEFAULT_EXPORT_SCALE);
+
+			const result = await captureDashboardPageCanvas(opts.targetEl, {
+				width,
+				desiredScale,
+				backgroundColor,
+			});
+			const canvas = opts.withHeader
+				? composePageHeader(result.canvas, {
+						title: opts.title,
+						backgroundColor,
+						textColor: readableTextColor(backgroundColor),
+						scale: result.scale,
+					})
+				: result.canvas;
+
+			if (result.scale < desiredScale) {
+				new Notice(
+					t("NOTICE_EXPORT_DASHBOARD_IMAGE_SCALE_REDUCED", [
+						String(result.scale),
+					]),
+				);
+			}
+			if (result.heightCapped) {
+				new Notice(t("NOTICE_EXPORT_DASHBOARD_IMAGE_HEIGHT_CAPPED"));
+			}
+			if (result.partial) {
+				new Notice(t("NOTICE_EXPORT_DASHBOARD_IMAGE_PARTIAL"));
+			}
+
+			return { canvas, name: opts.title };
+		} catch (error) {
+			console.error("[ioto-dashboard] capture image failed", error);
+			new Notice(t(opts.failNotice));
+			return null;
+		} finally {
+			this.isExporting = false;
+		}
+	}
+
+	/** 页面链薄封装：保留空检查与门控文案，行为与参数化之前一致。 */
+	private async captureForPageImage(): Promise<{
+		canvas: HTMLCanvasElement;
+		name: string;
+	} | null> {
+		const gridEl = this.gridEl;
+		if (!gridEl || gridEl.scrollHeight <= 0) {
+			new Notice(t("NOTICE_EXPORT_DASHBOARD_IMAGE_FAILED"));
+			return null;
+		}
+		return this.captureForImage({
+			targetEl: gridEl,
+			title: this.currentPageName ?? "",
+			withHeader: true,
+			generatingNotice: "NOTICE_EXPORT_DASHBOARD_IMAGE_GENERATING",
+			failNotice: "NOTICE_EXPORT_DASHBOARD_IMAGE_FAILED",
+		});
+	}
+
 	toggleZenMode(): void {
 		if (!this.isZenMode && this.editMode) {
 			this.editMode = false;
@@ -2166,6 +2402,37 @@ export class CustomDashboardView extends ItemView {
 				const owner = this.cardOwnerOf(event);
 				if (owner && owner !== card) return;
 				this.openCardMenu(event, config);
+			});
+		} else {
+			// 查看态右键：导出 / 复制这张卡片（桌面 only；手机沿用命令面板整页命令）。
+			card.addEventListener("contextmenu", (event) => {
+				const owner = this.cardOwnerOf(event);
+				if (owner && owner !== card) return; // 嵌套：子卡只弹子卡的菜单
+				const target = event.target as HTMLElement | null;
+				if (
+					target?.closest(
+						"a, button, input, select, textarea, [contenteditable='true']",
+					)
+				) {
+					return; // 让核心链接 / 控件菜单正常工作
+				}
+				event.preventDefault();
+				const menu = new Menu();
+				menu.addItem((item) =>
+					item
+						.setTitle(t("DASHBOARD_EXPORT_COMPONENT_IMAGE"))
+						.setIcon("image")
+						.onClick(() => void this.exportComponentAsImage(config, card)),
+				);
+				menu.addItem((item) =>
+					item
+						.setTitle(t("DASHBOARD_COPY_COMPONENT_IMAGE"))
+						.setIcon("clipboard")
+						.onClick(
+							() => void this.copyComponentImageToClipboard(config, card),
+						),
+				);
+				menu.showAtMouseEvent(event);
 			});
 		}
 

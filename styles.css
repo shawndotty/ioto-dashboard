@@ -334,6 +334,14 @@
     padding: 16px 20px 32px;
 }
 
+/* 导出瞬时态：只作用于离屏克隆宿主，避免过渡旧值 / 编辑焦点框 / 光标入图。 */
+.ioto-custom-dashboard-view.is-exporting,
+.ioto-custom-dashboard-view.is-exporting * {
+    transition: none !important;
+    animation: none !important;
+    caret-color: transparent !important;
+}
+
 .ioto-custom-dashboard-view .ioto-dashboard-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);

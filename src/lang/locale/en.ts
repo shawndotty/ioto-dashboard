@@ -1140,4 +1140,24 @@ export default {
 	AI_SCHEDULE_SETTING_SHOW_SKIPPED: "Show skipped runs",
 	AI_SCHEDULE_UNKNOWN_TIME: "Time unknown",
 	AI_SCHEDULE_PENDING_ITEMS: "{0} pending items",
+
+	// Dashboard page image export / copy
+	COMMAND_EXPORT_CANVAS_PAGE_IMAGE: "Export current page as image",
+	COMMAND_COPY_CANVAS_PAGE_IMAGE: "Copy current page as image",
+	NOTICE_EXPORT_DASHBOARD_IMAGE_GENERATING: "Generating page image...",
+	NOTICE_EXPORT_DASHBOARD_IMAGE_SAVED: "Page image saved to {0}",
+	NOTICE_EXPORT_DASHBOARD_IMAGE_COPIED: "Page image copied to clipboard",
+	NOTICE_EXPORT_DASHBOARD_IMAGE_FAILED: "Failed to export page image",
+	NOTICE_EXPORT_DASHBOARD_IMAGE_COPY_FAILED: "Failed to copy page image to clipboard",
+	NOTICE_EXPORT_DASHBOARD_IMAGE_SCALE_REDUCED: "Image too large; scale reduced to {0}x",
+	NOTICE_EXPORT_DASHBOARD_IMAGE_HEIGHT_CAPPED: "Image is very tall; height was capped",
+	NOTICE_EXPORT_DASHBOARD_IMAGE_PARTIAL: "Some content (embedded web pages / canvas previews) could not be captured; scrolling content inside cards shows only the visible part",
+
+	// Dashboard single-component image export / copy (view-mode right-click menu)
+	DASHBOARD_EXPORT_COMPONENT_IMAGE: "Export component as image",
+	DASHBOARD_COPY_COMPONENT_IMAGE: "Copy component image",
+	NOTICE_EXPORT_COMPONENT_IMAGE_GENERATING: "Generating component image...",
+	NOTICE_EXPORT_COMPONENT_IMAGE_SAVED: "Component image saved to {0}",
+	NOTICE_EXPORT_COMPONENT_IMAGE_COPIED: "Component image copied to clipboard",
+	NOTICE_EXPORT_COMPONENT_IMAGE_FAILED: "Failed to export component image",
 };

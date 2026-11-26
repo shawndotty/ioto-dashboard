@@ -375,6 +375,32 @@ export default class IotoDashboardPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "export-ioto-canvas-page-image",
+			name: t("COMMAND_EXPORT_CANVAS_PAGE_IMAGE"),
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(
+					CustomDashboardView,
+				);
+				if (!view?.canExportPageImage()) return false;
+				if (!checking) void view.exportPageAsImage();
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "copy-ioto-canvas-page-image",
+			name: t("COMMAND_COPY_CANVAS_PAGE_IMAGE"),
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(
+					CustomDashboardView,
+				);
+				if (!view?.canExportPageImage()) return false;
+				if (!checking) void view.copyPageImageToClipboard();
+				return true;
+			},
+		});
+
+		this.addCommand({
 			id: "export-ioto-canvas-backup",
 			name: t("COMMAND_EXPORT_CANVAS_BACKUP"),
 			callback: () => this.transfer.exportBackup(),
