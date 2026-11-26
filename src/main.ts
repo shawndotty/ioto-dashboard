@@ -32,6 +32,7 @@ import {
 	createAiMetricsPage,
 	type DashboardStoreData,
 } from "./dashboard/types";
+import { applyAiMetricsCompactLayout } from "./dashboard/ai-metrics-layout";
 import { DashboardPickerModal } from "./ui/dashboard-picker";
 import { TemplateCenterModal } from "./ui/template-center-modal";
 import {
@@ -413,6 +414,30 @@ export default class IotoDashboardPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "apply-ai-metrics-compact-layout",
+			name: t("COMMAND_APPLY_AI_METRICS_LAYOUT"),
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(
+					CustomDashboardView,
+				);
+				const target = view?.getTransferTarget();
+				if (
+					!target?.dashboardId ||
+					target.pageId !== AI_METRICS_PAGE_ID
+				) {
+					return false;
+				}
+				if (!checking) {
+					void this.applyAiMetricsCompactLayoutTo(
+						target.dashboardId,
+						target.pageId,
+					);
+				}
+				return true;
+			},
+		});
+
+		this.addCommand({
 			id: "open-ioto-template-center",
 			name: t("COMMAND_OPEN_TEMPLATE_CENTER"),
 			callback: () => {
@@ -469,6 +494,40 @@ export default class IotoDashboardPlugin extends Plugin {
 		};
 		// save() 会经 notify() 广播，onChange 监听器同步刷新内存 store。
 		await this.dashboardRepository.save(next);
+	}
+
+	/** 命令：把当前打开的 AI 指标页就地重排为紧凑布局（只动 w/h + 页级 rowHeight/gap）。 */
+	private async applyAiMetricsCompactLayoutTo(
+		dashboardId: string,
+		pageId: string,
+	): Promise<void> {
+		const store = this.dashboardStore;
+		if (!store) return;
+		const page = store.dashboards
+			.find((dashboard) => dashboard.id === dashboardId)
+			?.pages.find((candidate) => candidate.id === pageId);
+		if (!page) return;
+		const next = applyAiMetricsCompactLayout(page);
+		if (!next) {
+			new Notice(t("AI_METRICS_LAYOUT_UNSUPPORTED"));
+			return;
+		}
+		const updated: DashboardStoreData = {
+			...store,
+			dashboards: store.dashboards.map((dashboard) =>
+				dashboard.id === dashboardId
+					? {
+							...dashboard,
+							pages: dashboard.pages.map((candidate) =>
+								candidate.id === pageId ? next : candidate,
+							),
+						}
+					: dashboard,
+			),
+		};
+		// save() 会经 notify() 广播，视图自动刷新。
+		await this.dashboardRepository.save(updated);
+		new Notice(t("AI_METRICS_LAYOUT_APPLIED"));
 	}
 
 	getDashboardStore(): DashboardStoreData | null {

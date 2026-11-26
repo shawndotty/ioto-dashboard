@@ -1013,6 +1013,9 @@ export default {
 
 	// AI 執行指標（queryless 元件）
 	AI_METRICS_PAGE_NAME: "AI 執行指標",
+	COMMAND_APPLY_AI_METRICS_LAYOUT: "套用緊湊版面到 AI 執行指標頁",
+	AI_METRICS_LAYOUT_APPLIED: "已套用緊湊版面（僅調整卡片寬高與行高）",
+	AI_METRICS_LAYOUT_UNSUPPORTED: "目前 AI 指標頁的元件組合不符合預期，未做任何變更",
 	COMPONENT_AI_RUNS_KPI_NAME: "AI 執行 KPI",
 	COMPONENT_AI_RUNS_KPI_DESC: "IOTO AI 執行的 token 與耗時總覽",
 	COMPONENT_AI_RUNS_AGENTS_NAME: "Agent 呼叫占比",

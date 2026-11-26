@@ -38,6 +38,17 @@ test('preset page carries the four AI Metrics components without queryId', () =>
 	for (const component of page.components) {
 		assert.equal(component.queryId, '');
 	}
+	// A1 紧凑布局：rowHeight=10 是 h 值口径前提，每行 w 和恰为 12。
+	assert.equal(page.rowHeight, 10);
+	assert.equal(page.gap, 12);
+	assert.deepEqual(page.components.map((c) => c.w), [4, 8, 4, 4, 4]);
+	assert.deepEqual(page.components.map((c) => c.h), [19, 19, 17, 17, 17]);
+});
+
+test('preset AI Metrics page rows each fill all 12 columns', () => {
+	const widths = createAiMetricsPage('AI Metrics').components.map((c) => c.w);
+	assert.equal(widths[0] + widths[1], 12);
+	assert.equal(widths[2] + widths[3] + widths[4], 12);
 });
 
 test('all locale keys used by AI Metrics components exist in en', () => {
