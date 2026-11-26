@@ -240,7 +240,7 @@ export const aiRunsRecentComponent: ComponentDefinition = {
 			}
 			const status = row.createDiv({ cls: "ioto-ai-recent-status" });
 			status.createSpan({
-				cls: `ioto-ai-badge ${run.exitCode === 0 ? "ioto-ai-recent-ok" : "ioto-ai-recent-fail"}`,
+				cls: `ioto-ai-badge ${run.exitCode === 0 ? "is-ok" : "is-bad"}`,
 				text: run.exitCode === 0
 					? t("AI_METRICS_EXIT_OK")
 					: t("AI_METRICS_EXIT_FAILED"),

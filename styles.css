@@ -5886,6 +5886,40 @@ body.is-mobile .ioto-pages-handle {
     font-size: 0.78em;
 }
 
+/* 统一状态 Badge：语义色只做「前景 + 低透明底 + 内描边」。
+   前景向 --text-normal 混色（明暗主题自适应），底色浓度由本插件控制，
+   不再让 --text-success 等亮色前景压在 --background-modifier-* 淡色底上。 */
+.ioto-custom-dashboard-view .ioto-ai-badge.is-ok,
+.ioto-custom-dashboard-view .ioto-ai-badge.is-warn,
+.ioto-custom-dashboard-view .ioto-ai-badge.is-bad {
+    padding: 1px 7px;
+    font-size: 0.8em;
+    font-weight: 500;
+}
+
+.ioto-custom-dashboard-view .ioto-ai-badge.is-ok {
+    color: color-mix(in srgb, var(--text-success) 40%, var(--text-normal));
+    background: color-mix(in srgb, var(--text-success) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-success) 35%, transparent);
+}
+
+.ioto-custom-dashboard-view .ioto-ai-badge.is-warn {
+    color: color-mix(in srgb, var(--text-warning) 40%, var(--text-normal));
+    background: color-mix(in srgb, var(--text-warning) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-warning) 35%, transparent);
+}
+
+.ioto-custom-dashboard-view .ioto-ai-badge.is-bad {
+    color: color-mix(in srgb, var(--text-error) 40%, var(--text-normal));
+    background: color-mix(in srgb, var(--text-error) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-error) 35%, transparent);
+}
+
+.ioto-custom-dashboard-view .ioto-ai-badge.is-muted {
+    color: var(--text-muted);
+    background: var(--background-modifier-hover);
+}
+
 .ioto-custom-dashboard-view .ioto-ai-metric-row {
     display: flex;
     justify-content: space-between;
@@ -6070,13 +6104,7 @@ body.is-mobile .ioto-pages-handle {
     white-space: nowrap;
 }
 
-.ioto-custom-dashboard-view .ioto-ai-recent-ok {
-    color: var(--text-success);
-}
 
-.ioto-custom-dashboard-view .ioto-ai-recent-fail {
-    color: var(--text-error);
-}
 
 .ioto-custom-dashboard-view .ioto-ai-recent-status {
     align-self: center;
@@ -6272,21 +6300,6 @@ body.is-mobile .ioto-pages-handle {
     display: flex;
     align-items: center;
     gap: 4px;
-}
-.ioto-custom-dashboard-view .ioto-ai-schedule-badge.is-ok {
-    color: var(--text-success);
-    background: var(--background-modifier-success);
-}
-.ioto-custom-dashboard-view .ioto-ai-schedule-badge.is-warn {
-    color: var(--text-warning);
-    background: var(--background-modifier-warning);
-}
-.ioto-custom-dashboard-view .ioto-ai-schedule-badge.is-bad {
-    color: var(--text-error);
-    background: var(--background-modifier-error);
-}
-.ioto-custom-dashboard-view .ioto-ai-schedule-badge.is-muted {
-    color: var(--text-muted);
 }
 .ioto-custom-dashboard-view .ioto-ai-schedule-more,
 .ioto-custom-dashboard-view .ioto-ai-schedule-done {
