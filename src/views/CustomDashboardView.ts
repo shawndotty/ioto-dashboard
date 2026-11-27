@@ -115,6 +115,7 @@ import {
 	containerColumnsOf,
 	containerVarsOf,
 	titleHiddenInMode,
+	zoomEnabledFor,
 } from "../dashboard/style-settings";
 import {
 	PAGE_GAP_DEFAULT,
@@ -142,6 +143,10 @@ import {
 	type CardToolsPanelHandle,
 } from "../dashboard/ui/card-tools";
 import { buildArrangeEditor } from "../dashboard/ui/arrange-editor";
+import {
+	ComponentZoomModal,
+	type ComponentZoomItem,
+} from "../ui/component-zoom-modal";
 import {
 	DashboardManagerModal,
 	uniqueDashboardName,
@@ -2218,6 +2223,7 @@ export class CustomDashboardView extends ItemView {
 	private syncCards(
 		grid: HTMLElement,
 		components: readonly DashboardComponentConfig[],
+		scope = "",
 	): void {
 		for (const overlay of Array.from(
 			grid.querySelectorAll(
@@ -2251,7 +2257,7 @@ export class CustomDashboardView extends ItemView {
 			if (!element || element.dataset.cardSignature !== signature) {
 				let next: HTMLElement;
 				try {
-					next = this.createCard(grid, config, queries);
+					next = this.createCard(grid, config, queries, scope);
 					this.renderFailures.delete(config.id);
 				} catch (error) {
 					if (!this.renderFailures.has(config.id)) {
@@ -2337,6 +2343,7 @@ export class CustomDashboardView extends ItemView {
 		grid: HTMLElement,
 		config: DashboardComponentConfig,
 		queries: QueryRepository,
+		scope = "",
 	): HTMLElement {
 		const definition = this.registry.get(config.type);
 		const query = queries.get(config.queryId);
@@ -2440,6 +2447,11 @@ export class CustomDashboardView extends ItemView {
 			});
 		}
 
+		// 放大入口只给顶层卡片：子卡随父容器一起放大（决策 1）。
+		if (!this.editMode && grid === this.gridEl && zoomEnabledFor(config)) {
+			this.renderZoomButton(header, config);
+		}
+
 		const body = card.createDiv({ cls: "ioto-dashboard-card-body" });
 		if (this.editMode) {
 			this.renderResizeHandle(card, grid, config);
@@ -2450,7 +2462,7 @@ export class CustomDashboardView extends ItemView {
 				findComponentLocation(this.activePage?.components ?? [], config.id)
 					?.depth ?? 0;
 			if (depth < MAX_CONTAINER_DEPTH) {
-				this.renderContainerBody(card, body, config);
+				this.renderContainerBody(card, body, config, scope);
 			}
 		}
 		if (!definition) {
@@ -2516,7 +2528,7 @@ export class CustomDashboardView extends ItemView {
 				this.renderMarkdownFragment(el, markdown),
 			patchComponent: (patch) => void this.updateComponent(config.id, patch),
 			mountBaseEmbed: (body, path, view, hideToolbar) =>
-				this.mountBaseEmbed(config.id, body, path, view, hideToolbar),
+				this.mountBaseEmbed(config.id + scope, body, path, view, hideToolbar),
 			aiRuns: this.plugin.aiRunsSource?.snapshotNow() ?? null,
 			aiSchedule: this.plugin.aiScheduleSource?.boardNow() ?? null,
 			resolveLink: (linktext) =>
@@ -2582,6 +2594,7 @@ export class CustomDashboardView extends ItemView {
 		card: HTMLElement,
 		body: HTMLElement,
 		config: DashboardComponentConfig,
+		scope = "",
 	): void {
 		const vars = containerVarsOf(config.options);
 		const page = this.activePage;
@@ -2620,7 +2633,7 @@ export class CustomDashboardView extends ItemView {
 			cls: "ioto-dashboard-grid is-nested",
 		});
 		nested.setAttr("aria-label", t("CONTAINER_CONTENT_ARIA"));
-		this.syncCards(nested, config.children ?? []);
+		this.syncCards(nested, config.children ?? [], scope);
 	}
 
 	private statusOf(
@@ -2765,6 +2778,91 @@ export class CustomDashboardView extends ItemView {
 			event.stopPropagation();
 			this.confirmRemove(config.id);
 		});
+	}
+
+	/** 放大层与页面网格渲染同一组件，base 嵌入按作用域分开记账。 */
+	private readonly zoomScope = "::zoom";
+
+	private renderZoomButton(
+		header: HTMLElement,
+		config: DashboardComponentConfig,
+	): void {
+		const zoom = header.createEl("button", {
+			cls: "clickable-icon ioto-card-zoom",
+			attr: {
+				type: "button",
+				"aria-label": t("ACTION_ZOOM"),
+				title: t("ACTION_ZOOM"),
+				"data-action": "zoom",
+			},
+		});
+		setIcon(zoom, "maximize");
+		zoom.onClickEvent((event) => {
+			event.stopPropagation();
+			this.openComponentZoom(config.id);
+		});
+	}
+
+	/** 当前页顶层网格里可放大的组件，按 DOM 顺序即切换顺序（决策 1、2）。 */
+	private zoomableItems(): ComponentZoomItem[] {
+		const page = this.activePage;
+		const grid = this.gridEl;
+		if (!page || !grid) return [];
+		const byId = new Map(page.components.map((config) => [config.id, config]));
+		const items: ComponentZoomItem[] = [];
+		for (const element of Array.from(
+			grid.querySelectorAll<HTMLElement>(":scope > [data-component-id]"),
+		)) {
+			const config = byId.get(element.dataset.componentId ?? "");
+			if (!config || !zoomEnabledFor(config)) continue;
+			items.push({
+				config,
+				title: this.titleOf(config, this.registry.get(config.type)),
+			});
+		}
+		return items;
+	}
+
+	private openComponentZoom(startId: string): void {
+		const items = this.zoomableItems();
+		if (items.length === 0) return;
+		const modal = new ComponentZoomModal(this.app, {
+			items,
+			startIndex: Math.max(
+				0,
+				items.findIndex((item) => item.config.id === startId),
+			),
+			renderItem: (host, config) => {
+				host.appendChild(
+					this.createCard(host, config, this.queryRepository(), this.zoomScope),
+				);
+			},
+		});
+		const previousOnClose = modal.onClose.bind(modal);
+		modal.onClose = () => {
+			previousOnClose();
+			// 放大层挂载的 base 嵌入随舞台一起脱离 DOM，立刻回收记账。
+			this.sweepBaseEmbeds();
+		};
+		modal.open();
+	}
+
+	/** 命令面板可用性：预览态且本页有可放大组件（与 zoomActiveComponent 同前提）。 */
+	canZoomActiveComponent(): boolean {
+		return !this.editMode && this.zoomableItems().length > 0;
+	}
+
+	/** 命令面板入口：优先放大选中卡片，否则放大本页第一个可放大组件。 */
+	zoomActiveComponent(): void {
+		if (this.editMode) return;
+		const items = this.zoomableItems();
+		const index = Math.max(
+			0,
+			items.findIndex((item) => item.config.id === this.selectedComponentId),
+		);
+		const item = items[index];
+		if (!item) return;
+		this.openComponentZoom(item.config.id);
 	}
 
 	private boundsFor(

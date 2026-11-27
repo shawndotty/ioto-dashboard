@@ -346,6 +346,19 @@ export default class IotoDashboardPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "zoom-ioto-canvas-component",
+			name: t("COMMAND_ZOOM_COMPONENT"),
+			checkCallback: (checking: boolean) => {
+				const view = this.app.workspace.getActiveViewOfType(
+					CustomDashboardView,
+				);
+				if (!view?.canZoomActiveComponent()) return false;
+				if (!checking) view.zoomActiveComponent();
+				return true;
+			},
+		});
+
+		this.addCommand({
 			id: "export-ioto-canvas-page",
 			name: t("COMMAND_EXPORT_CANVAS_PAGE"),
 			checkCallback: (checking: boolean) => {

@@ -1,4 +1,5 @@
 import type { ComponentDefinition, ComponentSetting } from "./registry";
+import type { DashboardComponentConfig } from "./types";
 
 /**
  * Style option keys. `createConfig` only ever writes `surface` (and only for
@@ -136,7 +137,26 @@ export const DISPLAY_SETTINGS: ComponentSetting[] = [
 		fallback: false,
 		target: "options",
 	},
+	{
+		key: "enableZoom",
+		kind: "toggle",
+		group: "display",
+		labelKey: "SETTING_ENABLE_ZOOM",
+		hintKey: "SETTING_ENABLE_ZOOM_HINT",
+		fallback: true,
+		target: "options",
+		// 按钮卡只是触发器，放大后仍然只执行同一动作，第一版直接不给它这一行。
+		when: (config) => config.type !== "button",
+	},
 ];
+
+/** 缺省视为开启：老数据没有 `enableZoom`，演示能力应当默认在。 */
+export function zoomEnabledFor(
+	config: Pick<DashboardComponentConfig, "type" | "options">,
+): boolean {
+	if (config.type === "button") return false;
+	return config.options?.enableZoom !== false;
+}
 
 /**
  * Arrange settings are synthesised from `definition.arrange` so components do

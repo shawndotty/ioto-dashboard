@@ -836,6 +836,13 @@ export default {
 		"Overrides the theme, check contrast with the background. Leave unset to follow the theme.",
 	SETTING_STYLE_RESET_COLOR: "Reset to theme color",
 	SETTING_HIDE_TITLE: "Hide title",
+	SETTING_ENABLE_ZOOM: "Allow fullscreen zoom",
+	SETTING_ENABLE_ZOOM_HINT:
+		"Shows the zoom button in view mode; arrow keys cycle through the components on this page.",
+	ACTION_ZOOM: "Zoom component",
+	ZOOM_POSITION: "{0} / {1}",
+	ZOOM_KEYBOARD_HINT: "Arrow keys switch components · Esc to exit",
+	COMMAND_ZOOM_COMPONENT: "Zoom the selected component",
 	SETTING_MARKDOWN_CONTENT: "Markdown content",
 	SETTING_MARKDOWN_PLACEHOLDER: "Type Markdown here…",
 	SETTING_MARKDOWN_HINT:

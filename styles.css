@@ -6413,3 +6413,77 @@ body.is-mobile .ioto-pages-handle {
     text-align: center;
     padding-top: 2px;
 }
+
+/* ---- 组件全屏放大演示层 ---- */
+
+/* 非全屏态给足演示尺寸：放大层是内容视图，不是短表单。 */
+.modal.ioto-dashboard-modal.ioto-dashboard-modal--component-zoom:not(.is-fullscreen) {
+    width: min(1180px, 94vw);
+    height: min(88vh, 960px);
+    max-height: 92vh;
+}
+
+/* 全屏铺满态由 .modal.ioto-dashboard-modal.is-fullscreen 提供，这里只管内部布局。 */
+.ioto-dashboard-modal--component-zoom .ioto-dashboard-zoom {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* 舞台复刻 .ioto-custom-dashboard-view 以命中卡片与组件的既有样式，这里中和其视图级留白。 */
+.ioto-dashboard-modal--component-zoom .ioto-dashboard-zoom__stage {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    padding: 16px clamp(12px, 3vw, 40px) 24px;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    overflow: auto;
+    background: var(--background-primary);
+}
+
+.ioto-dashboard-modal--component-zoom .ioto-dashboard-zoom__stage > .ioto-dashboard-card {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 1440px;
+    min-height: 0;
+}
+
+/* 正文接管滚动：多数组件按网格定高写成 overflow:hidden，放大态长内容会被裁切。
+   容器与 base 卡各自已有滚动面，沿用原语义不覆写。 */
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card:not(.is-container):not([data-component-type="base"])
+    > .ioto-dashboard-card-body {
+    overflow: auto;
+}
+
+.ioto-dashboard-modal--component-zoom .ioto-dashboard-zoom__label {
+    min-width: 0;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ioto-dashboard-modal--component-zoom .ioto-dashboard-zoom__position {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+
+.ioto-dashboard-modal--component-zoom .ioto-dashboard-zoom__hint {
+    flex: 0 0 auto;
+    color: var(--text-faint);
+    font-size: 0.8em;
+}
+
+@media (max-width: 760px) {
+    .ioto-dashboard-modal--component-zoom .ioto-dashboard-zoom__hint {
+        display: none;
+    }
+}

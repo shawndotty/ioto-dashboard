@@ -211,6 +211,9 @@ const TRANSIENT_CLASSES = [
 	"is-placeholder",
 ];
 
+/** 查看态自带的操作按钮：导出图是成品，不该出现演示/编辑入口。 */
+const TRANSIENT_CONTROLS = [".ioto-card-zoom"];
+
 /**
  * 把当前页网格拍成**一张长图**（按内容全高一次出图，无滚动 / 拼接）。
  *
@@ -244,6 +247,9 @@ export async function captureDashboardPageCanvas(
 	const clone = gridEl.cloneNode(true) as HTMLElement;
 	for (const cls of TRANSIENT_CLASSES) {
 		clone.querySelectorAll(`.${cls}`).forEach((el) => el.classList.remove(cls));
+	}
+	for (const selector of TRANSIENT_CONTROLS) {
+		clone.querySelectorAll(selector).forEach((el) => el.remove());
 	}
 	host.appendChild(clone);
 	doc.body.appendChild(host);

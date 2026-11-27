@@ -819,6 +819,13 @@ export default {
 		"顏色會覆蓋明暗主題，請注意與背景的對比度；未設定時跟隨主題。",
 	SETTING_STYLE_RESET_COLOR: "恢復主題顏色",
 	SETTING_HIDE_TITLE: "隱藏標題",
+	SETTING_ENABLE_ZOOM: "允許全螢幕放大",
+	SETTING_ENABLE_ZOOM_HINT:
+		"檢視態顯示放大按鈕；方向鍵可在本組元件之間循環切換。",
+	ACTION_ZOOM: "放大元件",
+	ZOOM_POSITION: "{0} / {1}",
+	ZOOM_KEYBOARD_HINT: "方向鍵切換元件 · Esc 離開",
+	COMMAND_ZOOM_COMPONENT: "放大目前選取的元件",
 	SETTING_MARKDOWN_CONTENT: "Markdown 內容",
 	SETTING_MARKDOWN_PLACEHOLDER: "在此輸入 Markdown…",
 	SETTING_MARKDOWN_HINT:

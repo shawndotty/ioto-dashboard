@@ -16,7 +16,8 @@ export type ModalKind =
 	| "folder-contents"
 	| "chart-bucket"
 	| "transfer"
-	| "template-center";
+	| "template-center"
+	| "component-zoom";
 
 export interface ModalShellOptions {
 	kind: ModalKind;
@@ -26,6 +27,8 @@ export interface ModalShellOptions {
 	title?: string;
 	/** 默认 true；短表单弹窗可关闭全屏，避免全屏态把表单压扁。 */
 	allowFullscreen?: boolean;
+	/** 打开即全屏（不读会话记忆）：演示类弹窗要的是确定的开场形态。 */
+	startFullscreen?: boolean;
 }
 
 const sessionState = new Map<ModalKind, boolean>();
@@ -90,6 +93,8 @@ export function applyModalShell(
 	if (options.restore && allowFullscreen) {
 		// 只认本 kind 记住的形态，避免不同类型弹窗互相串味。
 		setFullscreen(modal, sessionState.get(options.kind) ?? false);
+	} else if (options.startFullscreen && allowFullscreen) {
+		setFullscreen(modal, true);
 	}
 
 	modal.modalEl.dataset[SHELL_FLAG] = options.kind;
