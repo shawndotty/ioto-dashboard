@@ -6,8 +6,6 @@ export const DASHBOARD_SCHEMA_VERSION = 7;
 export const DASHBOARD_STORE_KEY = "dashboardStore";
 export const DEFAULT_DASHBOARD_ID = "dashboard:default";
 export const DEFAULT_PAGE_ID = "page:default";
-/** A1 内置页：AI 运行指标；ID 固定，注入以它为幂等判据。 */
-export const AI_METRICS_PAGE_ID = "page:ai-metrics";
 
 export interface DashboardComponentConfig {
 	id: string;
@@ -88,54 +86,6 @@ export function createDefaultStore(defaultName = "Dashboard 1"): DashboardStoreD
 		],
 		activeDashboardId: DEFAULT_DASHBOARD_ID,
 		queries: [],
-	};
-}
-
-/** 预置页的组件类型/布局写死在代码里；不新增 schema 字段，不升级版本号。 */
-export function createAiMetricsPage(name = "AI Metrics"): DashboardPage {
-	return {
-		id: AI_METRICS_PAGE_ID,
-		name,
-		// A1 逐行铺满 12 列；rowHeight=10 是下面 h 值的口径前提（默认 72 会把 h19 放大成巨卡）。
-		rowHeight: 10,
-		gap: 12,
-		components: [
-			{
-				id: "ai-runs-kpi",
-				type: "ai-runs-kpi",
-				queryId: "",
-				w: 4,
-				h: 19,
-			},
-			{
-				id: "ai-runs-agents",
-				type: "ai-runs-agents",
-				queryId: "",
-				w: 8,
-				h: 19,
-			},
-			{
-				id: "ai-runs-frequency",
-				type: "ai-runs-frequency",
-				queryId: "",
-				w: 4,
-				h: 17,
-			},
-			{
-				id: "ai-runs-schedule",
-				type: "ai-runs-schedule",
-				queryId: "",
-				w: 4,
-				h: 17,
-			},
-			{
-				id: "ai-runs-recent",
-				type: "ai-runs-recent",
-				queryId: "",
-				w: 4,
-				h: 17,
-			},
-		],
 	};
 }
 

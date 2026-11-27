@@ -1050,11 +1050,6 @@ export default {
 	TEMPLATE_CENTER_FETCH_FAILED: "Could not download the template.",
 
 	// AI runs metrics (queryless components)
-	AI_METRICS_PAGE_NAME: "AI Metrics",
-	COMMAND_APPLY_AI_METRICS_LAYOUT: "Apply compact layout to AI Metrics page",
-	AI_METRICS_LAYOUT_APPLIED: "Compact layout applied (card size and row height only)",
-	AI_METRICS_LAYOUT_UNSUPPORTED:
-		"This AI Metrics page has an unexpected card set; nothing was changed",
 	COMPONENT_AI_RUNS_KPI_NAME: "AI Runs KPI",
 	COMPONENT_AI_RUNS_KPI_DESC: "Token and duration overview of IOTO AI runs",
 	COMPONENT_AI_RUNS_AGENTS_NAME: "Agent calls & share",

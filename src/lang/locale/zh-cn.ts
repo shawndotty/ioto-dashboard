@@ -1012,10 +1012,6 @@ export default {
 	TEMPLATE_CENTER_FETCH_FAILED: "模板下载失败。",
 
 	// AI 运行指标（queryless 组件）
-	AI_METRICS_PAGE_NAME: "AI 运行指标",
-	COMMAND_APPLY_AI_METRICS_LAYOUT: "应用紧凑布局到 AI 运行指标页",
-	AI_METRICS_LAYOUT_APPLIED: "已应用紧凑布局（仅调整卡片宽高与行高）",
-	AI_METRICS_LAYOUT_UNSUPPORTED: "当前 AI 指标页的组件组合不符合预期，未做更改",
 	COMPONENT_AI_RUNS_KPI_NAME: "AI 运行 KPI",
 	COMPONENT_AI_RUNS_KPI_DESC: "IOTO AI 运行的 token 与耗时总览",
 	COMPONENT_AI_RUNS_AGENTS_NAME: "Agent 调用占比",

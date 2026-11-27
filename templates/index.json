@@ -1,7 +1,87 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-22T12:47:47.732Z",
+  "generatedAt": "2026-11-27T12:25:00.887Z",
   "templates": [
+    {
+      "key": "ai-metrics",
+      "meta": {
+        "name": "AI 运行指标",
+        "subtitle": "MyDashboard",
+        "description": "一页看全 AI 运行次数、Token 用量、Agent 耗时、定时任务与今日明细（数据来自 IOTO Settings 运行快照）",
+        "kind": "ioto-dashboard-page",
+        "supported": true
+      },
+      "bundle": {
+        "kind": "ioto-dashboard-page",
+        "formatVersion": 1,
+        "pluginVersion": "2.8.4",
+        "storeSchemaVersion": 7,
+        "exportedAt": "2026-11-27T12:24:05.933Z",
+        "source": {
+          "dashboardName": "MyDashboard",
+          "pageNames": [
+            "AI 运行指标"
+          ],
+          "roots": {
+            "inputFolder": "1-输入",
+            "outputFolder": "2-输出",
+            "taskFolder": "3-任务",
+            "outcomeFolder": "4-成果"
+          },
+          "description": "一页看全 AI 运行次数、Token 用量、Agent 耗时、定时任务与今日明细（数据来自 IOTO Settings 运行快照）"
+        },
+        "payload": {
+          "pages": [
+            {
+              "id": "page:ai-metrics",
+              "name": "AI 运行指标",
+              "rowHeight": 10,
+              "gap": 12,
+              "components": [
+                {
+                  "id": "ai-runs-kpi",
+                  "type": "ai-runs-kpi",
+                  "queryId": "",
+                  "w": 4,
+                  "h": 19
+                },
+                {
+                  "id": "ai-runs-agents",
+                  "type": "ai-runs-agents",
+                  "queryId": "",
+                  "w": 8,
+                  "h": 19
+                },
+                {
+                  "id": "ai-runs-frequency",
+                  "type": "ai-runs-frequency",
+                  "queryId": "",
+                  "w": 4,
+                  "h": 17
+                },
+                {
+                  "id": "ai-runs-schedule",
+                  "type": "ai-runs-schedule",
+                  "queryId": "",
+                  "w": 4,
+                  "h": 17
+                },
+                {
+                  "id": "ai-runs-recent",
+                  "type": "ai-runs-recent",
+                  "queryId": "",
+                  "w": 4,
+                  "h": 17
+                }
+              ]
+            }
+          ],
+          "queries": [],
+          "customFilters": []
+        },
+        "warnings": []
+      }
+    },
     {
       "key": "heatmap180",
       "meta": {

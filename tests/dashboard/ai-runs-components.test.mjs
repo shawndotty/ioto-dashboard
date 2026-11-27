@@ -3,7 +3,6 @@ import test from 'node:test';
 import { load } from '../data/helpers.mjs';
 
 const { createComponentRegistry } = await load('../../src/dashboard/components/index.ts');
-const { createAiMetricsPage, AI_METRICS_PAGE_ID } = await load('../../src/dashboard/types.ts');
 const en = (await load('../../src/lang/locale/en.ts')).default;
 
 const EXPECTED = [
@@ -31,29 +30,8 @@ test('AI Metrics components are queryless with no queryId', () => {
 	}
 });
 
-test('preset page carries the four AI Metrics components without queryId', () => {
-	const page = createAiMetricsPage('AI Metrics');
-	assert.equal(page.id, AI_METRICS_PAGE_ID);
-	assert.deepEqual(page.components.map((component) => component.type), EXPECTED);
-	for (const component of page.components) {
-		assert.equal(component.queryId, '');
-	}
-	// A1 紧凑布局：rowHeight=10 是 h 值口径前提，每行 w 和恰为 12。
-	assert.equal(page.rowHeight, 10);
-	assert.equal(page.gap, 12);
-	assert.deepEqual(page.components.map((c) => c.w), [4, 8, 4, 4, 4]);
-	assert.deepEqual(page.components.map((c) => c.h), [19, 19, 17, 17, 17]);
-});
-
-test('preset AI Metrics page rows each fill all 12 columns', () => {
-	const widths = createAiMetricsPage('AI Metrics').components.map((c) => c.w);
-	assert.equal(widths[0] + widths[1], 12);
-	assert.equal(widths[2] + widths[3] + widths[4], 12);
-});
-
 test('all locale keys used by AI Metrics components exist in en', () => {
 	const keys = [
-		'AI_METRICS_PAGE_NAME',
 		'COMPONENT_AI_RUNS_KPI_NAME',
 		'COMPONENT_AI_RUNS_KPI_DESC',
 		'COMPONENT_AI_RUNS_AGENTS_NAME',
