@@ -412,7 +412,11 @@ export class CustomDashboardView extends ItemView {
 	}
 
 	private async loadStore(): Promise<void> {
-		const result = await this.plugin.dashboardRepository.load();
+		// Reuse the startup snapshot when present; `null` means it was consumed by
+		// a write, so fall back to reading `data.json` again.
+		const result = await this.plugin.dashboardRepository.load(
+			this.plugin.startupData ?? undefined,
+		);
 		this.store = result.store;
 		this.damaged = result.damaged;
 		if (result.damaged) {

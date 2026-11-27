@@ -99,8 +99,9 @@ export class DashboardRepository {
 		return createDefaultStore(this.defaultName());
 	}
 
-	async load(): Promise<DashboardLoadResult> {
-		const data = await this.host.readData();
+	async load(preloaded?: unknown): Promise<DashboardLoadResult> {
+		const data =
+			preloaded !== undefined ? preloaded : await this.host.readData();
 		const raw = isRecord(data) ? data[DASHBOARD_STORE_KEY] : undefined;
 		if (raw === undefined) {
 			const store = this.defaultStore();

@@ -13,7 +13,6 @@
  * （`debugger.attach` 常被占用），理由见 [[Research-20261126-152157]] §3.1。
  */
 
-import { toCanvas } from "html-to-image";
 import type { App } from "obsidian";
 
 export const EXPORT_SCALE_MIN = 1;
@@ -262,6 +261,8 @@ export async function captureDashboardPageCanvas(
 		);
 		const height = Math.min(rawHeight, maxHeightBySide, maxHeightByArea);
 
+		// Loaded on demand: keeps the rasteriser out of the startup bundle parse.
+		const { toCanvas } = await import("html-to-image");
 		const source = await toCanvas(clone, {
 			pixelRatio: scale,
 			backgroundColor: opts.backgroundColor,

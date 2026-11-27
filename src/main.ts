@@ -41,11 +41,7 @@ import {
 	type TemplateSource,
 } from "./dashboard/template-center";
 import { DashboardInspectorService } from "./dashboard/inspector-service";
-import {
-	SnapshotStore,
-	collectDailySnapshot,
-	localDate,
-} from "./metrics/snapshot-store";
+import { SnapshotStore } from "./metrics/snapshot-store";
 
 function splitHeadingList(value: string | undefined, fallback: string): string[] {
 	if (!value) return [fallback];
@@ -66,9 +62,14 @@ export default class IotoDashboardPlugin extends Plugin {
 	aiRunsSource: AiRunsSource;
 	aiScheduleSource: AiScheduleSource;
 	private indexRebuildTimer: number | null = null;
-	private snapshotTimer: number | null = null;
-	private lastSnapshotDate = "";
-	private lastSnapshotAt = 0;
+	/** Set in `onunload`; deferred `onLayoutReady` callbacks must bail out. */
+	private unloaded = false;
+	/**
+	 * Read-once snapshot of `data.json` taken in `onload`, reused by the
+	 * repository/view read paths. Cleared on the first write so a stale copy
+	 * can never feed a later read.
+	 */
+	startupData: Record<string, unknown> | null = null;
 	private dataQueue: Promise<void> = Promise.resolve();
 	private revealingInspector: Promise<void> | null = null;
 	private dashboardStore: DashboardStoreData | null = null;
@@ -79,7 +80,13 @@ export default class IotoDashboardPlugin extends Plugin {
 	private dashboardCommandTimer: number | null = null;
 
 	async onload() {
-		await this.loadSettings();
+		// Single read of `data.json` for the whole startup path.
+		const startupData = (await this.loadData()) as Record<
+			string,
+			unknown
+		> | null;
+		this.startupData = startupData;
+		await this.loadSettings(startupData);
 
 		// Persistent L2 cache for the template center, isolated from settings
 		// and the dashboard store under its own `templateCenterCache` key.
@@ -98,8 +105,6 @@ export default class IotoDashboardPlugin extends Plugin {
 		});
 
 		this.index = new VaultIndex(this.app, () => this.getIndexConfig());
-		this.index.attach();
-		this.register(() => this.index.detach());
 
 		this.dashboardRepository = new DashboardRepository(
 			{
@@ -111,7 +116,8 @@ export default class IotoDashboardPlugin extends Plugin {
 					t("DASHBOARD_DEFAULT_NAME", ["1"]),
 			},
 		);
-		this.dashboardStore = (await this.dashboardRepository.load()).store;
+		this.dashboardStore = (await this.dashboardRepository.load(startupData))
+			.store;
 		this.transfer = new DashboardTransfer(this);
 		this.syncDashboardCommands();
 		this.register(
@@ -120,9 +126,6 @@ export default class IotoDashboardPlugin extends Plugin {
 				this.scheduleDashboardCommandSync();
 			}),
 		);
-
-		// 步骤 3（A1）：首次加载注入 AI Metrics 预置页，走真实写入 + onChange 广播。
-		await this.ensureAiMetricsPage();
 
 		// 步骤 1：AI 运行桥文件的唯一数据源；刷新三件套中的事件与轮询在此注册，
 		// 进入视图强制读由 CustomDashboardView 负责。
@@ -135,16 +138,6 @@ export default class IotoDashboardPlugin extends Plugin {
 			app: this.app,
 			getSettings: () => new IotoSettingsService(this.app).getSettings(),
 		});
-		this.registerEvent(
-			this.app.vault.on("modify", (file) => {
-				if (this.aiRunsSource.matchesPath(file.path)) {
-					void this.aiRunsSource.read();
-				}
-				if (this.aiScheduleSource.matchesPath(file.path)) {
-					void this.aiScheduleSource.read();
-				}
-			}),
-		);
 		this.registerInterval(
 			window.setInterval(() => {
 				void this.aiRunsSource.tick();
@@ -179,12 +172,32 @@ export default class IotoDashboardPlugin extends Plugin {
 				}
 			}),
 		);
-		this.app.workspace.onLayoutReady(() =>
-			this.scheduleSnapshotCollect(2000),
-		);
-		this.register(
-			this.index.subscribe(() => this.scheduleSnapshotCollect()),
-		);
+		// Vault listeners are deferred until the initial scan is done: registered in
+		// `onload` they would receive a `create` per file and push every note through
+		// `invalidate()` while Obsidian is still building the vault
+		// (see Research-20261127-134443).
+		this.app.workspace.onLayoutReady(() => {
+			if (this.unloaded) return;
+			this.index.attach();
+			this.register(() => this.index.detach());
+			this.registerEvent(
+				this.app.vault.on("modify", (file) => {
+					if (this.aiRunsSource.matchesPath(file.path)) {
+						void this.aiRunsSource.read();
+					}
+					if (this.aiScheduleSource.matchesPath(file.path)) {
+						void this.aiScheduleSource.read();
+					}
+				}),
+			);
+			// 步骤 3（A1）：首次加载注入 AI Metrics 预置页，走真实写入 + onChange 广播。
+			void this.ensureAiMetricsPage().catch((error: unknown) => {
+				console.warn(
+					"IOTO Dashboard: failed to install AI Metrics page",
+					error,
+				);
+			});
+		});
 
 		// Register View
 		this.registerView(
@@ -452,6 +465,7 @@ export default class IotoDashboardPlugin extends Plugin {
 	}
 
 	onunload() {
+		this.unloaded = true;
 		if (this.dashboardCommandTimer !== null) {
 			window.clearTimeout(this.dashboardCommandTimer);
 			this.dashboardCommandTimer = null;
@@ -848,19 +862,19 @@ export default class IotoDashboardPlugin extends Plugin {
 		}
 	}
 
-	async loadSettings() {
-		const loadedData = (await this.loadData()) as Record<
-			string,
-			unknown
-		> | null;
+	async loadSettings(loadedData?: Record<string, unknown> | null) {
+		const data =
+			loadedData !== undefined
+				? loadedData
+				: ((await this.loadData()) as Record<string, unknown> | null);
 		const settings: IotoDashboardSettings = { ...DEFAULT_SETTINGS };
-		if (loadedData) {
+		if (data) {
 			for (const key of Object.keys(
 				DEFAULT_SETTINGS,
 			) as Array<keyof IotoDashboardSettings>) {
-				if (loadedData[key] !== undefined) {
+				if (data[key] !== undefined) {
 					(settings as unknown as Record<string, unknown>)[key] =
-						loadedData[key];
+						data[key];
 				}
 			}
 			settings.modalLayout =
@@ -871,7 +885,7 @@ export default class IotoDashboardPlugin extends Plugin {
 		}
 		this.settings = settings;
 
-		if (!loadedData) {
+		if (!data) {
 			const iotoSettingsService = new IotoSettingsService(this.app);
 
 			try {
@@ -935,6 +949,8 @@ export default class IotoDashboardPlugin extends Plugin {
 	async updateData(
 		mutate: (data: Record<string, unknown>) => void,
 	): Promise<void> {
+		// Any write invalidates the read-once snapshot: later reads must hit disk.
+		this.startupData = null;
 		const run = this.dataQueue.then(async () => {
 			const data = ((await this.loadData()) ?? {}) as Record<
 				string,
@@ -1016,41 +1032,6 @@ export default class IotoDashboardPlugin extends Plugin {
 			return id;
 		} catch {
 			return "dev-local";
-		}
-	}
-
-	private scheduleSnapshotCollect(delay = 5000): void {
-		if (this.snapshotTimer !== null) {
-			window.clearTimeout(this.snapshotTimer);
-		}
-		this.snapshotTimer = window.setTimeout(() => {
-			this.snapshotTimer = null;
-			void this.collectSnapshot();
-		}, delay);
-	}
-
-	private async collectSnapshot(): Promise<void> {
-		if (!this.snapshotStore) return;
-		const now = Date.now();
-		const today = localDate(now);
-		if (
-			today === this.lastSnapshotDate &&
-			now - this.lastSnapshotAt < 30 * 60 * 1000
-		) {
-			return;
-		}
-		this.lastSnapshotDate = today;
-		this.lastSnapshotAt = now;
-		try {
-			const snapshot = await this.index.getSnapshot();
-			await collectDailySnapshot(
-				snapshot,
-				this.getIndexConfig(),
-				this.snapshotStore,
-				now,
-			);
-		} catch (error) {
-			console.warn("IOTO Dashboard: daily snapshot failed", error);
 		}
 	}
 }
