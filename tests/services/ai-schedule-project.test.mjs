@@ -134,6 +134,52 @@ test('daily-cap 规则未来点不进入 upcoming，而进入 blocked', () => {
 	assert.equal(projection.blocked[0].blockedBy, 'status');
 });
 
+test('daily-cap 规则无未来点时不产生 blocked 幽灵行', () => {
+	const projection = projectSchedule(
+		board({
+			rules: [rule({ status: 'daily-cap', todayPlan: [local(2026, 11, 26, 9, 0)] })],
+			today: [entry()],
+		}),
+		NOW,
+	);
+	assert.equal(projection.blocked.length, 0);
+	assert.equal(projection.ran.length, 1);
+	assert.equal(projection.allDone, true);
+});
+
+test('blocked 按 plannedAt 升序，与 board.rules 顺序无关', () => {
+	const projection = projectSchedule(
+		board({
+			rules: [
+				rule({ id: 'late', status: 'daily-cap', todayPlan: [local(2026, 11, 26, 18, 0)] }),
+				rule({ id: 'early', status: 'daily-cap', todayPlan: [local(2026, 11, 26, 15, 0)] }),
+			],
+		}),
+		NOW,
+	);
+	assert.deepEqual(
+		projection.blocked.map((r) => r.plannedAt),
+		[local(2026, 11, 26, 15, 0), local(2026, 11, 26, 18, 0)],
+	);
+});
+
+test('存在 blocked 时 allDone 为 false，不再与「全部完成」并存', () => {
+	const projection = projectSchedule(
+		board({
+			rules: [
+				rule({ id: 'done', todayPlan: [local(2026, 11, 26, 9, 0)] }),
+				rule({ id: 'blocked', status: 'daily-cap', todayPlan: [local(2026, 11, 26, 18, 0)] }),
+			],
+			today: [entry({ ruleId: 'done' })],
+		}),
+		NOW,
+	);
+	assert.equal(projection.ran.length, 1);
+	assert.equal(projection.blocked.length, 1);
+	assert.equal(projection.upcoming.length, 0);
+	assert.equal(projection.allDone, false);
+});
+
 test('总开关关闭：全部未来点 blocked，enabled=false', () => {
 	const projection = projectSchedule(
 		board({

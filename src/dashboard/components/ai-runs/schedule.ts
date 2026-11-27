@@ -108,6 +108,9 @@ function renderRow(list: HTMLElement, row: ScheduleRow, ctx: ComponentRenderCont
 			text: t("AI_SCHEDULE_PENDING_ITEMS", [formatCount(row.pendingCount)]),
 		});
 	}
+	if ((row.outcome === "failed" || row.outcome === "skipped") && row.reason) {
+		meta.createSpan({ text: row.reason });
+	}
 	const action = item.createDiv({ cls: "ioto-ai-schedule-status" });
 	const warning = row.failureWarning;
 	if (warning) {

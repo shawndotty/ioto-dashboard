@@ -205,10 +205,13 @@ export function projectSchedule(
 		if (points.length === 0) continue;
 		summary.upcoming += future.length;
 		if (!runnable) {
-			blocked.push({
-				...baseRow(rule, future[0] ?? rule.nextFireAt ?? 0),
-				blockedBy: enabled ? "status" : "global",
-			});
+			const firstFuture = future[0];
+			if (firstFuture !== undefined) {
+				blocked.push({
+					...baseRow(rule, firstFuture),
+					blockedBy: enabled ? "status" : "global",
+				});
+			}
 			continue;
 		}
 		if (stale) continue;
@@ -222,6 +225,7 @@ export function projectSchedule(
 
 	ran.sort((a, b) => a.plannedAt - b.plannedAt);
 	futureRows.sort((a, b) => a.plannedAt - b.plannedAt);
+	blocked.sort((a, b) => a.plannedAt - b.plannedAt);
 	const upcoming = futureRows.slice(0, limit);
 	const moreUpcoming = Math.max(0, futureRows.length - upcoming.length);
 
@@ -242,6 +246,7 @@ export function projectSchedule(
 			!stale &&
 			summary.planned > 0 &&
 			summary.ran > 0 &&
-			summary.upcoming === 0,
+			summary.upcoming === 0 &&
+			blocked.length === 0,
 	};
 }
