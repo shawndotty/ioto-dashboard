@@ -161,6 +161,91 @@ test('corrupt JSON is reported and never overwritten', async () => {
 	assert.equal(adapter.files.get(path), '{not json');
 });
 
+test('empty snapshot file is rebuilt on next collect', async () => {
+	const path = `${DIR}/metrics-snapshots.json`;
+	const adapter = memoryAdapter({ [path]: '' });
+	const now = new Date(2026, 10, 8, 9, 0).getTime();
+	const result = await collectDailySnapshot(snapshot(), CONFIG, store(adapter, now), now);
+	assert.notEqual(result, null);
+	const parsed = JSON.parse(adapter.files.get(path));
+	assert.ok(parsed.days['2026-11-08']);
+	assert.deepEqual([...adapter.files.keys()], [path]);
+});
+
+test('whitespace-only snapshot file is rebuilt', async () => {
+	const path = `${DIR}/metrics-snapshots.json`;
+	const adapter = memoryAdapter({ [path]: '  \n\t' });
+	const now = new Date(2026, 10, 8, 9, 0).getTime();
+	const result = await collectDailySnapshot(snapshot(), CONFIG, store(adapter, now), now);
+	assert.notEqual(result, null);
+	const parsed = JSON.parse(adapter.files.get(path));
+	assert.equal(parsed.days['2026-11-08'].totals.tasks, 3);
+});
+
+test('atomic write goes through tmp and rename with no residue', async () => {
+	const path = `${DIR}/metrics-snapshots.json`;
+	const adapter = memoryAdapter();
+	const calls = [];
+	const baseWrite = adapter.write;
+	const baseRename = adapter.rename;
+	adapter.write = async (p, data) => { calls.push(['write', p]); await baseWrite(p, data); };
+	adapter.rename = async (from, to) => { calls.push(['rename', from, to]); await baseRename(from, to); };
+	const now = new Date(2026, 10, 8, 9, 0).getTime();
+	await collectDailySnapshot(snapshot(), CONFIG, store(adapter, now), now);
+	assert.deepEqual(calls, [
+		['write', `${path}.tmp`],
+		['rename', `${path}.tmp`, path],
+	]);
+	assert.deepEqual([...adapter.files.keys()], [path]);
+	assert.equal(JSON.parse(adapter.files.get(path)).days['2026-11-08'].totals.tasks, 3);
+});
+
+test('interrupted swap never leaves a truncated snapshot file', async () => {
+	const path = `${DIR}/metrics-snapshots.json`;
+	const good = JSON.stringify({ schemaVersion: 1, deviceId: 'dev-a', days: {} });
+	const adapter = memoryAdapter({ [path]: good });
+	const baseRename = adapter.rename;
+	adapter.rename = async () => { throw new Error('simulated crash'); };
+	const originalWarn = console.warn;
+	console.warn = () => {};
+	try {
+		const shared = store(adapter, new Date(2026, 10, 8, 9, 0).getTime());
+		await shared.save({ ...JSON.parse(good), days: { '2026-11-08': buildDailySnapshot(snapshot(), CONFIG, Date.now()) } });
+		// With the remove-then-rename swap, the worst case is that the real
+		// file is briefly absent — never a 0-byte / half-JSON file at the path.
+		assert.equal(adapter.files.has(`${path}.tmp`), false);
+		if (adapter.files.has(path)) {
+			assert.equal(JSON.parse(adapter.files.get(path)).schemaVersion, 1);
+		} else {
+			const loaded = await shared.load();
+			assert.equal(loaded.corrupted, false);
+			assert.deepEqual(loaded.file.days, {});
+		}
+		adapter.rename = baseRename;
+		await shared.save(JSON.parse(good));
+		assert.equal(JSON.parse(adapter.files.get(path)).schemaVersion, 1);
+		assert.equal(adapter.files.has(`${path}.tmp`), false);
+	} finally {
+		console.warn = originalWarn;
+	}
+});
+
+test('damaged file warns at most once per store instance', async () => {
+	const path = `${DIR}/metrics-snapshots.json`;
+	const adapter = memoryAdapter({ [path]: '{not json' });
+	const originalWarn = console.warn;
+	const warns = [];
+	console.warn = (...args) => { warns.push(args); };
+	try {
+		const shared = store(adapter, new Date(2026, 10, 8, 9, 0).getTime());
+		await shared.load();
+		await shared.load();
+		assert.equal(warns.length, 1);
+	} finally {
+		console.warn = originalWarn;
+	}
+});
+
 test('empty index is not recorded as a fake zero', async () => {
 	const adapter = memoryAdapter();
 	const now = Date.now();

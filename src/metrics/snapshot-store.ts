@@ -252,6 +252,7 @@ export class SnapshotStore {
 	private readonly dir: string;
 	private readonly now: () => number;
 	private readonly deviceId: string;
+	private warnedCorrupt = false;
 
 	constructor(options: {
 		adapter: SnapshotAdapter;
@@ -269,21 +270,43 @@ export class SnapshotStore {
 		return `${this.dir}/${SNAPSHOT_FILE_NAME}`;
 	}
 
-	async load(): Promise<{ file: SnapshotFile; corrupted: boolean }> {
+	private reportCorrupt(error?: unknown): void {
+		if (this.warnedCorrupt) return;
+		this.warnedCorrupt = true;
+		console.warn(
+			"IOTO Dashboard: snapshot file is damaged and left intact; delete it to rebuild from today",
+			error,
+		);
+	}
+
+	async load(): Promise<{
+		file: SnapshotFile;
+		corrupted: boolean;
+		recoverable: boolean;
+	}> {
 		const path = this.filePath();
 		if (!(await this.adapter.exists(path))) {
-			return { file: emptyFile(this.deviceId), corrupted: false };
+			return { file: emptyFile(this.deviceId), corrupted: false, recoverable: false };
 		}
 		try {
 			const raw = await this.adapter.read(path);
+			if (raw.trim() === "") {
+				// An empty file holds no data worth protecting; the collector rebuilds it.
+				return { file: emptyFile(this.deviceId), corrupted: true, recoverable: true };
+			}
 			const parsed: unknown = JSON.parse(raw);
 			if (!isSnapshotFile(parsed)) {
-				return { file: emptyFile(this.deviceId), corrupted: true };
+				this.reportCorrupt();
+				return { file: emptyFile(this.deviceId), corrupted: true, recoverable: false };
 			}
-			return { file: { ...parsed, deviceId: parsed.deviceId || this.deviceId }, corrupted: false };
+			return {
+				file: { ...parsed, deviceId: parsed.deviceId || this.deviceId },
+				corrupted: false,
+				recoverable: false,
+			};
 		} catch (error) {
-			console.warn("IOTO Dashboard: snapshot file unreadable, keeping it intact", error);
-			return { file: emptyFile(this.deviceId), corrupted: true };
+			this.reportCorrupt(error);
+			return { file: emptyFile(this.deviceId), corrupted: true, recoverable: false };
 		}
 	}
 
@@ -305,16 +328,28 @@ export class SnapshotStore {
 			if (await this.adapter.exists(tmp)) {
 				await this.adapter.remove(tmp);
 			}
-			await this.adapter.write(path, JSON.stringify(pruned, null, 2));
+			// Write to tmp first, then swap it in: an interrupted write can no
+			// longer leave a 0-byte file at the real path.
+			await this.adapter.write(tmp, JSON.stringify(pruned, null, 2));
+			if (await this.adapter.exists(path)) {
+				await this.adapter.remove(path);
+			}
+			await this.adapter.rename(tmp, path);
 		} catch (error) {
 			console.warn("IOTO Dashboard: failed to write snapshot file", error);
+			try {
+				if (await this.adapter.exists(tmp)) await this.adapter.remove(tmp);
+			} catch {
+				// 清理失败不影响主流程
+			}
 		}
 	}
 }
 
 /**
  * Records today's numbers. Returns `null` when the index is not ready or the
- * existing snapshot file is corrupt (it is never overwritten in that case).
+ * existing snapshot file is damaged with content (it is never overwritten in
+ * that case); an empty file is recoverable and gets rebuilt here.
  */
 export async function collectDailySnapshot(
 	snapshot: IndexSnapshot,
@@ -330,7 +365,7 @@ export async function collectDailySnapshot(
 		return null;
 	}
 	const loaded = await store.load();
-	if (loaded.corrupted) return null;
+	if (loaded.corrupted && !loaded.recoverable) return null;
 
 	const date = localDate(now);
 	const fresh = buildDailySnapshot(snapshot, config, now);
