@@ -4,7 +4,7 @@ import type {
 	IoType,
 	NoteRecord,
 } from "./types";
-import { folderOf, isInsideFolder, normalizeFolder, toText } from "./note-source";
+import { firstAlias, folderOf, isInsideFolder, normalizeFolder, toText } from "./note-source";
 
 export interface NoteQueryScope {
 	paths?: string[];
@@ -15,6 +15,18 @@ export interface NoteQueryScope {
 export function matchesName(text: string, filter: string): boolean {
 	if (!filter) return true;
 	return text.toLowerCase().includes(filter.toLowerCase());
+}
+
+/** A name filter matches either the filename or the first alias. */
+export function matchesNameOrAlias(
+	basename: string,
+	frontmatter: Record<string, unknown> | undefined,
+	filter: string,
+): boolean {
+	if (!filter) return true;
+	if (matchesName(basename, filter)) return true;
+	const alias = firstAlias(frontmatter);
+	return alias ? matchesName(alias, filter) : false;
 }
 
 export function matchesDate(
@@ -139,7 +151,8 @@ export function queryNotes(
 		if (!inScopePaths(note.path, scope)) return false;
 		if (scopeTypes.length > 0 && !scopeTypes.includes(note.ioType)) return false;
 		if (typeFilterActive && !noteTypes.includes(note.ioType)) return false;
-		if (!matchesName(note.basename, filters.name)) return false;
+		if (!matchesNameOrAlias(note.basename, note.frontmatter, filters.name))
+			return false;
 		if (filters.project) {
 			if (
 				!note.project ||

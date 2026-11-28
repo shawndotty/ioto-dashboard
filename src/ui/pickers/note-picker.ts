@@ -1,5 +1,6 @@
 import { App, FuzzySuggestModal, TFile } from "obsidian";
 import { t } from "../../lang/helpers";
+import { firstAlias } from "../../data/note-source";
 
 export class NotePickerModal extends FuzzySuggestModal<TFile> {
 	constructor(
@@ -17,7 +18,11 @@ export class NotePickerModal extends FuzzySuggestModal<TFile> {
 	}
 
 	getItemText(file: TFile): string {
-		return file.path;
+		// Keep the path in the match text so filename/path searches still hit.
+		const frontmatter = this.app.metadataCache.getFileCache(file)
+			?.frontmatter as Record<string, unknown> | undefined;
+		const alias = firstAlias(frontmatter);
+		return alias ? `${alias} · ${file.path}` : file.path;
 	}
 
 	onChooseItem(file: TFile): void {

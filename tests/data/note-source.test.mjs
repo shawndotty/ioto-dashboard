@@ -3,12 +3,14 @@ import test from 'node:test';
 import { HEADINGS, fixture, load } from './helpers.mjs';
 
 const {
+	basenameOf,
 	buildNoteRecord,
 	collectFacets,
 	firstAlias,
 	folderOf,
 	isInsideFolder,
 	normalizeFolder,
+	noteDisplayName,
 	resolveIoType,
 	toText,
 } = await load('../../src/data/note-source.ts');
@@ -61,6 +63,25 @@ test('firstAlias takes the first non-empty string in YAML order', () => {
 	assert.equal(firstAlias({}), undefined);
 	assert.equal(firstAlias({ aliases: [] }), undefined);
 	assert.equal(firstAlias({ aliases: ['', null] }), undefined);
+});
+
+test('basenameOf strips the folder and a trailing .md', () => {
+	assert.equal(basenameOf('1-输入/2026-01-01-a.md'), '2026-01-01-a');
+	assert.equal(basenameOf('a.md'), 'a');
+	assert.equal(basenameOf('1-输入/noext'), 'noext');
+});
+
+test('noteDisplayName honours the toggle in all four quadrants', () => {
+	const on = { useFirstAliasAsNoteName: true };
+	const off = { useFirstAliasAsNoteName: false };
+	assert.equal(noteDisplayName('file', { aliases: ['Alias'] }, on), 'Alias');
+	assert.equal(noteDisplayName('file', undefined, on), 'file');
+	assert.equal(noteDisplayName('file', { aliases: ['Alias'] }, off), 'file');
+	assert.equal(noteDisplayName('file', { aliases: ['Alias'] }, undefined), 'file');
+	// blank aliases never win over the filename
+	assert.equal(noteDisplayName('file', { aliases: ['  '] }, on), 'file');
+	// a single string alias is accepted
+	assert.equal(noteDisplayName('file', { aliases: ' Ali ' }, on), 'Ali');
 });
 
 test('buildNoteRecord counts file and section tasks separately', () => {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { load } from './helpers.mjs';
 
-const { queryNotes, matchesSubject, matchesDate } = await load(
+const { queryNotes, matchesSubject, matchesDate, matchesNameOrAlias } = await load(
 	'../../src/data/note-query.ts',
 );
 const { createDefaultFilterState } = await load(
@@ -77,6 +77,24 @@ test('name, project and fileStatus are case-insensitive substring matches', () =
 	assert.equal(
 		queryNotes(NOTES, createDefaultFilterState({ project: 'Missing' })).length,
 		0,
+	);
+});
+
+test('name filter hits the first alias as well as the filename', () => {
+	const withAlias = note({
+		basename: '2026-01-01-file',
+		frontmatter: { aliases: ['语义别名', 'Second'] },
+	});
+	assert.equal(matchesNameOrAlias('2026-01-01-file', withAlias.frontmatter, '2026'), true);
+	assert.equal(matchesNameOrAlias('2026-01-01-file', withAlias.frontmatter, '别名'), true);
+	assert.equal(matchesNameOrAlias('2026-01-01-file', withAlias.frontmatter, 'missing'), false);
+	assert.equal(
+		queryNotes([withAlias], createDefaultFilterState({ name: '别名' })).length,
+		1,
+	);
+	assert.equal(
+		queryNotes([withAlias], createDefaultFilterState({ name: '2026' })).length,
+		1,
 	);
 });
 

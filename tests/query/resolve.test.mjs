@@ -240,6 +240,41 @@ test('file target filters by folder scope, file name and extension', () => {
 	assert.deepEqual(markdown.files.map((file) => file.basename), ['b']);
 });
 
+test('file target never returns markdown notes, so aliases cannot leak in', () => {
+	const tree = {
+		...snapshot,
+		notes: [
+			...snapshot.notes,
+			note({
+				path: '3-任务/Alpha/2026-01-01-a.md',
+				basename: '2026-01-01-a',
+				frontmatter: { aliases: ['语义别名'] },
+			}),
+		],
+		files: [
+			{ path: '3-任务/Alpha/2026-01-01-a.md', basename: '2026-01-01-a', extension: 'md', folder: '3-任务/Alpha', size: 1, ctime: 1, mtime: 1 },
+			{ path: '3-任务/Alpha/pic.png', basename: 'pic', extension: 'png', folder: '3-任务/Alpha', size: 1, ctime: 1, mtime: 1 },
+		],
+	};
+	const byAlias = resolveQuery(
+		tree,
+		definition({ target: 'file', filters: { ...createDefaultFilterState(), name: '别名' } }),
+	);
+	assert.deepEqual(byAlias.files, []);
+
+	const byName = resolveQuery(
+		tree,
+		definition({ target: 'file', filters: { ...createDefaultFilterState(), name: '2026-01' } }),
+	);
+	assert.deepEqual(byName.files, []);
+
+	const attachment = resolveQuery(
+		tree,
+		definition({ target: 'file', filters: { ...createDefaultFilterState(), name: 'pic' } }),
+	);
+	assert.deepEqual(attachment.files.map((file) => file.basename), ['pic']);
+});
+
 test('file target never returns canvas files and matches case-insensitively', () => {
 	const tree = {
 		...snapshot,

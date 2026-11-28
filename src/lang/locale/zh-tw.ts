@@ -91,6 +91,9 @@ export default {
 	SETTINGS_OUTCOME_FOLDER_PLACEHOLDER: "4-成果",
 	SETTINGS_PAGE_SIZE_NAME: "每頁數量",
 	SETTINGS_PAGE_SIZE_DESC: "每頁顯示的項目數量 (20-300)。",
+	SETTINGS_USE_FIRST_ALIAS_NAME: "優先顯示筆記首個別名",
+	SETTINGS_USE_FIRST_ALIAS_NAME_DESC:
+		"筆記存在別名時，在所有元件與視圖中優先顯示第一個別名而不是檔名。關閉後全部回退為檔名；點擊與搜尋仍作用於真實檔案。",
 
 	// Commands & Ribbon
 	RIBBON_ICON_TITLE: "開啟 IOTO 儀表板",

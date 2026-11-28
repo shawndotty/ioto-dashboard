@@ -1,5 +1,7 @@
 import { resolveQuery } from "../../../query/resolve";
-import type { FileRecord } from "../../../data/types";
+import { noteDisplayName } from "../../../data/note-source";
+import type { NoteDisplayOptions } from "../../../data/note-source";
+import type { FileRecord, NoteRecord } from "../../../data/types";
 import {
 	emptyDataset,
 	formatDate,
@@ -42,8 +44,28 @@ function scalarTextFor(files: FileRecord[], measure: MeasureId): string {
 	return String(files.length);
 }
 
+function notesByPath(
+	snapshot: { notes?: NoteRecord[] } | undefined,
+): Map<string, NoteRecord> {
+	return new Map((snapshot?.notes ?? []).map((note) => [note.path, note]));
+}
+
+function displayNameOf(
+	file: FileRecord,
+	notes: Map<string, NoteRecord>,
+	display: NoteDisplayOptions | undefined,
+): string {
+	if (file.extension !== "md") return file.basename;
+	return noteDisplayName(
+		file.basename,
+		notes.get(file.path)?.frontmatter,
+		display,
+	);
+}
+
 export const fileAdapter: DatasetAdapter = (input): Dataset => {
 	const { request, query, snapshot } = input;
+	const display = input.display;
 	if (request.measure === "timeline") {
 		const columns = TIMELINE_COLUMNS.file;
 		if (!query || !snapshot) return emptyDataset(request, columns);
@@ -51,13 +73,14 @@ export const fileAdapter: DatasetAdapter = (input): Dataset => {
 			customFilters: input.customFilters,
 			now: input.now,
 		}).files ?? [];
+		const notes = notesByPath(snapshot);
 		const records: TimelineRecord[] = files.map((file) => ({
 			basename: file.basename,
 			ctime: file.ctime,
 			mtime: file.mtime,
 			size: file.size,
 			path: file.path,
-			text: file.basename,
+			text: displayNameOf(file, notes, display),
 			kind: "file",
 		}));
 		const timeline = buildTimelineRows(
@@ -84,10 +107,11 @@ export const fileAdapter: DatasetAdapter = (input): Dataset => {
 		customFilters: input.customFilters,
 		now: input.now,
 	}).files ?? [];
+	const notes = notesByPath(snapshot);
 	const rows = files.map((file) => ({
 		id: file.path,
 		cells: {
-			name: cell(file.basename, { path: file.path }),
+			name: cell(displayNameOf(file, notes, display), { path: file.path }),
 			folder: cell(file.folder, { path: file.folder }),
 			extension: cell(file.extension),
 			size: cell(formatSize(file.size), { sortValue: file.size }),

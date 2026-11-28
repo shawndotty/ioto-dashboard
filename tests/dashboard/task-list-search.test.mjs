@@ -32,6 +32,16 @@ test('note name and project name are also searched', () => {
 	assert.equal(matchesTaskRow(value, 'missing'), false);
 });
 
+test('task and note paths match even when labels are aliases', () => {
+	const value = row({
+		text: { text: 'do the thing', path: '3-任务/P1/a.md' },
+		note: { text: '语义别名', path: '3-任务/P1/a.md' },
+	});
+	assert.equal(matchesTaskRow(value, '语义别名'), true);
+	assert.equal(matchesTaskRow(value, 'P1/a.md'), true);
+	assert.equal(matchesTaskRow(value, 'missing'), false);
+});
+
 test('missing cells are treated as empty text', () => {
 	assert.equal(matchesTaskRow(row({}), 'search'), false);
 	assert.equal(matchesTaskRow(row({ text: {} }), 'search'), false);

@@ -70,13 +70,17 @@ function markerOf(status: string | undefined): string {
 	return TASK_STATUS_MARKERS[status ?? "open"] ?? " ";
 }
 
-/** 任务正文、笔记名或项目名任一命中即保留；空关键词视为全部命中。 */
+/** 任务正文、笔记名、项目名或真实路径任一命中即保留；空关键词视为全部命中。 */
 export function matchesTaskRow(row: DatasetRow, query: string): boolean {
 	const needle = query.trim().toLocaleLowerCase();
 	if (needle.length === 0) return true;
-	return [row.cells.text?.text, row.cells.note?.text, row.cells.project?.text].some(
-		(value) => (value ?? "").toLocaleLowerCase().includes(needle),
-	);
+	return [
+		row.cells.text?.text,
+		row.cells.text?.path,
+		row.cells.note?.text,
+		row.cells.note?.path,
+		row.cells.project?.text,
+	].some((value) => (value ?? "").toLocaleLowerCase().includes(needle));
 }
 
 function applyFilter(
@@ -258,6 +262,7 @@ export const taskListComponent: ComponentDefinition = {
 						cls: "internal-link",
 						text: noteName,
 						href: notePath,
+						title: notePath,
 					});
 					link.addEventListener("click", (event) => {
 						event.preventDefault();

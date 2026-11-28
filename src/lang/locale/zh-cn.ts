@@ -91,6 +91,9 @@ export default {
 	SETTINGS_OUTCOME_FOLDER_PLACEHOLDER: "4-成果",
 	SETTINGS_PAGE_SIZE_NAME: "每页数量",
 	SETTINGS_PAGE_SIZE_DESC: "每页显示的条目数量 (20-300)。",
+	SETTINGS_USE_FIRST_ALIAS_NAME: "优先显示笔记首个别名",
+	SETTINGS_USE_FIRST_ALIAS_NAME_DESC:
+		"笔记存在别名时，在所有组件与视图中优先显示第一个别名而不是文件名。关闭后全部回落为文件名；点击与搜索仍作用于真实文件。",
 
 	// Commands & Ribbon
 	RIBBON_ICON_TITLE: "打开 IOTO 仪表盘",

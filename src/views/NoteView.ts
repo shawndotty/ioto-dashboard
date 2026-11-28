@@ -19,7 +19,11 @@ import {
 	NoteViewState,
 } from "../models/types";
 import type { NoteFacets, NoteRecord } from "../data/types";
-import { collectFacets } from "../data/note-source";
+import {
+	basenameOf,
+	collectFacets,
+	noteDisplayName,
+} from "../data/note-source";
 import { queryNotes } from "../data/note-query";
 import { sortNotes } from "../data/sort";
 import {
@@ -196,6 +200,16 @@ export class NoteView extends ItemView {
 		this.applyFilters(false);
 	}
 
+	private displayNameOf(
+		path: string,
+		frontmatter?: Record<string, unknown>,
+	): string {
+		return noteDisplayName(basenameOf(path), frontmatter, {
+			useFirstAliasAsNoteName:
+				this.plugin.settings.useFirstAliasAsNoteName,
+		});
+	}
+
 	applyFilters(render = true) {
 		this.filteredFiles = sortNotes(
 			queryNotes(
@@ -205,6 +219,7 @@ export class NoteView extends ItemView {
 			),
 			this.sortOption,
 			this.sortOrder,
+			(note) => this.displayNameOf(note.path, note.frontmatter),
 		);
 
 		this.pagination.totalItems = this.filteredFiles.length;
@@ -351,6 +366,8 @@ export class NoteView extends ItemView {
 				outcome: this.plugin.settings.outcomeFolder,
 			},
 		);
+		this.middleSection.displayNameOf = (path, frontmatter) =>
+			this.displayNameOf(path, frontmatter);
 		this.addChild(this.middleSection);
 		this.middleSection.render();
 	}

@@ -28,7 +28,11 @@ import type {
 	TaskRecord,
 	TaskScope,
 } from "../data/types";
-import { collectFacets } from "../data/note-source";
+import {
+	basenameOf,
+	collectFacets,
+	noteDisplayName,
+} from "../data/note-source";
 import { queryNotes } from "../data/note-query";
 import { queryTasks } from "../data/task-query";
 import { sortNotes, sortTasks } from "../data/sort";
@@ -182,6 +186,16 @@ export class DashboardView extends ItemView {
 		};
 	}
 
+	private displayNameOf(
+		path: string,
+		frontmatter?: Record<string, unknown>,
+	): string {
+		return noteDisplayName(basenameOf(path), frontmatter, {
+			useFirstAliasAsNoteName:
+				this.plugin.settings.useFirstAliasAsNoteName,
+		});
+	}
+
 	applyFilters(resetPage = true) {
 		if (resetPage) {
 			this.noteCurrentPage = 1;
@@ -193,6 +207,7 @@ export class DashboardView extends ItemView {
 			queryNotes(this.files, this.filters, customFilters),
 			this.sortOption,
 			this.sortOrder,
+			(note) => this.displayNameOf(note.path, note.frontmatter),
 		);
 
 		const scopedTasks = this.tasks.filter(
@@ -204,6 +219,7 @@ export class DashboardView extends ItemView {
 			queryTasks(scopedTasks, this.filters, this.taskScope(), customFilters),
 			this.sortOption,
 			this.sortOrder,
+			(task) => this.displayNameOf(task.path, task.noteFrontmatter),
 		);
 	}
 
@@ -363,6 +379,8 @@ export class DashboardView extends ItemView {
 				outcome: this.plugin.settings.outcomeFolder,
 			},
 		);
+		this.middleSection.displayNameOf = (path, frontmatter) =>
+			this.displayNameOf(path, frontmatter);
 		this.addChild(this.middleSection);
 		this.middleSection.render();
 	}

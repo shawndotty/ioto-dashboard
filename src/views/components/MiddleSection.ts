@@ -32,6 +32,14 @@ export class MiddleSection extends Component {
 	groupOption: GroupOption;
 	private collapsedGroups: Set<string> = new Set();
 	private isComposing = false;
+	/**
+	 * Display label for a note (first alias vs filename). Assigned by the view
+	 * after construction so the already long argument list stays unchanged.
+	 */
+	displayNameOf?: (
+		path: string,
+		frontmatter?: Record<string, unknown>,
+	) => string;
 
 	constructor(
 		private app: App,
@@ -670,7 +678,8 @@ export class MiddleSection extends Component {
 
 		files.forEach((file) => {
 			const item = container.createDiv({ cls: "file-item" });
-			item.createEl("h6", { text: file.basename });
+			const label = this.displayNameOf?.(file.path, file.frontmatter) ?? file.basename;
+			item.createEl("h6", { text: label, attr: { title: file.basename } });
 
 			item.addEventListener("mouseenter", (e) => {
 				this.app.workspace.trigger("hover-link", {
@@ -723,7 +732,13 @@ export class MiddleSection extends Component {
 			const item = container.createDiv({ cls: "task-item" });
 
 			const header = item.createDiv({ cls: "task-item-header" });
-			header.createEl("span", { text: task.noteBasename });
+			const label =
+				this.displayNameOf?.(task.path, task.noteFrontmatter) ??
+				task.noteBasename;
+			header.createEl("span", {
+				text: label,
+				attr: { title: task.noteBasename },
+			});
 			const date = new Date(task.noteCtime).toLocaleDateString();
 			header.createEl("span", { text: date });
 

@@ -71,13 +71,15 @@ export function sortNoteRows(rows: readonly DatasetRow[]): DatasetRow[] {
 	}).rows;
 }
 
-/** 标题、文件夹或 IO 类型任一命中即保留；空关键词视为全部命中。 */
+/** 标题、文件夹、IO 类型或真实路径任一命中即保留；空关键词视为全部命中。 */
 export function matchesNoteRow(row: DatasetRow, query: string): boolean {
 	const needle = query.trim().toLocaleLowerCase();
 	if (needle.length === 0) return true;
 	return [
 		row.cells.note?.text,
+		row.cells.note?.path,
 		row.cells.folder?.text,
+		row.cells.folder?.path,
 		row.cells.ioType?.text,
 	].some((value) => (value ?? "").toLocaleLowerCase().includes(needle));
 }
@@ -240,6 +242,7 @@ export const noteListComponent: ComponentDefinition = {
 					cls: "internal-link ioto-note-list-title",
 					text: noteCell?.text ?? row.id,
 					href: path,
+					title: path,
 				});
 				title.addEventListener("click", (event) => {
 					event.preventDefault();

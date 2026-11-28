@@ -1,4 +1,5 @@
 import type { VaultIndex } from "../data/vault-index";
+import type { NoteDisplayOptions } from "../data/note-source";
 import type {
 	CustomFilterDef,
 	IndexConfig,
@@ -100,6 +101,8 @@ export interface DataHubOptions {
 	getQueries: () => QueryRepository;
 	getIndexConfig: () => IndexConfig;
 	getCustomFilters: () => CustomFilterDef[];
+	/** Display-only options for adapters (first alias vs filename). */
+	getDisplayOptions?: () => NoteDisplayOptions;
 	snapshotStore?: SnapshotStore;
 	now?: () => number;
 	/** Backoff schedule for automatic retries; injectable for tests. */
@@ -343,6 +346,7 @@ export class DataHub {
 						metric,
 						dailySeries: (limit) => this.points.slice(-limit),
 						customFilters: this.options.getCustomFilters(),
+						display: this.options.getDisplayOptions?.(),
 						now: this.options.now,
 					}),
 				);

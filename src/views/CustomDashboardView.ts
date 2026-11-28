@@ -19,6 +19,7 @@ import {
 import { CUSTOM_DASHBOARD_VIEW_TYPE } from "../models/constants";
 import type IotoDashboardPlugin from "../main";
 import { t } from "../lang/helpers";
+import { noteDisplayName, basenameOf } from "../data/note-source";
 import {
 	buildExportFileName,
 	captureDashboardPageCanvas,
@@ -320,6 +321,10 @@ export class CustomDashboardView extends ItemView {
 			getQueries: () => this.queryRepository(),
 			getIndexConfig: () => this.plugin.getIndexConfig(),
 			getCustomFilters: () => this.plugin.settings.customFilters,
+			getDisplayOptions: () => ({
+				useFirstAliasAsNoteName:
+					this.plugin.settings.useFirstAliasAsNoteName,
+			}),
 			snapshotStore: this.plugin.snapshotStore,
 		});
 		this.unsubscribers.push(
@@ -3327,6 +3332,12 @@ export class CustomDashboardView extends ItemView {
 		}, 0);
 	}
 
+	/** Display-only settings changed: recompute datasets and repaint. */
+	refreshDisplaySettings(): void {
+		this.hub?.refreshNow();
+		this.requestRender();
+	}
+
 	private requestRender(): void {
 		if (this.interacting) {
 			this.renderDeferred = true;
@@ -5275,11 +5286,27 @@ export class CustomDashboardView extends ItemView {
 		void this.plugin.activateCustomDashboard(target.id, { pageId });
 	}
 
+	/** First alias when enabled; empty string when the path is not a live file. */
+	private noteNameForPath(path: string): string {
+		const node = this.app.vault.getAbstractFileByPath(path);
+		if (!(node instanceof TFile)) return "";
+		const frontmatter = this.app.metadataCache.getFileCache(node)
+			?.frontmatter as Record<string, unknown> | undefined;
+		return noteDisplayName(basenameOf(path), frontmatter, {
+			useFirstAliasAsNoteName:
+				this.plugin.settings.useFirstAliasAsNoteName,
+		});
+	}
+
 	private describeTarget(picker: TargetPickerKind, value: string): string {
 		const stored = value.trim();
 		if (!stored) return "";
 		if (picker === "note") {
-			return stored.split("/").pop()?.replace(/\.md$/i, "") || stored;
+			return (
+				this.noteNameForPath(stored) ||
+				stored.split("/").pop()?.replace(/\.md$/i, "") ||
+				stored
+			);
 		}
 		if (picker === "command") {
 			return (
@@ -5360,6 +5387,8 @@ export class CustomDashboardView extends ItemView {
 			revealable: hasFolder,
 			openTask: (path, line, newTab) => void this.openNote(path, line, newTab),
 			reveal: (path) => void this.revealInExplorer(path),
+			displayNameOf: (path) =>
+				this.noteNameForPath(path) || basenameOf(path),
 		}).open();
 	}
 

@@ -53,6 +53,8 @@ export interface IotoDashboardSettings {
 	taskFolder: string;
 	outcomeFolder: string;
 	pageSize: number;
+	/** Render a note's first alias instead of its filename, across all views. */
+	useFirstAliasAsNoteName: boolean;
 	savedQueries: SavedQuery[];
 	customFilters: CustomFilter[];
 	modalLayout?: ModalLayout;
@@ -65,6 +67,7 @@ export const DEFAULT_SETTINGS: IotoDashboardSettings = {
 	taskFolder: t("TASK_FOLDER"),
 	outcomeFolder: t("OUTCOME_FOLDER"),
 	pageSize: 100,
+	useFirstAliasAsNoteName: true,
 	savedQueries: [],
 	customFilters: [],
 	modalLayout: "list",
@@ -220,6 +223,19 @@ export class DashboardSettingTab extends PluginSettingTab {
 						if (val > 300) val = 300;
 						this.plugin.settings.pageSize = val;
 						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName(t("SETTINGS_USE_FIRST_ALIAS_NAME"))
+			.setDesc(t("SETTINGS_USE_FIRST_ALIAS_NAME_DESC"))
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.useFirstAliasAsNoteName)
+					.onChange(async (value) => {
+						this.plugin.settings.useFirstAliasAsNoteName = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshDisplayDependentViews();
 					}),
 			);
 

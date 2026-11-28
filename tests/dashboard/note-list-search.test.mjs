@@ -34,6 +34,16 @@ test('folder and io type are also searched', () => {
 	assert.equal(matchesNoteRow(value, 'weekly'), true);
 });
 
+test('the real path still matches when the label is an alias', () => {
+	const value = row({
+		note: { text: '语义别名', path: '4-成果/Report/Report-20261112.md' },
+	});
+	assert.equal(matchesNoteRow(value, '语义别名'), true);
+	assert.equal(matchesNoteRow(value, 'Report-20261112'), true);
+	assert.equal(matchesNoteRow(value, '4-成果'), true);
+	assert.equal(matchesNoteRow(value, 'missing'), false);
+});
+
 test('missing cells are treated as empty text', () => {
 	assert.equal(matchesNoteRow(row({}), 'search'), false);
 	assert.equal(matchesNoteRow(row({ note: {} }), 'search'), false);

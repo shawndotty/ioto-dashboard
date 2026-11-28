@@ -89,6 +89,9 @@ export default {
 	SETTINGS_OUTCOME_FOLDER_PLACEHOLDER: "4-outcome",
 	SETTINGS_PAGE_SIZE_NAME: "Page Size",
 	SETTINGS_PAGE_SIZE_DESC: "Number of items to show per page (20-300).",
+	SETTINGS_USE_FIRST_ALIAS_NAME: "Use first alias as note name",
+	SETTINGS_USE_FIRST_ALIAS_NAME_DESC:
+		"When a note has aliases, show the first one instead of the filename in all components and views. Turn this off to fall back to filenames everywhere; clicks and searches still target the real file.",
 
 	// Commands & Ribbon
 	RIBBON_ICON_TITLE: "Open IOTO Dashboard",

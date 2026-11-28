@@ -45,6 +45,16 @@ test('row search spans every column and ignores case', () => {
 	assert.equal(matchesTableRow(ROWS[2], 'missing'), false);
 });
 
+test('cell paths match even when the visible text is an alias', () => {
+	const aliased = row('a', {
+		note: { text: '语义别名', path: '1-输入/2026-01-01-file.md' },
+	});
+	assert.equal(matchesTableRow(aliased, '语义别名'), true);
+	assert.equal(matchesTableRow(aliased, '2026-01-01-file'), true);
+	assert.equal(matchesTableRow(aliased, '1-输入'), true);
+	assert.equal(matchesTableRow(aliased, 'missing'), false);
+});
+
 test('values compare numerically and with numeric-aware locale order', () => {
 	assert.ok(compareTableValues(2, 10, 1) < 0);
 	assert.ok(compareTableValues(2, 10, -1) > 0);

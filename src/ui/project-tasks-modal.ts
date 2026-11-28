@@ -42,6 +42,8 @@ export interface ProjectTasksModalOptions {
 	revealable: boolean;
 	openTask(path: string, line: number, newTab: boolean): void;
 	reveal(path: string): void;
+	/** Display label for a note path; falls back to the note basename. */
+	displayNameOf?: (path: string) => string;
 }
 
 function isOverdue(dueDate: string | undefined): boolean {
@@ -217,10 +219,13 @@ export class ProjectTasksModal extends Modal {
 				cls: "ioto-project-tasks-note-group",
 			});
 			const header = section.createDiv({ cls: "ioto-project-tasks-note" });
+			const label =
+				this.options.displayNameOf?.(note.path) ?? note.basename;
 			const link = header.createEl("a", {
 				cls: "internal-link ioto-project-tasks-note-link",
-				text: note.basename,
+				text: label,
 				href: note.path,
+				title: note.path,
 			});
 			link.addEventListener("click", (event) => {
 				event.preventDefault();

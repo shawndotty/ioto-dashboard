@@ -9,6 +9,7 @@ export function sortNotes(
 	notes: NoteRecord[],
 	option: SortOption,
 	order: SortOrder,
+	displayNameOf?: (note: NoteRecord) => string,
 ): NoteRecord[] {
 	const sorted = [...notes];
 	sorted.sort((a, b) => {
@@ -20,8 +21,8 @@ export function sortNotes(
 				right = b.ctime;
 				break;
 			case "name":
-				left = a.basename;
-				right = b.basename;
+				left = displayNameOf?.(a) ?? a.basename;
+				right = displayNameOf?.(b) ?? b.basename;
 				break;
 			case "size":
 				left = a.size;
@@ -43,6 +44,7 @@ export function sortTasks(
 	tasks: TaskRecord[],
 	option: SortOption,
 	order: SortOrder,
+	displayNameOf?: (task: TaskRecord) => string,
 ): TaskRecord[] {
 	const sorted = [...tasks];
 	sorted.sort((a, b) => {
@@ -54,8 +56,8 @@ export function sortTasks(
 				right = b.noteCtime;
 				break;
 			case "name":
-				left = a.noteBasename;
-				right = b.noteBasename;
+				left = displayNameOf?.(a) ?? a.noteBasename;
+				right = displayNameOf?.(b) ?? b.noteBasename;
 				break;
 			case "size":
 				left = a.noteSize;

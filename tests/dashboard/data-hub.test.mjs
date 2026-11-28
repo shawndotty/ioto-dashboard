@@ -23,7 +23,7 @@ function emptySnapshot(marker = 'snapshot') {
 	return { notes: [], tasks: [], projects: [], marker };
 }
 
-function makeHub({ fail = null, folders = [] } = {}) {
+function makeHub({ fail = null, folders = [], display } = {}) {
 	const state = {
 		fail,
 		snapshot: emptySnapshot(),
@@ -50,6 +50,7 @@ function makeHub({ fail = null, folders = [] } = {}) {
 			headings: {},
 		}),
 		getCustomFilters: () => [],
+		getDisplayOptions: display ? () => display : undefined,
 		now: () => 0,
 		retryDelaysMs: [],
 	});
@@ -95,6 +96,40 @@ test('refreshNow clears failure records and recovers', async () => {
 	assert.equal(hub.getLastError(), null);
 	assert.equal(hub.getDatasetError(key), undefined);
 	assert.ok(hub.getDataset(key));
+});
+
+test('getDisplayOptions reaches the adapter and swaps the note label', async () => {
+	const { hub, state } = makeHub({
+		display: { useFirstAliasAsNoteName: true },
+	});
+	state.snapshot = {
+		notes: [
+			{
+				path: '1-输入/a.md',
+				basename: 'a',
+				folder: '1-输入',
+				ioType: 'Input',
+				ctime: 1,
+				mtime: 2,
+				size: 10,
+				fileTaskCount: 0,
+				fileCompletedCount: 0,
+				sectionTaskCount: 0,
+				sectionCompletedCount: 0,
+				frontmatter: { aliases: ['别名A'] },
+			},
+		],
+		tasks: [],
+		projects: [],
+	};
+
+	const idle = waitIdle(hub);
+	hub.setDatasetRequests([NOTE_COUNT]);
+	await idle;
+
+	const dataset = hub.getDataset(datasetKey(NOTE_COUNT));
+	assert.equal(dataset.rows[0].cells.note.text, '别名A');
+	assert.equal(dataset.rows[0].cells.note.path, '1-输入/a.md');
 });
 
 test('switching the query key publishes a dataset for the new key', async () => {

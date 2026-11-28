@@ -1,4 +1,4 @@
-import { firstAlias } from "../../../data/note-source";
+import { noteDisplayName } from "../../../data/note-source";
 import { resolveQuery } from "../../../query/resolve";
 import {
 	emptyDataset,
@@ -33,6 +33,7 @@ export const NOTE_COLUMNS: DatasetColumn[] = [
 
 export const noteAdapter: DatasetAdapter = (input): Dataset => {
 	const { request, query, snapshot } = input;
+	const display = input.display;
 	if (request.measure === "timeline") {
 		const columns = TIMELINE_COLUMNS.note;
 		if (!query || !snapshot) return emptyDataset(request, columns);
@@ -48,7 +49,7 @@ export const noteAdapter: DatasetAdapter = (input): Dataset => {
 			tasks: note.fileTaskCount,
 			completed: note.fileCompletedCount,
 			path: note.path,
-			text: firstAlias(note.frontmatter) ?? note.basename,
+			text: noteDisplayName(note.basename, note.frontmatter, display),
 			kind: "note",
 			ioType: note.ioType,
 		}));
@@ -79,7 +80,9 @@ export const noteAdapter: DatasetAdapter = (input): Dataset => {
 	const rows = notes.map((note) => ({
 		id: note.path,
 		cells: {
-			note: cell(note.basename, { path: note.path }),
+			note: cell(noteDisplayName(note.basename, note.frontmatter, display), {
+				path: note.path,
+			}),
 			folder: cell(note.folder, { path: note.folder }),
 			ioType: cell(note.ioType),
 			tasks: cell(String(note.fileTaskCount), {

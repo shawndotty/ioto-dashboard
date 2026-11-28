@@ -1,4 +1,5 @@
 import { ALL_SECTION_ROLES } from "../../../data/types";
+import { noteDisplayName } from "../../../data/note-source";
 import { resolveQuery } from "../../../query/resolve";
 import {
 	emptyDataset,
@@ -37,6 +38,7 @@ export const TASK_SERIES_COLUMNS: DatasetColumn[] = [
 
 export const taskAdapter: DatasetAdapter = (input): Dataset => {
 	const { request, query, snapshot, metric } = input;
+	const display = input.display;
 
 	if (request.measure === "timeline") {
 		const columns = TIMELINE_COLUMNS.task;
@@ -147,7 +149,14 @@ export const taskAdapter: DatasetAdapter = (input): Dataset => {
 				path: task.path,
 				line: task.line,
 			}),
-			note: cell(task.noteBasename, { path: task.path }),
+			note: cell(
+					noteDisplayName(
+						task.noteBasename,
+						task.noteFrontmatter,
+						display,
+					),
+					{ path: task.path },
+				),
 			project: cell(task.project ?? ""),
 			section: cell(task.sectionRole),
 			status: cell(task.marker, { sortValue: task.marker }),

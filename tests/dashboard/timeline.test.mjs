@@ -65,6 +65,16 @@ test('auto prefers the filename then falls back to ctime', () => {
 	);
 });
 
+test('a display alias never changes filename-based bucketing', () => {
+	const aliased = record({
+		basename: '2026-11-08-journal',
+		text: '语义别名',
+		ctime: stamp(2026, 1, 1),
+	});
+	assert.equal(timelineDateOf(aliased, 'filename'), stamp(2026, 11, 8));
+	assert.equal(timelineDateOf(aliased, 'auto'), stamp(2026, 11, 8));
+});
+
 test('bucket keys use local days, Monday weeks and calendar months', () => {
 	assert.equal(bucketKeyOf(stamp(2026, 11, 8), 'day'), '2026-11-08');
 	assert.equal(bucketKeyOf(stamp(2026, 11, 8), 'week'), '2026-11-02');

@@ -428,6 +428,7 @@ test('note timeline uses first alias as label and falls back to basename', () =>
 		request: timelineRequest('note'),
 		query: query('note'),
 		snapshot,
+		display: { useFirstAliasAsNoteName: true },
 		dailySeries: () => [],
 		now: () => TIMELINE_NOW,
 	});
@@ -435,6 +436,69 @@ test('note timeline uses first alias as label and falls back to basename', () =>
 	assert.equal(row.related[0].label, '语义别名A');
 	assert.equal(row.related[0].path, '3-任务/P1/a.md');
 	assert.equal(row.related[1].label, '2026-11-09-b');
+});
+
+test('display options swap in aliases without touching paths or basenames', () => {
+	const aliased = note({
+		basename: '2026-11-09-a',
+		frontmatter: { aliases: ['语义别名A'] },
+	});
+	const snapshot = {
+		notes: [aliased, note({ path: '1-输入/n.md', basename: 'n', folder: '1-输入', ioType: 'Input' })],
+		tasks: [
+			task({
+				path: aliased.path,
+				noteBasename: aliased.basename,
+				noteFrontmatter: aliased.frontmatter,
+			}),
+		],
+		files: [
+			{ path: aliased.path, basename: aliased.basename, extension: 'md', folder: '3-任务/P1', size: 100, ctime: 1, mtime: 10 },
+			{ path: '0-辅助/i.png', basename: 'i', extension: 'png', folder: '0-辅助', size: 2048, ctime: 2, mtime: 20 },
+		],
+	};
+	const on = { useFirstAliasAsNoteName: true };
+	const off = { useFirstAliasAsNoteName: false };
+	const read = (adapterRequest, display) =>
+		adapterInput(adapterRequest, { snapshot, display });
+
+	const notesOn = noteAdapter(read({ object: 'note', measure: 'count', queryId: 'q' }, on));
+	assert.equal(notesOn.rows[0].cells.note.text, '语义别名A');
+	assert.equal(notesOn.rows[0].cells.note.path, aliased.path);
+	const notesOff = noteAdapter(read({ object: 'note', measure: 'count', queryId: 'q' }, off));
+	assert.equal(notesOff.rows[0].cells.note.text, '2026-11-09-a');
+
+	const tasksOn = taskAdapter(read({ object: 'task', measure: 'count', queryId: 'q' }, on));
+	assert.equal(tasksOn.rows[0].cells.note.text, '语义别名A');
+	assert.equal(tasksOn.rows[0].cells.note.path, aliased.path);
+
+	const filesOn = fileAdapter(read({ object: 'file', measure: 'count', queryId: 'q' }, on));
+	const png = filesOn.rows.find((row) => row.id === '0-辅助/i.png');
+	// 文件查询按设计排除 md/canvas，附件永远保持文件名。
+	assert.ok(!filesOn.rows.some((row) => row.id === aliased.path));
+	assert.equal(png.cells.name.text, 'i');
+});
+
+test('file timeline keeps attachment filenames under display options', () => {
+	const snapshot = {
+		notes: [],
+		tasks: [],
+		files: [
+			{ path: 'a/2026-11-09-i.png', basename: '2026-11-09-i', extension: 'png', folder: 'a', size: 1, ctime: 1, mtime: 10 },
+		],
+	};
+	const dataset = fileAdapter({
+		request: timelineRequest('file'),
+		query: query('file'),
+		snapshot,
+		display: { useFirstAliasAsNoteName: true },
+		dailySeries: () => [],
+		now: () => TIMELINE_NOW,
+	});
+	assert.deepEqual(
+		dataset.rows[4].related.map((ref) => ref.label),
+		['2026-11-09-i'],
+	);
 });
 
 test('file timeline sums the file sizes inside the window', () => {

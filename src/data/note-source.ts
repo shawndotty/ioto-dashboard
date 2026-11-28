@@ -37,6 +37,12 @@ export function folderOf(path: string): string {
 	return index === -1 ? "" : path.slice(0, index);
 }
 
+/** Filename without folder and `.md`; mirrors Obsidian's `TFile.basename`. */
+export function basenameOf(path: string): string {
+	const name = path.slice(path.lastIndexOf("/") + 1);
+	return name.replace(/\.md$/i, "");
+}
+
 /**
  * Folder-first project attribution: `3-任务/<Project>/...` belongs to
  * `<Project>` even without a `Project` frontmatter. Files directly under the
@@ -79,6 +85,23 @@ export function firstAlias(
 	}
 	if (typeof value === "string" && value.trim()) return value.trim();
 	return undefined;
+}
+
+export interface NoteDisplayOptions {
+	useFirstAliasAsNoteName: boolean;
+}
+
+/**
+ * Single source of truth for how a note's name is rendered. `undefined`
+ * options mean "off", so adapters stay predictable in tests.
+ */
+export function noteDisplayName(
+	basename: string,
+	frontmatter: Record<string, unknown> | undefined,
+	options: NoteDisplayOptions | undefined,
+): string {
+	if (!options?.useFirstAliasAsNoteName) return basename;
+	return firstAlias(frontmatter) ?? basename;
 }
 
 /** Stringify only primitives; never fall back to `[object Object]`. */

@@ -25,7 +25,11 @@ import type {
 	TaskRecord,
 } from "../data/types";
 import { DEFAULT_TASK_SCOPE } from "../data/types";
-import { collectFacets } from "../data/note-source";
+import {
+	basenameOf,
+	collectFacets,
+	noteDisplayName,
+} from "../data/note-source";
 import { queryTasks } from "../data/task-query";
 import { sortTasks } from "../data/sort";
 import {
@@ -134,6 +138,16 @@ export class TaskView extends ItemView {
 		this.applyFilters();
 	}
 
+	private displayNameOf(
+		path: string,
+		frontmatter?: Record<string, unknown>,
+	): string {
+		return noteDisplayName(basenameOf(path), frontmatter, {
+			useFirstAliasAsNoteName:
+				this.plugin.settings.useFirstAliasAsNoteName,
+		});
+	}
+
 	applyFilters(resetPage = true) {
 		if (resetPage) {
 			this.taskCurrentPage = 1;
@@ -148,6 +162,7 @@ export class TaskView extends ItemView {
 			),
 			this.sortOption,
 			this.sortOrder,
+			(task) => this.displayNameOf(task.path, task.noteFrontmatter),
 		);
 	}
 
@@ -290,6 +305,8 @@ export class TaskView extends ItemView {
 				outcome: this.plugin.settings.outcomeFolder,
 			},
 		);
+		this.middleSection.displayNameOf = (path, frontmatter) =>
+			this.displayNameOf(path, frontmatter);
 		this.addChild(this.middleSection);
 		this.middleSection.render();
 	}

@@ -4,7 +4,7 @@ import {
 	normalizeExtensions,
 } from "../data/file-extensions";
 import { isInsideFolder } from "../data/note-source";
-import { queryNotes } from "../data/note-query";
+import { matchesNameOrAlias, queryNotes } from "../data/note-query";
 import { queryTasks } from "../data/task-query";
 import type { QueryDefinition, QueryResolution } from "./types";
 
@@ -108,16 +108,25 @@ function resolveTreeQuery(
 	const includeSubfolders = query.scope.includeSubfolders ?? true;
 	if (query.target === "file") {
 		const extensions = normalizeExtensions(query.scope.extensions);
+		const notesByPath = new Map(
+			(snapshot.notes ?? []).map((note) => [note.path, note]),
+		);
+		const nameFilter = query.filters.name;
 		const files = withoutExtraPaths(
 			snapshot.files ?? [],
 			snapshot,
 			paths,
-		).filter(
-			(file) =>
+		).filter((file) => {
+			const note = file.extension === "md" ? notesByPath.get(file.path) : undefined;
+			const nameMatches = note
+				? matchesNameOrAlias(note.basename, note.frontmatter, nameFilter)
+				: matchesName(file.basename, nameFilter);
+			return (
 				inFolderScope(file.folder, paths, includeSubfolders) &&
-				matchesName(file.basename, query.filters.name) &&
-				matchesFileExtension(file.extension, extensions),
-		);
+				nameMatches &&
+				matchesFileExtension(file.extension, extensions)
+			);
+		});
 		return { notes: [], tasks: [], files };
 	}
 	const folders = withoutExtraPaths(

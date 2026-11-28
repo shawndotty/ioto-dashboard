@@ -1,4 +1,5 @@
 import type { CustomFilterDef, IndexSnapshot } from "../../data/types";
+import type { NoteDisplayOptions } from "../../data/note-source";
 import type { DailyPoint, MetricResult } from "../../metrics/types";
 import type { QueryDefinition } from "../../query/types";
 import type { TimelineSourceRef } from "./timeline";
@@ -151,6 +152,8 @@ export interface DatasetAdapterInput {
 	metric?: MetricResult;
 	dailySeries: (limit: number) => DailyPoint[];
 	customFilters?: CustomFilterDef[];
+	/** Display-only options; absent means filenames. */
+	display?: NoteDisplayOptions;
 	now?: () => number;
 }
 

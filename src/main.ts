@@ -843,6 +843,7 @@ export default class IotoDashboardPlugin extends Plugin {
 			data.taskFolder = this.settings.taskFolder;
 			data.outcomeFolder = this.settings.outcomeFolder;
 			data.pageSize = this.settings.pageSize;
+			data.useFirstAliasAsNoteName = this.settings.useFirstAliasAsNoteName;
 			data.savedQueries = this.settings.savedQueries;
 			data.customFilters = this.settings.customFilters;
 			data.modalLayout = this.settings.modalLayout;
@@ -916,6 +917,38 @@ export default class IotoDashboardPlugin extends Plugin {
 			outcomeFolder: this.settings.outcomeFolder,
 			headings: this.getSectionHeadings(),
 		};
+	}
+
+	/** Re-render open views after a display-only setting changed (no re-index). */
+	refreshDisplayDependentViews(): void {
+		const workspace = this.app.workspace;
+		for (const type of [
+			DASHBOARD_VIEW_TYPE,
+			TASK_VIEW_TYPE,
+			NOTE_VIEW_TYPE,
+		]) {
+			for (const leaf of workspace.getLeavesOfType(type)) {
+				const view = leaf.view;
+				if (view instanceof NoteView) {
+					// NoteView.applyFilters(render) would paint twice; render once.
+					view.applyFilters(false);
+					view.renderMiddleColumn();
+				} else if (
+					view instanceof DashboardView ||
+					view instanceof TaskView
+				) {
+					view.applyFilters(true);
+					view.renderMiddleColumn();
+				}
+			}
+		}
+		for (const leaf of workspace.getLeavesOfType(
+			CUSTOM_DASHBOARD_VIEW_TYPE,
+		)) {
+			if (leaf.view instanceof CustomDashboardView) {
+				leaf.view.refreshDisplaySettings();
+			}
+		}
 	}
 
 	/** Folder/heading settings changed: rebuild the index after typing settles. */

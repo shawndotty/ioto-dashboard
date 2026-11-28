@@ -179,12 +179,14 @@ export function resolveGroupFor(
 /* Table helpers (re-exported by the table view to keep its surface stable)   */
 /* -------------------------------------------------------------------------- */
 
-/** Every cell text matches, so search spans all visible and hidden columns. */
+/** Cell text or its target path matches, so alias labels stay searchable by file. */
 export function matchesTableRow(row: DatasetRow, query: string): boolean {
 	const needle = query.trim().toLocaleLowerCase();
 	if (needle.length === 0) return true;
-	return Object.values(row.cells).some((cell) =>
-		(cell?.text ?? "").toLocaleLowerCase().includes(needle),
+	return Object.values(row.cells).some(
+		(cell) =>
+			(cell?.text ?? "").toLocaleLowerCase().includes(needle) ||
+			(cell?.path ?? "").toLocaleLowerCase().includes(needle),
 	);
 }
 
