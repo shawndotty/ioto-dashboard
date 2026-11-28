@@ -227,7 +227,12 @@ export function buildPieSpec(
 		extrasHeight +=
 			Math.ceil(slices.length / LEGEND_ITEMS_PER_ROW) * LEGEND_ROW_HEIGHT;
 	}
-	if (valueList) extrasHeight += Math.min(valueList.length, 6) * 20;
+	if (valueList) {
+		// 预留高度随可用高度比例放宽：网格约 6 行，放大态约容 12–16 行；
+		// chart-host 二次 build 会按扣减后高度收敛，不会互相顶高。
+		const listCap = Math.max(6, Math.min(16, Math.floor((size.h * 0.45) / 20)));
+		extrasHeight += Math.min(valueList.length, listCap) * 20;
+	}
 	if (hiddenCount > 0) extrasHeight += 20;
 
 	const formatValue = formatterFor(

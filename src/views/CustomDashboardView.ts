@@ -2521,6 +2521,7 @@ export class CustomDashboardView extends ItemView {
 			result,
 			dataset,
 			status,
+			stage: scope === this.zoomScope ? "zoom" : "grid",
 			messageKey,
 			editMode: this.editMode,
 			openNote: (path, line) => void this.openNote(path, line),

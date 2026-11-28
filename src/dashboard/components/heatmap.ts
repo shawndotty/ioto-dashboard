@@ -99,6 +99,8 @@ const OBJECT_LABEL_KEYS: Record<
 const CELL_GAP = 3;
 const MIN_CELL = 10;
 const MAX_CELL = 40;
+// 放大态舞台更大，放宽色块边长上限（决策：网格态不动，仅 zoom 切片放宽）。
+const MAX_CELL_ZOOM = 64;
 const COMPACT_CELL = 16;
 const WEEKDAY_LABEL_WIDTH = 28;
 const HOST_GAP = 6;
@@ -334,6 +336,7 @@ export const heatmapComponent: ComponentDefinition = {
 		const range = heatmapRangeOf(options.range);
 		const mode = heatmapLayoutMode(options.layout);
 		const fill = options.fill === "stretch" ? "stretch" : "center";
+		const maxCell = ctx.stage === "zoom" ? MAX_CELL_ZOOM : MAX_CELL;
 		const showMonths = options.showMonthLabels !== false;
 		const showWeekdays = options.showWeekdayLabels !== false;
 		const showLegend = options.showLegend !== false;
@@ -717,7 +720,7 @@ export const heatmapComponent: ComponentDefinition = {
 					calendarColumns: model.columns,
 					gap: CELL_GAP,
 					minCell: MIN_CELL,
-					maxCell: MAX_CELL,
+					maxCell,
 					weekdayLabelWidth,
 					calendarChromeHeight: chrome.calendar,
 					stripChromeHeight: chrome.strip,
@@ -743,7 +746,7 @@ export const heatmapComponent: ComponentDefinition = {
 					layout === "calendar" && weekdaysEl ? weekdayLabelWidth : 0,
 				chromeHeight: layout === "calendar" ? chrome.calendar : chrome.strip,
 				minCell: MIN_CELL,
-				maxCell: MAX_CELL,
+				maxCell,
 				stretch: fill === "stretch" ? STRETCH_RATIO : 1,
 			});
 			grid.style.setProperty("--ioto-heatmap-cell-w", `${fit.cellW}px`);

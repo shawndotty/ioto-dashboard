@@ -205,6 +205,8 @@ export interface ComponentRenderContext {
 	result: MetricResult | undefined;
 	dataset?: Dataset;
 	status: ComponentStatus;
+	/** 渲染舞台：缺省视为网格。放大态仅放宽渲染切片（色块上限、每日条数、数值行数），不改变数据查询与分页语义。 */
+	stage?: "grid" | "zoom";
 	messageKey?: string;
 	message?: string;
 	editMode: boolean;

@@ -6632,7 +6632,7 @@ body.is-mobile .ioto-pages-handle {
 .ioto-dashboard-modal--component-zoom
     .ioto-dashboard-zoom__stage
     > .ioto-dashboard-card {
-    font-size: clamp(15px, calc(0.55vh + 11px), 21px);
+    font-size: clamp(17px, calc(1.4vh + 7px), 24px);
 }
 
 .ioto-dashboard-modal--component-zoom .ioto-task-list-item {
@@ -6663,5 +6663,101 @@ body.is-mobile .ioto-pages-handle {
 @media (max-width: 760px) {
     .ioto-dashboard-modal--component-zoom .ioto-dashboard-zoom__hint {
         display: none;
+    }
+}
+
+/* ---- 放大态：小字号节点改 em 系，随舞台字号生长（卡片已带舞台字号） ---- */
+
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    .ioto-chart-legend {
+    font-size: 0.9em;
+}
+
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    .ioto-chart-values {
+    font-size: 0.9em;
+}
+
+/* ---- 放大态：拆固定 px 上限（环图吃满正文高、KPI 行高随字号） ---- */
+
+.ioto-dashboard-modal--component-zoom
+    .ioto-custom-dashboard-view .ioto-ai-agents .ioto-ai-donut-grid {
+    grid-template-rows: minmax(68px, 1fr);
+    flex: 1 1 auto;
+    align-content: stretch;
+}
+
+.ioto-dashboard-modal--component-zoom
+    .ioto-custom-dashboard-view .ioto-ai-kpi .ioto-ai-metric-row {
+    padding: 0.35em 2px;
+}
+
+/* ---- 放大态：少内容组件贴合内容高度并在舞台居中（类型白名单，禁止排除法反圈） ---- */
+
+/* 舞台是滚动容器：用「剩余空间 auto 外边距」做居中，溢出时外边距归零，
+   首行仍可从 scrollTop=0 看到——不用 align-items:center（会把溢出顶缘推出滚动区）。 */
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="markdown"],
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="kpi"],
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="ai-runs-kpi"],
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="ai-runs-recent"] {
+    flex: 0 1 auto;
+    max-height: 100%;
+    height: auto;
+    align-self: center;
+    margin-block: auto;
+    border-radius: var(--radius-m);
+    box-shadow: var(--shadow-l, var(--shadow-m));
+    background: var(--background-primary);
+}
+
+/* 白名单卡的正文不再撑满剩余高，让卡片收缩到内容高 */
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="markdown"]
+    > .ioto-dashboard-card-body,
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="kpi"]
+    > .ioto-dashboard-card-body,
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="ai-runs-kpi"]
+    > .ioto-dashboard-card-body,
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="ai-runs-recent"]
+    > .ioto-dashboard-card-body {
+    flex: 0 1 auto;
+}
+
+/* ---- 放大态：标题条压扁 + 键位提示开场淡出 ---- */
+
+/* 标题条默认 padding 让整条约 67px，收紧到约 36px。 */
+.modal.ioto-dashboard-modal--component-zoom .modal-title {
+    padding-block: 6px;
+}
+
+/* 纯 CSS 淡出，不删 DOM：3s 可读窗口后自动让位给内容。 */
+.ioto-dashboard-modal--component-zoom .ioto-dashboard-zoom__hint {
+    animation: ioto-zoom-hint-fade 3s ease-in forwards;
+}
+
+@keyframes ioto-zoom-hint-fade {
+    0%,
+    70% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
     }
 }

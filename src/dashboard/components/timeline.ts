@@ -70,6 +70,16 @@ export function maxPerDayOf(value: unknown): number {
 	return Math.max(1, Math.min(100, Math.trunc(parsed)));
 }
 
+/**
+ * 放大态只把每日可见条数抬到 20（16–24 建议区间内），
+ * 用户显式设更大的值一律保留，不被放大态压低。
+ */
+export function maxPerDayForStage(value: unknown, stage?: "grid" | "zoom"): number {
+	const configured = maxPerDayOf(value);
+	if (stage !== "zoom") return configured;
+	return Math.max(configured, 20);
+}
+
 /** Number of refs hidden behind the "More" button. */
 export function moreCountOf(relatedTotal: number, maxPerDay: number): number {
 	return Math.max(0, relatedTotal - maxPerDay);
@@ -215,7 +225,7 @@ export const timelineComponent: ComponentDefinition = {
 		const ordered = arranged.rows;
 		const options = ctx.config.options ?? {};
 		const cardSort = cardSortOf(options.cardSort);
-		const maxPerDay = maxPerDayOf(options.maxPerDay);
+		const maxPerDay = maxPerDayForStage(options.maxPerDay, ctx.stage);
 		let visibleRows = 0;
 		for (const row of ordered) {
 			const allRefs = row.related ?? [];
