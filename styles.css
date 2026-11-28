@@ -838,6 +838,65 @@
     background: var(--background-secondary-alt);
 }
 
+/* 预览态：标题栏控件默认隐去，悬浮 / 聚焦 / 确需它时才显现，降低整页噪声。
+   只作用于页面顶层网格——放大舞台没有 .ioto-dashboard-grid，容器子卡走 is-nested。 */
+.ioto-custom-dashboard-view:not(.is-editing)
+    .ioto-dashboard-grid:not(.is-nested)
+    > .ioto-dashboard-card
+    > .ioto-dashboard-card-header
+    .clickable-icon {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+}
+
+/* 不用 visibility / display 隐藏：那会让按钮失去可聚焦性，键盘 Tab 唤不出来。 */
+.ioto-custom-dashboard-view:not(.is-editing)
+    .ioto-dashboard-grid:not(.is-nested)
+    > .ioto-dashboard-card:hover
+    > .ioto-dashboard-card-header
+    .clickable-icon,
+.ioto-custom-dashboard-view:not(.is-editing)
+    .ioto-dashboard-grid:not(.is-nested)
+    > .ioto-dashboard-card
+    > .ioto-dashboard-card-header:focus-within
+    .clickable-icon {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* 常显例外，否则「按了却看不见」：搜索框展开中、面板展开中（aria-expanded）、筛选已生效。 */
+.ioto-custom-dashboard-view:not(.is-editing)
+    .ioto-dashboard-grid:not(.is-nested)
+    > .ioto-dashboard-card
+    > .ioto-dashboard-card-header.is-searching
+    .clickable-icon,
+.ioto-custom-dashboard-view:not(.is-editing)
+    .ioto-dashboard-grid:not(.is-nested)
+    > .ioto-dashboard-card
+    > .ioto-dashboard-card-header
+    .clickable-icon[aria-expanded="true"],
+.ioto-custom-dashboard-view:not(.is-editing)
+    .ioto-dashboard-grid:not(.is-nested)
+    > .ioto-dashboard-card
+    > .ioto-dashboard-card-header
+    .clickable-icon.has-filter {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* 触摸端无 hover：点一次卡片显现该卡控件，不做常驻条。 */
+@media (hover: none) {
+    .ioto-custom-dashboard-view:not(.is-editing)
+        .ioto-dashboard-grid:not(.is-nested)
+        > .ioto-dashboard-card.is-tools-revealed
+        > .ioto-dashboard-card-header
+        .clickable-icon {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
 .ioto-custom-dashboard-view .ioto-dashboard-card-title {
     flex: 1 1 auto;
     min-width: 0;
@@ -6480,6 +6539,125 @@ body.is-mobile .ioto-pages-handle {
     flex: 0 0 auto;
     color: var(--text-faint);
     font-size: 0.8em;
+}
+
+/* ---- 放大态：安全居中 ---- */
+
+/* 正文转 flex 列，配合首尾 auto 外边距吸收剩余空间。
+   刻意不用 justify-content:center：它会把溢出部分推到滚动区上沿之外，向上滚看不到首行。
+   排除选择器与上面的 overflow 规则保持一致，容器卡与 base 的自建滚动面不受影响。 */
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card:not(.is-container):not([data-component-type="base"])
+    > .ioto-dashboard-card-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card:not(.is-container):not([data-component-type="base"])
+    > .ioto-dashboard-card-body
+    > :first-child {
+    margin-block-start: auto;
+}
+
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card:not(.is-container):not([data-component-type="base"])
+    > .ioto-dashboard-card-body
+    > :last-child {
+    margin-block-end: auto;
+}
+
+/* ---- 放大态：宽度按组件类型分档，未列出的类型沿用 1440px 居中柱 ---- */
+
+/* 长文收成可读柱 */
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="markdown"] {
+    max-width: min(84ch, 100%);
+}
+
+/* 数据密集型铺满舞台 */
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="table"],
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="task-list"],
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="note-list"],
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="timeline"],
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="project-progress"],
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="heatmap"],
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card[data-component-type="treemap-chart"] {
+    max-width: 1680px;
+}
+
+/* ---- 放大态：去重标题，卡片头压成右对齐控件行 ---- */
+
+/* 标题由 Modal 标题条（.ioto-dashboard-zoom__label）承担，这里去掉第二条标题。
+   hideTitle 卡片本就没有标题节点，规则对其幂等。 */
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card
+    > .ioto-dashboard-card-header
+    .ioto-dashboard-card-title {
+    display: none;
+}
+
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card
+    > .ioto-dashboard-card-header:not(.is-title-overlay) {
+    justify-content: flex-end;
+    padding-block: 4px;
+    border-bottom: 0;
+    background: none;
+}
+
+/* ---- 放大态排版（L2）：字号随屏幕高度走，行内间距改用 em ---- */
+
+/* 竖向留白主要由行高贡献，所以字号用 vh 才对症。 */
+.ioto-dashboard-modal--component-zoom
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card {
+    font-size: clamp(15px, calc(0.55vh + 11px), 21px);
+}
+
+.ioto-dashboard-modal--component-zoom .ioto-task-list-item {
+    padding-block: 0.5em;
+    gap: 0.7em;
+    line-height: 1.5;
+}
+
+.ioto-dashboard-modal--component-zoom .ioto-task-list-item .task-list-item-checkbox {
+    width: 1.15em;
+    height: 1.15em;
+}
+
+/* 表格自带 font-size，需改回继承才吃得到舞台字号 */
+.ioto-dashboard-modal--component-zoom .ioto-table-el {
+    font-size: 1em;
+}
+
+.ioto-dashboard-modal--component-zoom .ioto-table-el th,
+.ioto-dashboard-modal--component-zoom .ioto-table-el td {
+    padding: 0.45em 0.8em;
+}
+
+.ioto-dashboard-modal--component-zoom .ioto-table-el tbody tr:nth-child(even) {
+    background: var(--background-secondary);
 }
 
 @media (max-width: 760px) {

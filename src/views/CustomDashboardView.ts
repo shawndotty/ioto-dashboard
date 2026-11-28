@@ -2380,6 +2380,13 @@ export class CustomDashboardView extends ItemView {
 				}
 				this.selectComponent(config.id);
 			});
+		} else {
+			// 预览态控件默认隐藏，触摸端点一次卡片让它们显现（不走 selectComponent，避免拉起 Inspector）。
+			card.addEventListener("click", (event) => {
+				const owner = this.cardOwnerOf(event);
+				if (owner && owner !== card) return;
+				this.revealCardTools(card);
+			});
 		}
 
 		const hideTitle = titleHiddenInMode(
@@ -2443,6 +2450,15 @@ export class CustomDashboardView extends ItemView {
 							() => void this.copyComponentImageToClipboard(config, card),
 						),
 				);
+				// 放大按钮改为悬浮显现后，右键菜单补一个常驻入口保住可发现性。
+				if (grid === this.gridEl && zoomEnabledFor(config)) {
+					menu.addItem((item) =>
+						item
+							.setTitle(t("ACTION_ZOOM"))
+							.setIcon("maximize")
+							.onClick(() => this.openComponentZoom(config.id)),
+					);
+				}
 				menu.showAtMouseEvent(event);
 			});
 		}
@@ -2782,6 +2798,21 @@ export class CustomDashboardView extends ItemView {
 
 	/** 放大层与页面网格渲染同一组件，base 嵌入按作用域分开记账。 */
 	private readonly zoomScope = "::zoom";
+
+	/**
+	 * 触摸端显现单张卡片的标题栏控件：页内一次只保留一张，render() 重建网格即自然复位。
+	 */
+	private revealCardTools(card: HTMLElement): void {
+		if (card.hasClass("is-tools-revealed")) return;
+		for (const el of Array.from(
+			this.gridEl?.querySelectorAll<HTMLElement>(
+				":scope > .ioto-dashboard-card.is-tools-revealed",
+			) ?? [],
+		)) {
+			el.removeClass("is-tools-revealed");
+		}
+		card.addClass("is-tools-revealed");
+	}
 
 	private renderZoomButton(
 		header: HTMLElement,
