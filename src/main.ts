@@ -430,11 +430,7 @@ export default class IotoDashboardPlugin extends Plugin {
 		this.addCommand({
 			id: "open-ioto-template-center",
 			name: t("COMMAND_OPEN_TEMPLATE_CENTER"),
-			callback: () => {
-				new TemplateCenterModal(this.app, (json) => {
-					this.importTemplateBundle(json);
-				}).open();
-			},
+			callback: () => this.openTemplateCenter(),
 		});
 
 		// Settings Tab
@@ -650,8 +646,18 @@ export default class IotoDashboardPlugin extends Plugin {
 		).open();
 	}
 
+	/** 打开模板中心；传入 targetDashboardId 时跳过仪表盘选择。 */
+	openTemplateCenter(targetDashboardId?: string): void {
+		new TemplateCenterModal(this.app, (json) => {
+			this.importTemplateBundle(json, targetDashboardId);
+		}).open();
+	}
+
 	/** Template imports need a target Dashboard; pick one when there are many. */
-	private importTemplateBundle(json: string): void {
+	private importTemplateBundle(
+		json: string,
+		targetDashboardId?: string,
+	): void {
 		const dashboards = this.dashboardStore?.dashboards ?? [];
 		const apply = (dashboardId?: string): void => {
 			try {
@@ -661,6 +667,13 @@ export default class IotoDashboardPlugin extends Plugin {
 				new Notice(t("TEMPLATE_CENTER_IMPORT_FAILED"));
 			}
 		};
+		if (
+			targetDashboardId &&
+			dashboards.some((dashboard) => dashboard.id === targetDashboardId)
+		) {
+			apply(targetDashboardId);
+			return;
+		}
 		if (dashboards.length <= 1) {
 			apply(dashboards[0]?.id);
 			return;

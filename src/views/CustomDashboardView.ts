@@ -703,6 +703,12 @@ export class CustomDashboardView extends ItemView {
 		const manage = toolbar.createDiv({ cls: "ioto-dashboard-manage" });
 		this.addIconToolbarButton(
 			manage,
+			"layout-template",
+			t("TEMPLATE_CENTER_TITLE"),
+			() => this.plugin.openTemplateCenter(this.activeDashboard?.id),
+		);
+		this.addIconToolbarButton(
+			manage,
 			"list-filter",
 			t("DASHBOARD_MANAGE_QUERIES"),
 			() => this.openQueryManager(),
@@ -2071,6 +2077,14 @@ export class CustomDashboardView extends ItemView {
 					void this.plugin.aiRunsSource?.tick();
 					void this.plugin.aiScheduleSource?.tick();
 				}),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(t("TEMPLATE_CENTER_TITLE"))
+				.setIcon("layout-template")
+				.onClick(() =>
+					this.plugin.openTemplateCenter(this.activeDashboard?.id),
+				),
 		);
 		menu.addItem((item) =>
 			item
