@@ -214,6 +214,44 @@ const TRANSIENT_CLASSES = [
 /** 查看态自带的操作按钮：导出图是成品，不该出现演示/编辑入口。 */
 const TRANSIENT_CONTROLS = [".ioto-card-zoom"];
 
+/** 放大态 Modal 根类名（导出宿主进入等效放大态上下文时补挂）。 */
+const ZOOM_MODAL_CLASS = "ioto-dashboard-modal--component-zoom";
+
+/**
+ * 拼装离屏导出宿主的类名（纯函数，便于单测逐字符断言）。
+ *
+ * - 非放大态（网格态 / 整页链）：``${viewRootClass} is-exporting ioto-dashboard-export-host``，
+ *   与既有实现逐字符一致，结构性保证两条既有链路零回归。
+ * - 放大态：宿主只承载视图根类与导出瞬时类，**不再合写** `--component-zoom`。放大态的布局规则
+ *   全是「modal 祖先 + 舞台中间层」的后代选择器，扁平宿主一条都命中不了，故改由
+ *   {@link buildExportHostLayers} 产出三层壳后逐层包装，让规则原样命中。
+ */
+export function buildExportHostClassNames(
+	viewRootClass: string,
+	fromZoom: boolean,
+): string {
+	const transient = "is-exporting ioto-dashboard-export-host";
+	if (!fromZoom) {
+		return `${viewRootClass} ${transient}`;
+	}
+	return `ioto-custom-dashboard-view ${transient}`;
+}
+
+/**
+ * 放大态导出的中间层类名（由外到内），逐层复刻实时放大层的 DOM 层级：
+ * `host > modal 壳 > stage 壳 > 卡片克隆`。舞台壳与实时舞台同名同类，
+ * 卡片因此成为 `stage` 的直接子元素，放大态规则（含 `stage > card`）得以命中。
+ * 非放大态返回空数组，保持 `host > clone` 的单层结构。
+ */
+export function buildExportHostLayers(fromZoom: boolean): string[] {
+	return fromZoom
+		? [
+				ZOOM_MODAL_CLASS,
+				"ioto-custom-dashboard-view ioto-dashboard-zoom__stage",
+			]
+		: [];
+}
+
 /**
  * 把当前页网格拍成**一张长图**（按内容全高一次出图，无滚动 / 拼接）。
  *
@@ -228,7 +266,13 @@ const TRANSIENT_CONTROLS = [".ioto-card-zoom"];
  */
 export async function captureDashboardPageCanvas(
 	gridEl: HTMLElement,
-	opts: { width: number; desiredScale: number; backgroundColor: string },
+	opts: {
+		width: number;
+		desiredScale: number;
+		backgroundColor: string;
+		/** 目标是否来自放大层：true 时宿主补挂放大态类，解锁规则生效（默认 false）。 */
+		fromZoom?: boolean;
+	},
 ): Promise<CaptureResult> {
 	const width = Math.max(1, Math.round(opts.width));
 	const viewRoot =
@@ -237,7 +281,11 @@ export async function captureDashboardPageCanvas(
 	const host = doc.createElement("div");
 	// 复刻视图根类名 + 挂 `is-exporting`（让 styles.css 的导出瞬间规则作用在克隆上：禁用过渡
 	// 与动画、抹掉光标）。新树不跑 transition，天然避开「过渡旧值入图」。
-	host.className = `${viewRoot.className} is-exporting ioto-dashboard-export-host`;
+	// 放大态来源时由下面逐层包壳复刻 modal / stage 层级，宿主体本身不再合写两类。
+	host.className = buildExportHostClassNames(
+		viewRoot.className,
+		opts.fromZoom === true,
+	);
 	host.setAttribute(
 		"style",
 		// 中和视图根类自带的 padding/height/overflow：宿主宽度就是 grid 的实际宽度，
@@ -251,7 +299,14 @@ export async function captureDashboardPageCanvas(
 	for (const selector of TRANSIENT_CONTROLS) {
 		clone.querySelectorAll(selector).forEach((el) => el.remove());
 	}
-	host.appendChild(clone);
+	let parent: HTMLElement = host;
+	for (const layerClass of buildExportHostLayers(opts.fromZoom === true)) {
+		const layer = doc.createElement("div");
+		layer.className = layerClass;
+		parent.appendChild(layer);
+		parent = layer;
+	}
+	parent.appendChild(clone);
 	doc.body.appendChild(host);
 
 	try {

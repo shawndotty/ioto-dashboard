@@ -1790,13 +1790,23 @@ export class CustomDashboardView extends ItemView {
 				1,
 				Math.round(opts.targetEl.getBoundingClientRect().width),
 			);
-			const backgroundColor = resolveExportBackground(this.contentEl);
+			// 是否来自放大层：放大态卡片同样由 createCard 渲染、走同一 contextmenu，
+			// 用 closest 判定天然覆盖两个右键入口，无需分别处理。
+			const fromZoom =
+				opts.targetEl.closest(".ioto-dashboard-modal--component-zoom") !==
+				null;
+			// 放大态下卡片压在舞台的 --background-primary 上；沿 targetEl 解析底衬，修掉
+			// 「网格态底 + 放大态卡背不一致时四周留白错色」。页面链与非放大组件链沿用 contentEl。
+			const backgroundColor = resolveExportBackground(
+				fromZoom ? opts.targetEl : this.contentEl,
+			);
 			const desiredScale = clampExportScale(DEFAULT_EXPORT_SCALE);
 
 			const result = await captureDashboardPageCanvas(opts.targetEl, {
 				width,
 				desiredScale,
 				backgroundColor,
+				fromZoom,
 			});
 			const canvas = opts.withHeader
 				? composePageHeader(result.canvas, {

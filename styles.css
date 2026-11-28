@@ -6523,6 +6523,7 @@ body.is-mobile .ioto-pages-handle {
 .ioto-dashboard-modal--component-zoom .ioto-dashboard-zoom__label {
     min-width: 0;
     font-weight: 600;
+    font-size: var(--font-ui-small);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -6532,13 +6533,13 @@ body.is-mobile .ioto-pages-handle {
     flex: 0 0 auto;
     font-variant-numeric: tabular-nums;
     color: var(--text-muted);
-    font-size: 0.85em;
+    font-size: var(--font-ui-smaller);
 }
 
 .ioto-dashboard-modal--component-zoom .ioto-dashboard-zoom__hint {
     flex: 0 0 auto;
     color: var(--text-faint);
-    font-size: 0.8em;
+    font-size: var(--font-ui-smaller);
 }
 
 /* ---- 放大态：安全居中 ---- */
@@ -6604,27 +6605,11 @@ body.is-mobile .ioto-pages-handle {
     max-width: 1680px;
 }
 
-/* ---- 放大态：去重标题，卡片头压成右对齐控件行 ---- */
+/* ---- 放大态：保留卡片标题 ---- */
 
-/* 标题由 Modal 标题条（.ioto-dashboard-zoom__label）承担，这里去掉第二条标题。
-   hideTitle 卡片本就没有标题节点，规则对其幂等。 */
-.ioto-dashboard-modal--component-zoom
-    .ioto-dashboard-zoom__stage
-    > .ioto-dashboard-card
-    > .ioto-dashboard-card-header
-    .ioto-dashboard-card-title {
-    display: none;
-}
-
-.ioto-dashboard-modal--component-zoom
-    .ioto-dashboard-zoom__stage
-    > .ioto-dashboard-card
-    > .ioto-dashboard-card-header:not(.is-title-overlay) {
-    justify-content: flex-end;
-    padding-block: 4px;
-    border-bottom: 0;
-    background: none;
-}
+/* 早期为给 Modal 标题条让位而隐藏卡片标题；现按需求恢复，
+   头部外观回落到通用规则（:832-839 头部、:900-909 标题）。
+   开启 hideTitle 的卡片本就没有标题节点，天然不受影响。 */
 
 /* ---- 放大态排版（L2）：字号随屏幕高度走，行内间距改用 em ---- */
 
@@ -6761,3 +6746,69 @@ body.is-mobile .ioto-pages-handle {
         opacity: 0;
     }
 }
+
+/* ==========================================================================
+   放大态导出：解锁视口锁高与滚动面
+   只作用于「等效放大态」的离屏导出宿主。宿主结构已复刻实时放大层：
+   `export-host > modal 壳 > stage 壳 > 卡片克隆`，放大态规则因此原样命中。
+   网格态 / 整页导出宿主为 `host > 卡片` 单层结构、无 `--component-zoom` 祖先，
+   天然零命中、零回归。html-to-image 把实时已用 height / overflow / auto 外边距
+   内联到了 style 属性上，普通 CSS 覆盖不掉，全部走 `!important`。
+   容器卡（.is-container）与 base 卡刻意不解锁：沿用「只拍可见部分 + partial 提示」既有口径，
+   排除选择器与放大态 overflow 规则（:6516-6521）保持字面一致。
+   ========================================================================== */
+
+/* 卡片：解锁被视口锁死的高度 / 封顶 / 贴合残留，改由内容全高决定。
+   flex:0 0 auto + margin-block:0 归零白名单卡在非 flex 舞台上下文下的残留。 */
+.ioto-dashboard-export-host
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card:not(.is-container):not([data-component-type="base"]) {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    align-self: auto !important;
+    margin-block: 0 !important;
+}
+
+/* 正文：把滚动面解锁为可见，同时修掉「复制前正文已滚到中段、出图从中段开始、顶部丢失」。 */
+.ioto-dashboard-export-host
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card:not(.is-container):not([data-component-type="base"])
+    > .ioto-dashboard-card-body {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+/* 正文首尾 auto 外边距（放大态用于滚动容器内居中）在独立宿主下会内联成固定 px、
+   把内容顶下去留顶部空白；一律归零，让内容从头贴起。 */
+.ioto-dashboard-export-host
+    .ioto-dashboard-zoom__stage
+    > .ioto-dashboard-card
+    > .ioto-dashboard-card-body
+    > :is(:first-child, :last-child) {
+    margin-block-start: 0 !important;
+    margin-block-end: 0 !important;
+}
+
+/* ==========================================================================
+   放大态导出：中和复刻壳的外壳
+   stage 壳与实时舞台同名同类，会继承 `.ioto-custom-dashboard-view` 的
+   height / overflow / padding 与舞台的 padding / 滚动 / 底色 / 居中。
+   导出无视口、无滚动，全部中和为「按内容自然铺开」。规则置于文件末尾，
+   保证覆盖 :6495 起的舞台规则。仅以 `.ioto-dashboard-export-host` 开头，
+   实时放大层不带该类，零影响。
+   ========================================================================== */
+
+.ioto-dashboard-export-host .ioto-dashboard-zoom__stage {
+    display: block !important;
+    flex: none !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+}
+

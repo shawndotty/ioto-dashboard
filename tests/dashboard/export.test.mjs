@@ -4,6 +4,8 @@ import { load } from '../data/helpers.mjs';
 
 const {
 	buildExportFileName,
+	buildExportHostClassNames,
+	buildExportHostLayers,
 	clampExportScale,
 	composePageHeader,
 	computeCanvasScaleLimit,
@@ -139,3 +141,53 @@ test('SVG_INLINE_PROPS: 无重复且每项均为合法的 kebab-case 属性名',
 		assert.match(prop, /^[a-z]+(-[a-z]+)*$/);
 	}
 });
+
+test('buildExportHostClassNames: 非放大态逐字符等于既有实现（网格/整页零回归）', () => {
+	const viewRootClass = 'ioto-custom-dashboard-view';
+	assert.equal(
+		buildExportHostClassNames(viewRootClass, false),
+		`${viewRootClass} is-exporting ioto-dashboard-export-host`,
+	);
+	// 视图根带额外修饰类时原样透传，不丢不改。
+	assert.equal(
+		buildExportHostClassNames('ioto-custom-dashboard-view zen-mode', false),
+		'ioto-custom-dashboard-view zen-mode is-exporting ioto-dashboard-export-host',
+	);
+});
+
+test('buildExportHostClassNames: 放大态只带视图根与导出瞬时类，不再合写放大态类', () => {
+	const stageClass = 'ioto-custom-dashboard-view ioto-dashboard-zoom__stage';
+	const out = buildExportHostClassNames(stageClass, true);
+	const tokens = out.split(/\s+/);
+	for (const token of [
+		'ioto-custom-dashboard-view',
+		'is-exporting',
+		'ioto-dashboard-export-host',
+	]) {
+		assert.ok(tokens.includes(token), `缺少 ${token}`);
+	}
+	assert.ok(
+		!tokens.includes('ioto-dashboard-modal--component-zoom'),
+		'放大态类改由分层函数承载，宿主不再合写',
+	);
+	assert.ok(
+		!tokens.includes('ioto-dashboard-zoom__stage'),
+		'舞台类改由分层函数承载，宿主不再合写',
+	);
+});
+
+test('buildExportHostLayers: 非放大态无中间层（host > clone 单层结构不变）', () => {
+	assert.deepEqual(buildExportHostLayers(false), []);
+});
+
+test('buildExportHostLayers: 放大态复刻 modal > stage 两层，卡片可作 stage 直接子元素', () => {
+	const layers = buildExportHostLayers(true);
+	assert.deepEqual(layers, [
+		'ioto-dashboard-modal--component-zoom',
+		'ioto-custom-dashboard-view ioto-dashboard-zoom__stage',
+	]);
+	const stageTokens = layers[1].split(/\s+/);
+	assert.ok(stageTokens.includes('ioto-custom-dashboard-view'));
+	assert.ok(stageTokens.includes('ioto-dashboard-zoom__stage'));
+});
+
